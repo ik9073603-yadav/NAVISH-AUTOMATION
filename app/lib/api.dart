@@ -85,4 +85,74 @@ class Api {
     if (res.statusCode != 200) throw Exception('Failed to load notifications');
     return jsonDecode(res.body);
   }
+  static Future<List<dynamic>> users() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/users'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load users');
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> addUser({
+    required String name,
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/users'),
+      headers: _headers,
+      body: jsonEncode({
+        'name': name,
+        'email': email,
+        'password': password,
+        'role': role,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to add user');
+    }
+  }
+
+  static Future<void> createTask({
+    required String title,
+    String? description,
+    required List<String> assigneeIds,
+    required DateTime dueAt,
+    required String priority,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/tasks/bulk'),
+      headers: _headers,
+      body: jsonEncode({
+        'title': title,
+        if (description != null && description.isNotEmpty) 'description': description,
+        'assigneeIds': assigneeIds,
+        'dueAt': dueAt.toUtc().toIso8601String(),
+        'priority': priority,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to create task');
+    }
+  }
+
+  static Future<List<dynamic>> allTasks() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/tasks/all'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load tasks');
+    return jsonDecode(res.body);
+  }
+
+  static Future<List<dynamic>> stats() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/tasks/stats'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load stats');
+    return jsonDecode(res.body);
+  }
 }

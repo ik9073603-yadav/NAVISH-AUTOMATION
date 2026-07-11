@@ -116,3 +116,96 @@ taskRouter.get('/notifications', async (req, res, next) => {
     res.json(items);
   } catch (err) { next(err); }
 });
+
+// Owner/Manager: company ke saare tasks
+taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const tasks = await prisma.task.findMany({
+      where: { orgId: req.user!.orgId },
+      orderBy: { createdAt: 'desc' },
+      take: 100,
+    });
+
+    // Assignee ke naam bhi bhejo
+    const users = await prisma.user.findMany({
+      where: { orgId: req.user!.orgId },
+      select: { id: true, name: true },
+    });
+    const nameById = Object.fromEntries(users.map(u => [u.id, u.name]));
+
+    res.json(tasks.map(t => ({ ...t, assigneeName: nameById[t.assigneeId] ?? 'Unknown' })));
+  } catch (err) { next(err); }
+});
+
+// Bulk assign — ek command, kai log (Feature 124)
+taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const schema = z.object({
+      title: z.string().min(2),
+      description: z.string().optional(),
+      assigneeIds: z.array(z.string().uuid()).min(1),
+      dueAt: z.string().datetime().optional(),
+      priority: z.enum(['HIGH', 'NORMAL', 'LOW']).optional(),
+    });
+    const parsed = schema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed' });
+
+    const { orgId, userId } = req.user!;
+    const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : null;
+
+    const valid = await prisma.user.findMany({
+      where: { id: { in: parsed.data.assigneeIds }, orgId },
+      select: { id: true },
+    });
+
+    const created = await Promise.all(valid.map(u =>
+      prisma.task.create({
+        data: {
+          orgId,
+          title: parsed.data.title,
+          description: parsed.data.description,
+          assigneeId: u.id,
+          createdById: userId,
+          dueAt,
+          priority: parsed.data.priority ?? 'NORMAL',
+          nextActionAt: computeFirstAction(dueAt),
+        },
+      })
+    ));
+
+    res.status(201).json({ created: created.length, tasks: created });
+  } catch (err) { next(err); }
+});
+
+// Employee performance (Feature 69)
+taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const orgId = req.user!.orgId;
+    const users = await prisma.user.findMany({
+      where: { orgId, status: 'ACTIVE' },
+      select: { id: true, name: true },
+    });
+
+    const stats = await Promise.all(users.map(async (u) => {
+      const [total, done, escalated] = await Promise.all([
+        prisma.task.count({ where: { orgId, assigneeId: u.id } }),
+        prisma.task.count({ where: { orgId, assigneeId: u.id, status: 'DONE' } }),
+        prisma.task.count({ where: { orgId, assigneeId: u.id, escalatedAt: { not: null } } }),
+      ]);
+      const onTime = await prisma.task.count({
+        where: { orgId, assigneeId: u.id, status: 'DONE', escalatedAt: null },
+      });
+      return {
+        userId: u.id,
+        name: u.name,
+        total,
+        done,
+        pending: total - done,
+        escalated,
+        onTimePct: done > 0 ? Math.round((onTime / done) * 100) : 0,
+      };
+    }));
+
+    res.json(stats.filter(s => s.total > 0));
+  } catch (err) { next(err); }
+});

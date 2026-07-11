@@ -4,10 +4,12 @@ import { authRouter } from './modules/auth/auth.routes';
 import { taskRouter } from './modules/task/task.route';
 import { startScheduler } from './modules/engine/engine.worker';
 import cors from 'cors';
+import { userRouter } from './modules/user/user.routes';
 
 const app = express();
 app.use(express.json());
 app.use(cors());
+app.use('/api/users', userRouter);
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'navish-backend', time: new Date().toISOString() });

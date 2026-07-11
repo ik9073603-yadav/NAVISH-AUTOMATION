@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'owner.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -122,6 +123,7 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _notifs = [];
   bool _loading = true;
   int _tab = 0;
+  bool get _isOwner => _user?['role'] == 'OWNER' || _user?['role'] == 'MANAGER';
 
   @override
   void initState() {
@@ -177,7 +179,9 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _tab == 0 ? _tasksView() : _notifsView(),
+      body: _isOwner
+          ? (_tab == 0 ? const OwnerScreen() : _notifsView())
+          : (_tab == 0 ? _tasksView() : _notifsView()),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
