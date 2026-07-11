@@ -155,4 +155,48 @@ class Api {
     if (res.statusCode != 200) throw Exception('Failed to load stats');
     return jsonDecode(res.body);
   }
+
+  static Future<List<dynamic>> checklists() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/checklists'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load checklists');
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> createChecklist({
+    required String title,
+    required String assigneeId,
+    required String recurrence,
+    required String timeOfDay,
+    int? weekday,
+    int? dayOfMonth,
+    String priority = 'NORMAL',
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/checklists'),
+      headers: _headers,
+      body: jsonEncode({
+        'title': title,
+        'assigneeId': assigneeId,
+        'recurrence': recurrence,
+        'timeOfDay': timeOfDay,
+        if (weekday != null) 'weekday': weekday,
+        if (dayOfMonth != null) 'dayOfMonth': dayOfMonth,
+        'priority': priority,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to create checklist');
+    }
+  }
+
+  static Future<void> toggleChecklist(String id) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/checklists/$id/toggle'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to toggle');
+  }
 }

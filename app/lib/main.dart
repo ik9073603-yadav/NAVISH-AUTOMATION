@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'owner.dart';
+import 'checklist.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -180,15 +181,21 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isOwner
-          ? (_tab == 0 ? const OwnerScreen() : _notifsView())
-          : (_tab == 0 ? _tasksView() : _notifsView()),
+          ? [const OwnerScreen(), const ChecklistScreen(), _notifsView()][_tab]
+          : [_tasksView(), _notifsView()][_tab],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.checklist), label: 'Tasks'),
-          NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
-        ],
+        destinations: _isOwner
+            ? const [
+                NavigationDestination(icon: Icon(Icons.list_alt), label: 'Tasks'),
+                NavigationDestination(icon: Icon(Icons.event_repeat), label: 'Checklists'),
+                NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
+              ]
+            : const [
+                NavigationDestination(icon: Icon(Icons.checklist), label: 'Tasks'),
+                NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
+              ],
       ),
     );
   }

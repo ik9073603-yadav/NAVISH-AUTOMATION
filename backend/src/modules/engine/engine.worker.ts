@@ -3,6 +3,7 @@ import { redis } from '../../lib/redis';
 import { prisma } from '../../lib/prisma';
 import { chaseTask, escalateTask } from './engine.service';
 import { MAX_CHASES_BEFORE_ESCALATE } from './engine.config';
+import { fireDueChecklists } from '../checklist/checklist.service';
 
 export const taskQueue = new Queue('task-actions', { connection: redis });
 
@@ -20,6 +21,7 @@ new Worker(
 // SCHEDULER: har 30 sec — "kiska time aa gaya?"
 export function startScheduler() {
   setInterval(async () => {
+    await fireDueChecklists();
     const due = await prisma.task.findMany({
       where: {
         nextActionAt: { lte: new Date() },
