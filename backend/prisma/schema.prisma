@@ -1,0 +1,98 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  OWNER
+  MANAGER
+  EMPLOYEE
+}
+
+enum AccountStatus {
+  INVITED
+  ACTIVE
+  DEACTIVATED
+}
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  industry  String?
+  timezone  String   @default("Asia/Kolkata")
+  gstin     String?
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users       User[]
+  departments Department[]
+
+  @@map("organizations")
+}
+
+model Department {
+  id     String @id @default(uuid())
+  orgId  String
+  name   String
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  users        User[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+  @@map("departments")
+}
+
+model User {
+  id           String        @id @default(uuid())
+  orgId        String
+  name         String
+  email        String
+  phone        String?
+  passwordHash String
+  role         Role          @default(EMPLOYEE)
+  status       AccountStatus @default(ACTIVE)
+  managerId    String?
+  departmentId String?
+  photoUrl     String?
+  language     String        @default("en")
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  department   Department?  @relation(fields: [departmentId], references: [id])
+  manager      User?        @relation("ManagerChain", fields: [managerId], references: [id])
+  reports      User[]       @relation("ManagerChain")
+
+  @@unique([orgId, email])
+  @@index([orgId])
+  @@index([managerId])
+  @@map("users")
+}
+
+model ActivityLog {
+  id        String   @id @default(uuid())
+  orgId     String
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  meta      Json?
+  createdAt DateTime @default(now())
+
+  @@index([orgId, createdAt])
+  @@map("activity_logs")
+}
