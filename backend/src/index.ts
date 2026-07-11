@@ -1,6 +1,8 @@
 import express, { NextFunction, Request, Response } from 'express';
 import { env } from './lib/env';
 import { authRouter } from './modules/auth/auth.routes';
+import { taskRouter } from './modules/task/task.route';
+import { startScheduler } from './modules/engine/engine.worker';
 
 const app = express();
 app.use(express.json());
@@ -10,6 +12,7 @@ app.get('/health', (_req, res) => {
 });
 
 app.use('/api/auth', authRouter);
+app.use('/api/tasks', taskRouter);
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
@@ -29,4 +32,5 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(env.PORT, () => {
   console.log(`Navish backend running on http://localhost:${env.PORT}`);
+  startScheduler();   // ← yeh add karo
 });

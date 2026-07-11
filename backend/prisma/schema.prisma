@@ -96,3 +96,64 @@ model ActivityLog {
   @@index([orgId, createdAt])
   @@map("activity_logs")
 }
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  STUCK
+  DONE
+  CANCELLED
+}
+
+enum TaskSource {
+  DELEGATION
+  CHECKLIST
+  FMS_STAGE
+  INVENTORY_ALERT
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  orgId       String
+  title       String
+  description String?
+  source      TaskSource @default(DELEGATION)
+  status      TaskStatus @default(PENDING)
+  priority    String     @default("NORMAL")
+
+  assigneeId  String
+  createdById String
+
+  dueAt        DateTime?
+  completedAt  DateTime?
+  stuckReason  String?
+
+  // The engine's brain:
+  nextActionAt   DateTime?
+  chaseCount     Int       @default(0)
+  escalatedAt    DateTime?
+  escalatedToId  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orgId, status])
+  @@index([nextActionAt])
+  @@index([assigneeId, status])
+  @@map("tasks")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  type      String
+  title     String
+  body      String
+  taskId    String?
+  readAt    DateTime?
+  createdAt DateTime @default(now())
+
+  @@index([orgId, userId, createdAt])
+  @@map("notifications")
+}
