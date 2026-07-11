@@ -3,9 +3,11 @@ import { env } from './lib/env';
 import { authRouter } from './modules/auth/auth.routes';
 import { taskRouter } from './modules/task/task.route';
 import { startScheduler } from './modules/engine/engine.worker';
+import cors from 'cors';
 
 const app = express();
 app.use(express.json());
+app.use(cors());
 
 app.get('/health', (_req, res) => {
   res.json({ status: 'ok', service: 'navish-backend', time: new Date().toISOString() });
@@ -13,6 +15,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/tasks', taskRouter);
+
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
 
