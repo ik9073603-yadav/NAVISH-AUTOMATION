@@ -192,3 +192,107 @@ model ChecklistRule {
   @@index([nextFireAt])
   @@map("checklist_rules")
 }
+
+enum FieldType {
+  TEXT
+  NUMBER
+  DROPDOWN
+  DATE
+  PHOTO
+  YESNO
+}
+
+enum OrderStatus {
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+model Flow {
+  id          String   @id @default(uuid())
+  orgId       String
+  name        String
+  prefix      String   @default("ORD")   // order number: ORD-001
+  itemLabel   String   @default("Item")
+  active      Boolean  @default(true)
+  orderCount  Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  stages StageDef[]
+  orders Order[]
+
+  @@index([orgId])
+  @@map("flows")
+}
+
+model StageDef {
+  id            String  @id @default(uuid())
+  orgId         String
+  flowId        String
+  name          String
+  sequence      Int                      // 1, 2, 3...
+  responsibleId String?                  // kaun karega
+  plannedMins   Int?                     // kitna time lagna chahiye
+
+  flow   Flow       @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  fields FieldDef[]
+
+  @@index([flowId, sequence])
+  @@map("stage_defs")
+}
+
+model FieldDef {
+  id       String    @id @default(uuid())
+  orgId    String
+  stageId  String
+  label    String
+  type     FieldType @default(TEXT)
+  required Boolean   @default(false)
+  options  String?                     // DROPDOWN ke liye: "A,B,C"
+  sequence Int       @default(0)
+
+  stage StageDef @relation(fields: [stageId], references: [id], onDelete: Cascade)
+
+  @@index([stageId])
+  @@map("field_defs")
+}
+
+model Order {
+  id          String      @id @default(uuid())
+  orgId       String
+  flowId      String
+  orderNumber String
+  status      OrderStatus @default(ACTIVE)
+
+  currentStageId String?
+  startedAt      DateTime  @default(now())
+  completedAt    DateTime?
+
+  flow   Flow            @relation(fields: [flowId], references: [id], onDelete: Cascade)
+  stages OrderStage[]
+
+  @@unique([orgId, orderNumber])
+  @@index([orgId, status])
+  @@map("orders")
+}
+
+model OrderStage {
+  id        String    @id @default(uuid())
+  orgId     String
+  orderId   String
+  stageId   String
+  sequence  Int
+
+  taskId       String?     // engine ka task
+  enteredAt    DateTime?   // kab yahan aaya
+  completedAt  DateTime?
+  completedById String?
+  data         Json?       // custom fields ka data
+  delayMins    Int?        // planned vs actual
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, orderId])
+  @@index([stageId])
+  @@map("order_stages")
+}

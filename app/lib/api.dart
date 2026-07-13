@@ -199,4 +199,71 @@ class Api {
     );
     if (res.statusCode != 200) throw Exception('Failed to toggle');
   }
+
+  static Future<List<dynamic>> flows() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/fms/flows'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load flows');
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> createFlow({
+    required String name,
+    required String prefix,
+    required String itemLabel,
+    required List<Map<String, dynamic>> stages,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/fms/flows'),
+      headers: _headers,
+      body: jsonEncode({
+        'name': name,
+        'prefix': prefix,
+        'itemLabel': itemLabel,
+        'stages': stages,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to create flow');
+    }
+  }
+
+  static Future<void> createOrder(String flowId) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/fms/flows/$flowId/orders'),
+      headers: _headers,
+    );
+    if (res.statusCode != 201) throw Exception('Failed to create order');
+  }
+
+  static Future<List<dynamic>> orders() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/fms/orders'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load orders');
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> completeStage(String orderStageId, Map<String, dynamic> data) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/fms/orderstages/$orderStageId/complete'),
+      headers: _headers,
+      body: jsonEncode({'data': data}),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to complete stage');
+    }
+  }
+
+  static Future<List<dynamic>> bottlenecks() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/fms/bottlenecks'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load bottlenecks');
+    return jsonDecode(res.body);
+  }
 }
