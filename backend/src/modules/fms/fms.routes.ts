@@ -158,6 +158,8 @@ fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
     });
 
     const data = (req.body?.data ?? {}) as Record<string, any>;
+    const remarks = req.body?.remarks as string | undefined;
+    if (remarks) data.__remarks = remarks;
 
     // Required fields check
     for (const f of stageDef?.fields ?? []) {

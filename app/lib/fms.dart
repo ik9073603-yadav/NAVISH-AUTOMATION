@@ -1,5 +1,8 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
 import 'api.dart';
+import 'order_history.dart';
 
 class FmsScreen extends StatefulWidget {
   const FmsScreen({super.key});
@@ -111,6 +114,15 @@ class _FmsScreenState extends State<FmsScreen> {
           final delayed = o['delayed'] == true;
           return Card(
             child: ListTile(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => OrderHistoryScreen(
+                    orderId: o['id'] as String,
+                    orderNumber: o['orderNumber'] as String,
+                  ),
+                ),
+              ),
               leading: Icon(
                 done
                     ? Icons.check_circle
@@ -222,7 +234,7 @@ class _FmsScreenState extends State<FmsScreen> {
           );
     final fields = stage == null ? [] : (stage['fields'] as List);
 
-    final data = await showModalBottomSheet<Map<String, dynamic>>(
+    final result = await showModalBottomSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _StageFormSheet(
@@ -231,10 +243,14 @@ class _FmsScreenState extends State<FmsScreen> {
         fields: fields,
       ),
     );
-    if (data == null) return;
+    if (result == null) return;
 
     try {
-      await Api.completeStage(o['orderStageId'], data);
+      await Api.completeStage(
+        o['orderStageId'],
+        result['data'] as Map<String, dynamic>,
+        remarks: result['remarks'] as String?,
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Stage done. Order moved forward.')),
@@ -275,6 +291,33 @@ class _StageFormSheet extends StatefulWidget {
 
 class _StageFormSheetState extends State<_StageFormSheet> {
   final Map<String, dynamic> _data = {};
+  final _remarks = TextEditingController();
+  String? _uploadingField;
+
+  List<String> _photoList(String label) =>
+      _data.putIfAbsent(label, () => <String>[]) as List<String>;
+
+  Future<void> _addPhotos(String label) async {
+    final picker = ImagePicker();
+    final files = await picker.pickMultiImage();
+    if (files.isEmpty) return;
+
+    setState(() => _uploadingField = label);
+    try {
+      final urls = _photoList(label);
+      for (final f in files) {
+        final Uint8List bytes = await f.readAsBytes();
+        final url = await Api.uploadImage(bytes, f.name);
+        urls.add(url);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    } finally {
+      if (mounted) setState(() => _uploadingField = null);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -308,6 +351,66 @@ class _StageFormSheetState extends State<_StageFormSheet> {
                   title: Text('$label${req ? " *" : ""}'),
                   value: _data[label] == true,
                   onChanged: (v) => setState(() => _data[label] = v),
+                );
+              }
+
+              if (type == 'PHOTO') {
+                final urls = _photoList(label);
+                final uploading = _uploadingField == label;
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('$label${req ? " *" : ""}'),
+                      const SizedBox(height: 8),
+                      if (urls.isNotEmpty)
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: urls.map((url) {
+                            return Stack(
+                              clipBehavior: Clip.none,
+                              children: [
+                                ClipRRect(
+                                  borderRadius: BorderRadius.circular(8),
+                                  child: Image.network(
+                                    url,
+                                    width: 72,
+                                    height: 72,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                Positioned(
+                                  top: -8,
+                                  right: -8,
+                                  child: GestureDetector(
+                                    onTap: () => setState(() => urls.remove(url)),
+                                    child: const CircleAvatar(
+                                      radius: 10,
+                                      backgroundColor: Colors.red,
+                                      child: Icon(Icons.close, size: 14, color: Colors.white),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            );
+                          }).toList(),
+                        ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: uploading ? null : () => _addPhotos(label),
+                        icon: uploading
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.add_a_photo, size: 18),
+                        label: Text(uploading ? 'Uploading...' : 'Add photo'),
+                      ),
+                    ],
+                  ),
                 );
               }
 
@@ -346,9 +449,21 @@ class _StageFormSheetState extends State<_StageFormSheet> {
                 ),
               );
             }),
+            TextField(
+              controller: _remarks,
+              maxLines: 3,
+              decoration: const InputDecoration(
+                labelText: 'Remarks (optional)',
+                hintText: 'Any notes about this stage...',
+                border: OutlineInputBorder(),
+              ),
+            ),
             const SizedBox(height: 16),
             FilledButton(
-              onPressed: () => Navigator.pop(context, _data),
+              onPressed: () => Navigator.pop(context, {
+                'data': _data,
+                'remarks': _remarks.text.trim(),
+              }),
               style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16)),
               child: const Text('Complete stage'),

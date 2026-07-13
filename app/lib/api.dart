@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
@@ -247,15 +248,48 @@ class Api {
     return jsonDecode(res.body);
   }
 
-  static Future<void> completeStage(String orderStageId, Map<String, dynamic> data) async {
+  static Future<void> completeStage(
+    String orderStageId,
+    Map<String, dynamic> data, {
+    String? remarks,
+  }) async {
     final res = await http.post(
       Uri.parse('${Config.apiBase}/api/fms/orderstages/$orderStageId/complete'),
       headers: _headers,
-      body: jsonEncode({'data': data}),
+      body: jsonEncode({
+        'data': data,
+        if (remarks != null && remarks.isNotEmpty) 'remarks': remarks,
+      }),
     );
     if (res.statusCode != 200) {
       throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to complete stage');
     }
+  }
+
+  static Future<String> uploadImage(Uint8List bytes, String filename) async {
+    final req = http.MultipartRequest(
+      'POST',
+      Uri.parse('${Config.apiBase}/api/uploads'),
+    );
+    if (_token != null) req.headers['Authorization'] = 'Bearer $_token';
+    req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+
+    final streamed = await req.send();
+    final res = await http.Response.fromStream(streamed);
+    final decoded = jsonDecode(res.body);
+    if (res.statusCode != 201) {
+      throw Exception(decoded['error'] ?? 'Failed to upload image');
+    }
+    return decoded['url'] as String;
+  }
+
+  static Future<Map<String, dynamic>> orderHistory(String orderId) async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/fms/orders/$orderId/history'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load order history');
+    return jsonDecode(res.body);
   }
 
   static Future<List<dynamic>> bottlenecks() async {

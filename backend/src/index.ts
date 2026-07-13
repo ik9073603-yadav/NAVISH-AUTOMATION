@@ -7,6 +7,7 @@ import cors from 'cors';
 import { userRouter } from './modules/user/user.routes';
 import { checklistRouter } from './modules/checklist/checklist.routes';
 import { fmsRouter } from './modules/fms/fms.routes';
+import { uploadsRouter } from './modules/uploads/uploads.routes';
 
 const app = express();
 app.use(express.json());
@@ -21,6 +22,7 @@ app.get('/health', (_req, res) => {
 
 app.use('/api/auth', authRouter);
 app.use('/api/tasks', taskRouter);
+app.use('/api/uploads', uploadsRouter);
 
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

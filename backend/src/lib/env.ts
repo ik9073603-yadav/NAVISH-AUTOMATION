@@ -10,4 +10,6 @@ export const env = {
   JWT_SECRET: required('JWT_SECRET'),
   JWT_EXPIRES_IN: process.env.JWT_EXPIRES_IN ?? '7d',
   PORT: Number(process.env.PORT ?? 4000),
+  SUPABASE_URL: required('SUPABASE_URL'),
+  SUPABASE_SERVICE_KEY: required('SUPABASE_SERVICE_KEY'),
 };
