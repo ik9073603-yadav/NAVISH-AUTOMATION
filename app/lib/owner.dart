@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'filters.dart';
 
 class OwnerScreen extends StatefulWidget {
   const OwnerScreen({super.key});
@@ -10,8 +11,12 @@ class OwnerScreen extends StatefulWidget {
 class _OwnerScreenState extends State<OwnerScreen> {
   List<dynamic> _tasks = [];
   List<dynamic> _stats = [];
+  List<dynamic> _users = [];
   bool _loading = true;
   int _tab = 0;
+  String _taskStatus = 'ACTIVE';
+  DateRangePreset _datePreset = DateRangePreset.all;
+  String? _assigneeId;
 
   @override
   void initState() {
@@ -22,9 +27,14 @@ class _OwnerScreenState extends State<OwnerScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final tasks = await Api.allTasks();
+      final tasks = await Api.allTasks(
+        status: _taskStatus,
+        from: _datePreset.from,
+        assigneeId: _assigneeId,
+      );
       final stats = await Api.stats();
-      setState(() { _tasks = tasks; _stats = stats; });
+      final users = await Api.users();
+      setState(() { _tasks = tasks; _stats = stats; _users = users; });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -65,9 +75,36 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Widget _tasksView() {
-    if (_tasks.isEmpty) {
-      return const Center(child: Text('No tasks yet. Assign one 👇'));
-    }
+    return Column(
+      children: [
+        FilterBar(
+          status: _taskStatus,
+          onStatusChanged: (s) {
+            setState(() => _taskStatus = s);
+            _load();
+          },
+          datePreset: _datePreset,
+          onDatePresetChanged: (p) {
+            setState(() => _datePreset = p);
+            _load();
+          },
+          users: _users,
+          assigneeId: _assigneeId,
+          onAssigneeChanged: (a) {
+            setState(() => _assigneeId = a);
+            _load();
+          },
+        ),
+        Expanded(
+          child: _tasks.isEmpty
+              ? const Center(child: Text('No tasks yet. Assign one 👇'))
+              : _tasksList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _tasksList() {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(

@@ -296,3 +296,50 @@ model OrderStage {
   @@index([stageId])
   @@map("order_stages")
 }
+
+model Sku {
+  id            String   @id @default(uuid())
+  orgId         String
+  name          String
+  code          String
+  category      String?
+  unit          String   @default("pcs")      // kg / pcs / box / litre — free text
+  imageUrl      String?
+  currentStock  Float    @default(0)
+  minStock      Float?                        // null = no min alert
+  maxStock      Float?                        // null = no max alert
+  unitCost      Float?                        // for stock value in Rupees
+  lastMovedAt   DateTime?                     // drives liquid-vs-dead classification
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  movements StockMovement[]
+
+  @@unique([orgId, code])
+  @@index([orgId, active])
+  @@map("skus")
+}
+
+enum MovementType {
+  IN
+  OUT
+  ADJUST
+}
+
+model StockMovement {
+  id        String       @id @default(uuid())
+  orgId     String
+  skuId     String
+  type      MovementType
+  quantity  Float
+  reason    String?                      // source (IN) / reason (OUT) / note (ADJUST)
+  doneById  String
+  balance   Float                        // running stock AFTER this movement
+  createdAt DateTime     @default(now())
+
+  sku Sku @relation(fields: [skuId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, skuId, createdAt])
+  @@map("stock_movements")
+}

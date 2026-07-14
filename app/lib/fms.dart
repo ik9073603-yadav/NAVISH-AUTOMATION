@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'api.dart';
 import 'order_history.dart';
+import 'filters.dart';
 
 class FmsScreen extends StatefulWidget {
-  const FmsScreen({super.key});
+  final String? currentUserId;
+  final String? role;
+
+  const FmsScreen({super.key, this.currentUserId, this.role});
   @override
   State<FmsScreen> createState() => _FmsScreenState();
 }
@@ -14,8 +18,20 @@ class _FmsScreenState extends State<FmsScreen> {
   List<dynamic> _orders = [];
   List<dynamic> _flows = [];
   List<dynamic> _bottlenecks = [];
+  List<dynamic> _users = [];
   bool _loading = true;
   int _view = 0;
+  String _orderStatus = 'ACTIVE';
+  DateRangePreset _datePreset = DateRangePreset.all;
+  String? _assigneeId;
+
+  // Owner never executes; only the stage's responsible person (or anyone,
+  // if the stage has no assigned responsible) may complete it.
+  bool _canComplete(Map o) {
+    if (widget.role == 'OWNER' || widget.currentUserId == null) return false;
+    final responsibleId = o['responsibleId'];
+    return responsibleId == null || responsibleId == widget.currentUserId;
+  }
 
   @override
   void initState() {
@@ -26,13 +42,19 @@ class _FmsScreenState extends State<FmsScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final o = await Api.orders();
+      final o = await Api.orders(
+        status: _orderStatus,
+        from: _datePreset.from,
+        assigneeId: _assigneeId,
+      );
       final f = await Api.flows();
       final b = await Api.bottlenecks();
+      final u = await Api.users();
       setState(() {
         _orders = o;
         _flows = f;
         _bottlenecks = b;
+        _users = u;
       });
     } catch (e) {
       if (mounted) {
@@ -93,16 +115,45 @@ class _FmsScreenState extends State<FmsScreen> {
   }
 
   Widget _board() {
-    if (_orders.isEmpty) {
-      return Center(
-        child: Text(
-          _flows.isEmpty
-              ? 'No flows yet.\nBuild your process first.'
-              : 'Nothing in progress.\nStart one below.',
-          textAlign: TextAlign.center,
+    return Column(
+      children: [
+        FilterBar(
+          status: _orderStatus,
+          onStatusChanged: (s) {
+            setState(() => _orderStatus = s);
+            _load();
+          },
+          datePreset: _datePreset,
+          onDatePresetChanged: (p) {
+            setState(() => _datePreset = p);
+            _load();
+          },
+          users: _users,
+          assigneeId: _assigneeId,
+          onAssigneeChanged: (a) {
+            setState(() => _assigneeId = a);
+            _load();
+          },
         ),
-      );
-    }
+        Expanded(
+          child: _orders.isEmpty
+              ? Center(
+                  child: Text(
+                    _flows.isEmpty
+                        ? 'No flows yet.\nBuild your process first.'
+                        : (_orderStatus == 'ACTIVE'
+                            ? 'Nothing in progress.\nStart one below.'
+                            : 'Nothing here yet.'),
+                    textAlign: TextAlign.center,
+                  ),
+                )
+              : _ordersList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _ordersList() {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -149,7 +200,7 @@ class _FmsScreenState extends State<FmsScreen> {
                     ),
                 ],
               ),
-              trailing: done || o['orderStageId'] == null
+              trailing: done || o['orderStageId'] == null || !_canComplete(o)
                   ? null
                   : FilledButton(
                       onPressed: () => _completeStage(o),
@@ -823,6 +874,7 @@ class _FieldDialogState extends State<_FieldDialog> {
                 DropdownMenuItem(value: 'DROPDOWN', child: Text('Dropdown')),
                 DropdownMenuItem(value: 'DATE', child: Text('Date')),
                 DropdownMenuItem(value: 'YESNO', child: Text('Yes / No')),
+                DropdownMenuItem(value: 'PHOTO', child: Text('Photo')),
               ],
               onChanged: (v) => setState(() => _type = v!),
             ),

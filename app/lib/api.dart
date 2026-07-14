@@ -31,6 +31,22 @@ class Api {
         if (_token != null) 'Authorization': 'Bearer $_token',
       };
 
+  // Shared ?status=&from=&to=&assigneeId= builder for the list endpoints.
+  static Uri _listUri(
+    String path, {
+    String status = 'ACTIVE',
+    DateTime? from,
+    DateTime? to,
+    String? assigneeId,
+  }) {
+    return Uri.parse('${Config.apiBase}$path').replace(queryParameters: {
+      'status': status,
+      if (from != null) 'from': from.toUtc().toIso8601String(),
+      if (to != null) 'to': to.toUtc().toIso8601String(),
+      if (assigneeId != null) 'assigneeId': assigneeId,
+    });
+  }
+
   static Future<Map<String, dynamic>> login(String email, String password) async {
     final res = await http.post(
       Uri.parse('${Config.apiBase}/api/auth/login'),
@@ -52,9 +68,13 @@ class Api {
     return jsonDecode(res.body);
   }
 
-  static Future<List<dynamic>> myTasks() async {
+  static Future<List<dynamic>> myTasks({
+    String status = 'ACTIVE',
+    DateTime? from,
+    DateTime? to,
+  }) async {
     final res = await http.get(
-      Uri.parse('${Config.apiBase}/api/tasks/my'),
+      _listUri('/api/tasks/my', status: status, from: from, to: to),
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load tasks');
@@ -139,9 +159,14 @@ class Api {
     }
   }
 
-  static Future<List<dynamic>> allTasks() async {
+  static Future<List<dynamic>> allTasks({
+    String status = 'ACTIVE',
+    DateTime? from,
+    DateTime? to,
+    String? assigneeId,
+  }) async {
     final res = await http.get(
-      Uri.parse('${Config.apiBase}/api/tasks/all'),
+      _listUri('/api/tasks/all', status: status, from: from, to: to, assigneeId: assigneeId),
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load tasks');
@@ -157,9 +182,14 @@ class Api {
     return jsonDecode(res.body);
   }
 
-  static Future<List<dynamic>> checklists() async {
+  static Future<List<dynamic>> checklists({
+    String status = 'ACTIVE',
+    DateTime? from,
+    DateTime? to,
+    String? assigneeId,
+  }) async {
     final res = await http.get(
-      Uri.parse('${Config.apiBase}/api/checklists'),
+      _listUri('/api/checklists', status: status, from: from, to: to, assigneeId: assigneeId),
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load checklists');
@@ -239,9 +269,14 @@ class Api {
     if (res.statusCode != 201) throw Exception('Failed to create order');
   }
 
-  static Future<List<dynamic>> orders() async {
+  static Future<List<dynamic>> orders({
+    String status = 'ACTIVE',
+    DateTime? from,
+    DateTime? to,
+    String? assigneeId,
+  }) async {
     final res = await http.get(
-      Uri.parse('${Config.apiBase}/api/fms/orders'),
+      _listUri('/api/fms/orders', status: status, from: from, to: to, assigneeId: assigneeId),
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load orders');
@@ -298,6 +333,95 @@ class Api {
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load bottlenecks');
+    return jsonDecode(res.body);
+  }
+
+  static Future<List<dynamic>> skus({String? search, String? category, String status = 'ALL'}) async {
+    final uri = Uri.parse('${Config.apiBase}/api/inventory/skus').replace(queryParameters: {
+      'status': status,
+      if (search != null && search.isNotEmpty) 'search': search,
+      if (category != null && category.isNotEmpty) 'category': category,
+    });
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to load inventory');
+    return jsonDecode(res.body);
+  }
+
+  static Future<void> createSku({
+    required String name,
+    required String code,
+    String? category,
+    String unit = 'pcs',
+    double? currentStock,
+    double? minStock,
+    double? maxStock,
+    double? unitCost,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/inventory/skus'),
+      headers: _headers,
+      body: jsonEncode({
+        'name': name,
+        'code': code,
+        if (category != null && category.isNotEmpty) 'category': category,
+        'unit': unit,
+        if (currentStock != null) 'currentStock': currentStock,
+        if (minStock != null) 'minStock': minStock,
+        if (maxStock != null) 'maxStock': maxStock,
+        if (unitCost != null) 'unitCost': unitCost,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to create SKU');
+    }
+  }
+
+  static Future<void> updateSku(String id, Map<String, dynamic> changes) async {
+    final res = await http.patch(
+      Uri.parse('${Config.apiBase}/api/inventory/skus/$id'),
+      headers: _headers,
+      body: jsonEncode(changes),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update SKU');
+    }
+  }
+
+  static Future<void> recordMovement({
+    required String skuId,
+    required String type,
+    required double quantity,
+    String? reason,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/inventory/skus/$skuId/movement'),
+      headers: _headers,
+      body: jsonEncode({
+        'type': type,
+        'quantity': quantity,
+        if (reason != null && reason.isNotEmpty) 'reason': reason,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to record movement');
+    }
+  }
+
+  static Future<Map<String, dynamic>> skuHistory(String skuId) async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/inventory/skus/$skuId/history'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load history');
+    return jsonDecode(res.body);
+  }
+
+  static Future<Map<String, dynamic>> inventorySummary() async {
+    final res = await http.get(
+      Uri.parse('${Config.apiBase}/api/inventory/summary'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to load inventory summary');
     return jsonDecode(res.body);
   }
 }

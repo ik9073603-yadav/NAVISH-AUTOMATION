@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { computeNextFire } from './checklist.service';
+import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 
 export const checklistRouter = Router();
 checklistRouter.use(requireAuth);
@@ -50,8 +51,16 @@ checklistRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next
 
 checklistRouter.get('/', async (req, res, next) => {
   try {
+    const { status, from, to, assigneeId } = parseListQuery(req);
+    const where: any = { orgId: req.user!.orgId };
+    if (status === 'ACTIVE') where.active = true;
+    else if (status === 'DONE') where.active = false;
+    if (assigneeId) where.assigneeId = assigneeId;
+    const createdAt = dateRangeFilter(from, to);
+    if (createdAt) where.createdAt = createdAt;
+
     const rules = await prisma.checklistRule.findMany({
-      where: { orgId: req.user!.orgId },
+      where,
       orderBy: { createdAt: 'desc' },
     });
 

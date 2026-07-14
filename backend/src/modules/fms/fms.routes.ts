@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { advanceOrder } from './fms.service';
+import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 
 export const fmsRouter = Router();
 fmsRouter.use(requireAuth);
@@ -108,8 +109,16 @@ fmsRouter.post('/flows/:flowId/orders', async (req, res, next) => {
 fmsRouter.get('/orders', async (req, res, next) => {
   try {
     const { orgId } = req.user!;
+    const { status, from, to, assigneeId } = parseListQuery(req);
+
+    const where: any = { orgId };
+    if (status === 'ACTIVE') where.status = 'ACTIVE';
+    else if (status === 'DONE') where.status = { in: ['COMPLETED', 'CANCELLED'] };
+    const startedAt = dateRangeFilter(from, to);
+    if (startedAt) where.startedAt = startedAt;
+
     const orders = await prisma.order.findMany({
-      where: { orgId },
+      where,
       include: {
         flow: { include: { stages: { orderBy: { sequence: 'asc' } } } },
         stages: true,
@@ -118,7 +127,7 @@ fmsRouter.get('/orders', async (req, res, next) => {
       take: 100,
     });
 
-    res.json(orders.map(o => {
+    let mapped = orders.map(o => {
       const current = o.flow.stages.find(s => s.id === o.currentStageId);
       const os = o.stages.find(x => x.stageId === o.currentStageId && !x.completedAt);
       const sittingMins = os?.enteredAt
@@ -132,20 +141,25 @@ fmsRouter.get('/orders', async (req, res, next) => {
         status: o.status,
         currentStage: current?.name ?? '—',
         currentStageId: current?.id,
+        responsibleId: current?.responsibleId ?? null,
         orderStageId: os?.id,
         totalStages: o.flow.stages.length,
         doneStages: o.stages.filter(s => s.completedAt).length,
         sittingMins,
         delayed: current?.plannedMins ? sittingMins > current.plannedMins : false,
       };
-    }));
+    });
+
+    if (assigneeId) mapped = mapped.filter(o => o.responsibleId === assigneeId);
+
+    res.json(mapped);
   } catch (err) { next(err); }
 });
 
 // Stage complete karo + custom fields bharo
 fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
   try {
-    const { orgId, userId } = req.user!;
+    const { orgId, userId, role } = req.user!;
 
     const os = await prisma.orderStage.findFirst({
       where: { id: req.params.id, orgId, completedAt: null },
@@ -156,6 +170,12 @@ fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
       where: { id: os.stageId },
       include: { fields: true },
     });
+
+    // Only the doer acts — owner never executes, and if a specific person is
+    // responsible for this stage, only that person may complete it.
+    if (role === 'OWNER' || (stageDef?.responsibleId && stageDef.responsibleId !== userId)) {
+      return res.status(403).json({ error: 'Only the responsible person can complete this stage' });
+    }
 
     const data = (req.body?.data ?? {}) as Record<string, any>;
     const remarks = req.body?.remarks as string | undefined;

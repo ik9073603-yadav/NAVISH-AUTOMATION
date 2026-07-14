@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { computeFirstAction } from '../engine/engine.service';
+import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 
 export const taskRouter = Router();
 taskRouter.use(requireAuth);
@@ -56,10 +57,14 @@ taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next) => 
 // Mere tasks
 taskRouter.get('/my', async (req, res, next) => {
   try {
-    const tasks = await prisma.task.findMany({
-      where: { orgId: req.user!.orgId, assigneeId: req.user!.userId, status: { notIn: ['DONE', 'CANCELLED'] } },
-      orderBy: { dueAt: 'asc' },
-    });
+    const { status, from, to } = parseListQuery(req);
+    const where: any = { orgId: req.user!.orgId, assigneeId: req.user!.userId };
+    if (status === 'ACTIVE') where.status = { in: ['PENDING', 'IN_PROGRESS', 'STUCK'] };
+    else if (status === 'DONE') where.status = { in: ['DONE', 'CANCELLED'] };
+    const createdAt = dateRangeFilter(from, to);
+    if (createdAt) where.createdAt = createdAt;
+
+    const tasks = await prisma.task.findMany({ where, orderBy: { dueAt: 'asc' } });
     res.json(tasks);
   } catch (err) { next(err); }
 });
@@ -68,9 +73,16 @@ taskRouter.get('/my', async (req, res, next) => {
 taskRouter.post('/:id/done', async (req, res, next) => {
   try {
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, assigneeId: req.user!.userId },
+      where: { id: req.params.id, orgId: req.user!.orgId },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    // Owner is read-only everywhere EXCEPT inventory alerts — those are assigned
+    // to him by design since there's no one else below him for stock decisions.
+    const ownerExempt = req.user!.role === 'OWNER' && task.source === 'INVENTORY_ALERT';
+    if (task.assigneeId !== req.user!.userId || (req.user!.role === 'OWNER' && !ownerExempt)) {
+      return res.status(403).json({ error: 'Only the assignee can complete this task' });
+    }
 
     const updated = await prisma.task.update({
       where: { id: task.id },
@@ -92,9 +104,14 @@ taskRouter.post('/:id/stuck', async (req, res, next) => {
     if (!reason.success) return res.status(400).json({ error: 'Reason required' });
 
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, assigneeId: req.user!.userId },
+      where: { id: req.params.id, orgId: req.user!.orgId },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
+
+    const ownerExempt = req.user!.role === 'OWNER' && task.source === 'INVENTORY_ALERT';
+    if (task.assigneeId !== req.user!.userId || (req.user!.role === 'OWNER' && !ownerExempt)) {
+      return res.status(403).json({ error: 'Only the assignee can mark this task stuck' });
+    }
 
     const updated = await prisma.task.update({
       where: { id: task.id },
@@ -120,8 +137,16 @@ taskRouter.get('/notifications', async (req, res, next) => {
 // Owner/Manager: company ke saare tasks
 taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
+    const { status, from, to, assigneeId } = parseListQuery(req);
+    const where: any = { orgId: req.user!.orgId };
+    if (status === 'ACTIVE') where.status = { in: ['PENDING', 'IN_PROGRESS', 'STUCK'] };
+    else if (status === 'DONE') where.status = { in: ['DONE', 'CANCELLED'] };
+    if (assigneeId) where.assigneeId = assigneeId;
+    const createdAt = dateRangeFilter(from, to);
+    if (createdAt) where.createdAt = createdAt;
+
     const tasks = await prisma.task.findMany({
-      where: { orgId: req.user!.orgId },
+      where,
       orderBy: { createdAt: 'desc' },
       take: 100,
     });

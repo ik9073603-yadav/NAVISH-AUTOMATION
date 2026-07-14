@@ -3,6 +3,8 @@ import 'api.dart';
 import 'owner.dart';
 import 'checklist.dart';
 import 'fms.dart';
+import 'filters.dart';
+import 'inventory.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -125,6 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<dynamic> _notifs = [];
   bool _loading = true;
   int _tab = 0;
+  String _taskStatus = 'ACTIVE';
+  DateRangePreset _datePreset = DateRangePreset.all;
   bool get _isOwner => _user?['role'] == 'OWNER' || _user?['role'] == 'MANAGER';
 
   @override
@@ -137,7 +141,7 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _loading = true);
     try {
       final user = await Api.me();
-      final tasks = await Api.myTasks();
+      final tasks = await Api.myTasks(status: _taskStatus, from: _datePreset.from);
       final notifs = await Api.notifications();
       setState(() { _user = user; _tasks = tasks; _notifs = notifs; });
     } catch (e) {
@@ -182,8 +186,18 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
       body: _isOwner
-          ? [const OwnerScreen(), const ChecklistScreen(), const FmsScreen(), _notifsView()][_tab]
-          : [_tasksView(), _notifsView()][_tab],
+          ? [
+              const OwnerScreen(),
+              const ChecklistScreen(),
+              FmsScreen(currentUserId: _user?['id'] as String?, role: _user?['role'] as String?),
+              InventoryScreen(role: _user?['role'] as String?),
+              _notifsView(),
+            ][_tab]
+          : [
+              _tasksView(),
+              InventoryScreen(role: _user?['role'] as String?),
+              _notifsView(),
+            ][_tab],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
@@ -192,10 +206,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 NavigationDestination(icon: Icon(Icons.list_alt), label: 'Tasks'),
                 NavigationDestination(icon: Icon(Icons.event_repeat), label: 'Checklists'),
                 NavigationDestination(icon: Icon(Icons.account_tree), label: 'FMS'),
+                NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
                 NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
               ]
             : const [
                 NavigationDestination(icon: Icon(Icons.checklist), label: 'Tasks'),
+                NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
                 NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
               ],
       ),
@@ -203,9 +219,34 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _tasksView() {
-    if (_tasks.isEmpty) {
-      return const Center(child: Text('No pending tasks 🎉'));
-    }
+    return Column(
+      children: [
+        FilterBar(
+          status: _taskStatus,
+          onStatusChanged: (s) {
+            setState(() => _taskStatus = s);
+            _load();
+          },
+          datePreset: _datePreset,
+          onDatePresetChanged: (p) {
+            setState(() => _datePreset = p);
+            _load();
+          },
+        ),
+        Expanded(
+          child: _tasks.isEmpty
+              ? Center(
+                  child: Text(_taskStatus == 'ACTIVE'
+                      ? 'No pending tasks 🎉'
+                      : 'Nothing here yet'),
+                )
+              : _tasksList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _tasksList() {
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -231,10 +272,12 @@ class _HomeScreenState extends State<HomeScreen> {
                       style: const TextStyle(fontSize: 12)),
                 ],
               ),
-              trailing: FilledButton(
-                onPressed: () => _done(t['id']),
-                child: const Text('Done'),
-              ),
+              trailing: _taskStatus == 'ACTIVE'
+                  ? FilledButton(
+                      onPressed: () => _done(t['id']),
+                      child: const Text('Done'),
+                    )
+                  : null,
             ),
           );
         },

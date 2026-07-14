@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'filters.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -9,7 +10,11 @@ class ChecklistScreen extends StatefulWidget {
 
 class _ChecklistScreenState extends State<ChecklistScreen> {
   List<dynamic> _rules = [];
+  List<dynamic> _users = [];
   bool _loading = true;
+  String _status = 'ACTIVE';
+  DateRangePreset _datePreset = DateRangePreset.all;
+  String? _assigneeId;
 
   @override
   void initState() {
@@ -20,8 +25,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final rules = await Api.checklists();
-      setState(() => _rules = rules);
+      final rules = await Api.checklists(
+        status: _status,
+        from: _datePreset.from,
+        assigneeId: _assigneeId,
+      );
+      final users = await Api.users();
+      setState(() { _rules = rules; _users = users; });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -50,10 +60,58 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     return Scaffold(
-      body: _rules.isEmpty
-          ? const Center(child: Text('No checklists yet.\nCreate one 👇',
-              textAlign: TextAlign.center))
-          : RefreshIndicator(
+      body: Column(
+        children: [
+          FilterBar(
+            status: _status,
+            onStatusChanged: (s) {
+              setState(() => _status = s);
+              _load();
+            },
+            doneLabel: 'Inactive',
+            datePreset: _datePreset,
+            onDatePresetChanged: (p) {
+              setState(() => _datePreset = p);
+              _load();
+            },
+            users: _users,
+            assigneeId: _assigneeId,
+            onAssigneeChanged: (a) {
+              setState(() => _assigneeId = a);
+              _load();
+            },
+          ),
+          Expanded(
+            child: _rules.isEmpty
+                ? Center(
+                    child: Text(
+                      _status == 'ACTIVE'
+                          ? 'No checklists yet.\nCreate one 👇'
+                          : 'No inactive checklists',
+                      textAlign: TextAlign.center,
+                    ),
+                  )
+                : _rulesList(),
+          ),
+        ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () async {
+          final ok = await showModalBottomSheet<bool>(
+            context: context,
+            isScrollControlled: true,
+            builder: (_) => const _NewChecklistSheet(),
+          );
+          if (ok == true) _load();
+        },
+        icon: const Icon(Icons.add),
+        label: const Text('New checklist'),
+      ),
+    );
+  }
+
+  Widget _rulesList() {
+    return RefreshIndicator(
               onRefresh: _load,
               child: ListView.builder(
                 padding: const EdgeInsets.all(12),
@@ -81,20 +139,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                   );
                 },
               ),
-            ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final ok = await showModalBottomSheet<bool>(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => const _NewChecklistSheet(),
-          );
-          if (ok == true) _load();
-        },
-        icon: const Icon(Icons.add),
-        label: const Text('New checklist'),
-      ),
-    );
+            );
   }
 }
 

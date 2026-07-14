@@ -4,6 +4,7 @@ import { prisma } from '../../lib/prisma';
 import { chaseTask, escalateTask } from './engine.service';
 import { MAX_CHASES_BEFORE_ESCALATE } from './engine.config';
 import { fireDueChecklists } from '../checklist/checklist.service';
+import { checkStockAlerts } from '../inventory/inventory.service';
 
 export const taskQueue = new Queue('task-actions', { connection: redis });
 
@@ -22,6 +23,7 @@ new Worker(
 export function startScheduler() {
   setInterval(async () => {
     await fireDueChecklists();
+    await checkStockAlerts();
     const due = await prisma.task.findMany({
       where: {
         nextActionAt: { lte: new Date() },
