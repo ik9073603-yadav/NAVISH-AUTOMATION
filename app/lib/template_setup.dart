@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'responsive.dart';
 
 // Shows the template library (filtered by type), lets the user pick one,
 // and applies it. Returns the apply result ({type, flowId} or {type, ruleId})
@@ -15,7 +16,7 @@ Future<Map<String, dynamic>?> pickAndApplyTemplate(BuildContext context, String 
   final templates = all.where((t) => t['type'] == type).toList();
 
   if (!context.mounted) return null;
-  final chosen = await showModalBottomSheet<Map<String, dynamic>>(
+  final chosen = await showAdaptiveSheet<Map<String, dynamic>>(
     context: context,
     isScrollControlled: true,
     builder: (_) => _TemplateListSheet(templates: templates),

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'filters.dart';
 import 'contact_actions.dart';
+import 'responsive.dart';
 
 class OwnerScreen extends StatefulWidget {
   const OwnerScreen({super.key});
@@ -258,7 +259,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Future<void> _openAssign() async {
-    final ok = await showModalBottomSheet<bool>(
+    final ok = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const _AssignSheet(),
@@ -267,7 +268,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Future<void> _openAddUser() async {
-    final ok = await showModalBottomSheet<bool>(
+    final ok = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const _AddUserSheet(),

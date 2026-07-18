@@ -1,6 +1,13 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'export_actions.dart';
+import 'push.dart';
+import 'reset_requests.dart';
+import 'responsive.dart';
+import 'theme_controller.dart';
 
 const _commonTimezones = [
   'Asia/Kolkata',
@@ -17,7 +24,9 @@ const _weekdayLabels = {
   1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
 };
 
-// Owner-only: org working hours that gate the automation engine's chasing.
+// Owner-only: company profile + working hours that gate the automation
+// engine's chasing, plus reset-request approvals, notification and
+// appearance preferences.
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
   @override
@@ -28,6 +37,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loading = true;
   bool _saving = false;
   bool _backingUp = false;
+  bool _uploadingLogo = false;
+  bool _pushEnabled = true;
+
+  final _companyName = TextEditingController();
+  final _industry = TextEditingController();
+  String? _logoUrl;
+
   String _timezone = 'Asia/Kolkata';
   Set<int> _workingDays = {1, 2, 3, 4, 5, 6};
   TimeOfDay _shiftStart = const TimeOfDay(hour: 9, minute: 0);
@@ -38,6 +54,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void initState() {
     super.initState();
     _load();
+    _loadPushPref();
+  }
+
+  @override
+  void dispose() {
+    _companyName.dispose();
+    _industry.dispose();
+    super.dispose();
   }
 
   String _fmtTime(TimeOfDay t) =>
@@ -53,6 +77,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final s = await Api.getSettings();
       setState(() {
+        _companyName.text = s['name'] as String? ?? '';
+        _industry.text = s['industry'] as String? ?? '';
+        _logoUrl = s['logoUrl'] as String?;
         _timezone = s['timezone'] as String? ?? 'Asia/Kolkata';
         _workingDays = ((s['workingDays'] as List?) ?? [1, 2, 3, 4, 5, 6])
             .map((e) => e as int)
@@ -70,10 +97,46 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
+  Future<void> _loadPushPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) setState(() => _pushEnabled = prefs.getBool('pushEnabled') ?? true);
+  }
+
+  Future<void> _togglePush(bool enabled) async {
+    setState(() => _pushEnabled = enabled);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('pushEnabled', enabled);
+    if (enabled) {
+      await PushService.registerToken();
+    } else {
+      await PushService.unregisterToken();
+    }
+  }
+
+  Future<void> _pickLogo() async {
+    final picker = ImagePicker();
+    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+    if (file == null) return;
+
+    setState(() => _uploadingLogo = true);
+    try {
+      final Uint8List bytes = await file.readAsBytes();
+      final url = await Api.uploadImage(bytes, file.name);
+      await Api.updateSettings(logoUrl: url);
+      if (mounted) setState(() => _logoUrl = url);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    } finally {
+      if (mounted) setState(() => _uploadingLogo = false);
+    }
+  }
+
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
       await Api.updateSettings(
+        name: _companyName.text.trim(),
+        industry: _industry.text.trim(),
         timezone: _timezone,
         workingDays: _workingDays.toList()..sort(),
         shiftStart: _fmtTime(_shiftStart),
@@ -143,121 +206,206 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('Company settings')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Text('Timezone', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            initialValue: _commonTimezones.contains(_timezone) ? _timezone : null,
-            decoration: const InputDecoration(border: OutlineInputBorder()),
-            hint: Text(_timezone),
-            items: _commonTimezones
-                .map((tz) => DropdownMenuItem(value: tz, child: Text(tz)))
-                .toList(),
-            onChanged: (v) {
-              if (v != null) setState(() => _timezone = v);
-            },
-          ),
-          const SizedBox(height: 24),
-          const Text('Working days', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            children: _weekdayLabels.entries.map((e) {
-              final selected = _workingDays.contains(e.key);
-              return FilterChip(
-                label: Text(e.value),
-                selected: selected,
-                onSelected: (v) {
-                  setState(() {
-                    if (v) {
-                      _workingDays.add(e.key);
-                    } else {
-                      _workingDays.remove(e.key);
-                    }
-                  });
-                },
-              );
-            }).toList(),
-          ),
-          const SizedBox(height: 24),
-          const Text('Shift hours', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _pickShiftStart,
-                  child: Text('Start: ${_fmtTime(_shiftStart)}'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: _pickShiftEnd,
-                  child: Text('End: ${_fmtTime(_shiftEnd)}'),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Holidays', style: TextStyle(fontWeight: FontWeight.bold)),
-              TextButton.icon(
-                onPressed: _addHoliday,
-                icon: const Icon(Icons.add),
-                label: const Text('Add'),
-              ),
-            ],
-          ),
-          if (_holidays.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 8),
-              child: Text('No holidays added', style: TextStyle(color: Colors.grey)),
-            )
-          else
+      body: MaxWidthCenter(
+        maxWidth: 760,
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            _sectionLabel('Company profile'),
+            Center(child: _logoPicker()),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _companyName,
+              decoration: const InputDecoration(labelText: 'Company name', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _industry,
+              decoration: const InputDecoration(
+                labelText: 'Industry', hintText: 'e.g. Manufacturing, Retail', border: OutlineInputBorder()),
+            ),
+            const SizedBox(height: 28),
+            _sectionLabel('Timezone'),
+            DropdownButtonFormField<String>(
+              initialValue: _commonTimezones.contains(_timezone) ? _timezone : null,
+              decoration: const InputDecoration(border: OutlineInputBorder()),
+              hint: Text(_timezone),
+              items: _commonTimezones
+                  .map((tz) => DropdownMenuItem(value: tz, child: Text(tz)))
+                  .toList(),
+              onChanged: (v) {
+                if (v != null) setState(() => _timezone = v);
+              },
+            ),
+            const SizedBox(height: 28),
+            _sectionLabel('Working days'),
             Wrap(
               spacing: 8,
-              runSpacing: 4,
-              children: _holidays.map((h) {
-                return Chip(
-                  label: Text(h),
-                  onDeleted: () => setState(() => _holidays.remove(h)),
+              children: _weekdayLabels.entries.map((e) {
+                final selected = _workingDays.contains(e.key);
+                return FilterChip(
+                  label: Text(e.value),
+                  selected: selected,
+                  onSelected: (v) {
+                    setState(() {
+                      if (v) {
+                        _workingDays.add(e.key);
+                      } else {
+                        _workingDays.remove(e.key);
+                      }
+                    });
+                  },
                 );
               }).toList(),
             ),
-          const SizedBox(height: 32),
-          FilledButton(
-            onPressed: _saving ? null : _save,
-            style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-            child: _saving
-                ? const SizedBox(
-                    height: 20, width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : const Text('Save settings'),
-          ),
-          const SizedBox(height: 24),
-          const Divider(),
-          const SizedBox(height: 8),
-          const Text('Data', style: TextStyle(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 4),
-          const Text(
-            'A full export of your company\'s data — users, tasks, checklists, flow monitoring orders, inventory.',
-            style: TextStyle(fontSize: 12, color: Colors.grey),
-          ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(
-            onPressed: _backingUp ? null : _downloadBackup,
-            icon: _backingUp
-                ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Icon(Icons.archive_outlined),
-            label: Text(_backingUp ? 'Preparing backup...' : 'Download full company backup'),
-          ),
-        ],
+            const SizedBox(height: 28),
+            _sectionLabel('Shift hours'),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _pickShiftStart,
+                    child: Text('Start: ${_fmtTime(_shiftStart)}'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: _pickShiftEnd,
+                    child: Text('End: ${_fmtTime(_shiftEnd)}'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 28),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _sectionLabel('Holidays'),
+                TextButton.icon(
+                  onPressed: _addHoliday,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add'),
+                ),
+              ],
+            ),
+            if (_holidays.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 8),
+                child: Text('No holidays added', style: TextStyle(color: Colors.grey)),
+              )
+            else
+              Wrap(
+                spacing: 8,
+                runSpacing: 4,
+                children: _holidays.map((h) {
+                  return Chip(
+                    label: Text(h),
+                    onDeleted: () => setState(() => _holidays.remove(h)),
+                  );
+                }).toList(),
+              ),
+            const SizedBox(height: 24),
+            FilledButton(
+              onPressed: _saving ? null : _save,
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: _saving
+                  ? const SizedBox(
+                      height: 20, width: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Text('Save settings'),
+            ),
+            const SizedBox(height: 32),
+            _sectionLabel('Requests'),
+            Card(
+              child: ListTile(
+                leading: const Icon(Icons.lock_reset),
+                title: const Text('Password reset requests'),
+                subtitle: const Text('Approve or deny employees who forgot their password'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => Navigator.push(
+                    context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen())),
+              ),
+            ),
+            const SizedBox(height: 28),
+            _sectionLabel('Notifications'),
+            Card(
+              child: SwitchListTile(
+                secondary: const Icon(Icons.notifications_active_outlined),
+                title: const Text('Push notifications on this device'),
+                subtitle: const Text('Chases, escalations and alerts'),
+                value: _pushEnabled,
+                onChanged: _togglePush,
+              ),
+            ),
+            const SizedBox(height: 28),
+            _sectionLabel('Appearance'),
+            ValueListenableBuilder<ThemeMode>(
+              valueListenable: ThemeController.mode,
+              builder: (_, mode, __) => SegmentedButton<ThemeMode>(
+                segments: const [
+                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode), label: Text('Light')),
+                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode), label: Text('Dark')),
+                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('System')),
+                ],
+                selected: {mode},
+                onSelectionChanged: (s) => ThemeController.set(s.first),
+              ),
+            ),
+            const SizedBox(height: 32),
+            const Divider(),
+            const SizedBox(height: 8),
+            _sectionLabel('Data'),
+            const Text(
+              'A full export of your company\'s data — users, tasks, checklists, flow monitoring orders, inventory.',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(
+              onPressed: _backingUp ? null : _downloadBackup,
+              icon: _backingUp
+                  ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Icon(Icons.archive_outlined),
+              label: Text(_backingUp ? 'Preparing backup...' : 'Download full company backup'),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _sectionLabel(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+      );
+
+  Widget _logoPicker() {
+    return Stack(
+      children: [
+        CircleAvatar(
+          radius: 40,
+          backgroundImage: _logoUrl != null ? NetworkImage(_logoUrl!) : null,
+          child: _logoUrl == null ? const Icon(Icons.business, size: 32) : null,
+        ),
+        Positioned(
+          right: 0,
+          bottom: 0,
+          child: InkWell(
+            onTap: _uploadingLogo ? null : _pickLogo,
+            borderRadius: BorderRadius.circular(20),
+            child: CircleAvatar(
+              radius: 15,
+              backgroundColor: Theme.of(context).colorScheme.primary,
+              child: _uploadingLogo
+                  ? const SizedBox(
+                      height: 12, width: 12,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  : const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

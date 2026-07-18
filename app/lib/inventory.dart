@@ -4,6 +4,7 @@ import 'package:flutter/rendering.dart';
 import 'package:barcode_widget/barcode_widget.dart';
 import 'api.dart';
 import 'export_actions.dart';
+import 'responsive.dart';
 import 'offline/write_queue.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -221,7 +222,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _openAddSku() async {
-    final ok = await showModalBottomSheet<bool>(
+    final ok = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => const _AddSkuSheet(),
@@ -230,7 +231,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
   }
 
   Future<void> _openSkuDetail(dynamic sku) async {
-    final changed = await showModalBottomSheet<bool>(
+    final changed = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _SkuDetailSheet(
@@ -414,7 +415,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
   }
 
   Future<void> _move(String type) async {
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
+    final result = await showAdaptiveSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _MovementSheet(type: type, unit: widget.sku['unit'] as String),

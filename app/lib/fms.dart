@@ -7,6 +7,7 @@ import 'filters.dart';
 import 'contact_actions.dart';
 import 'export_actions.dart';
 import 'template_setup.dart';
+import 'responsive.dart';
 import 'offline/write_queue.dart';
 import 'flow_analytics.dart';
 
@@ -325,7 +326,7 @@ class _FmsScreenState extends State<FmsScreen> {
           );
     final fields = stage == null ? [] : (stage['fields'] as List);
 
-    final result = await showModalBottomSheet<Map<String, dynamic>>(
+    final result = await showAdaptiveSheet<Map<String, dynamic>>(
       context: context,
       isScrollControlled: true,
       builder: (_) => _StageFormSheet(
@@ -420,7 +421,7 @@ class _FmsScreenState extends State<FmsScreen> {
     if (choice == null) return;
 
     if (choice == 'blank') {
-      final ok = await showModalBottomSheet<bool>(
+      final ok = await showAdaptiveSheet<bool>(
         context: context,
         isScrollControlled: true,
         builder: (_) => const _FlowBuilderSheet(),

@@ -565,14 +565,36 @@ class Api {
   }
 
   static Future<void> updateMyPhone(String? phone) async {
+    await updateMe(phone: phone);
+  }
+
+  // Self-service profile edits — any field left null (not passed) is left
+  // untouched server-side. Pass an empty string to clear a nullable field.
+  static Future<Map<String, dynamic>> updateMe({
+    String? phone,
+    String? name,
+    String? nickname,
+    String? designation,
+    String? language,
+    String? photoUrl,
+  }) async {
+    final body = <String, dynamic>{};
+    if (phone != null) body['phone'] = phone.isEmpty ? null : phone;
+    if (name != null && name.isNotEmpty) body['name'] = name;
+    if (nickname != null) body['nickname'] = nickname.isEmpty ? null : nickname;
+    if (designation != null) body['designation'] = designation.isEmpty ? null : designation;
+    if (language != null) body['language'] = language;
+    if (photoUrl != null) body['photoUrl'] = photoUrl.isEmpty ? null : photoUrl;
+
     final res = await http.patch(
       Uri.parse('${Config.apiBase}/api/auth/me'),
       headers: _headers,
-      body: jsonEncode({'phone': (phone == null || phone.isEmpty) ? null : phone}),
+      body: jsonEncode(body),
     );
     if (res.statusCode != 200) {
-      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update phone');
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update profile');
     }
+    return jsonDecode(res.body);
   }
 
   static Future<List<dynamic>> stuckList() async {
@@ -598,6 +620,9 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> updateSettings({
+    String? name,
+    String? industry,
+    String? logoUrl,
     String? timezone,
     List<int>? workingDays,
     String? shiftStart,
@@ -608,6 +633,9 @@ class Api {
       Uri.parse('${Config.apiBase}/api/settings'),
       headers: _headers,
       body: jsonEncode({
+        if (name != null) 'name': name,
+        if (industry != null) 'industry': industry.isEmpty ? null : industry,
+        if (logoUrl != null) 'logoUrl': logoUrl.isEmpty ? null : logoUrl,
         if (timezone != null) 'timezone': timezone,
         if (workingDays != null) 'workingDays': workingDays,
         if (shiftStart != null) 'shiftStart': shiftStart,

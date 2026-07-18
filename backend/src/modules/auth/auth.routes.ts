@@ -65,6 +65,8 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
       select: {
         id: true, name: true, email: true, phone: true, role: true,
         status: true, isSuperAdmin: true, canStockIn: true, canStockOut: true,
+        photoUrl: true, language: true, nickname: true, designation: true,
+        department: { select: { id: true, name: true } },
         organization: { select: { id: true, name: true, slug: true } },
       },
     });
@@ -76,10 +78,16 @@ authRouter.get('/me', requireAuth, async (req, res, next) => {
 });
 
 const updateMeSchema = z.object({
-  phone: z.string().min(1).max(20).nullable(),
+  phone: z.string().min(1).max(20).nullable().optional(),
+  name: z.string().min(2).max(80).optional(),
+  nickname: z.string().max(60).nullable().optional(),
+  designation: z.string().max(80).nullable().optional(),
+  language: z.enum(['en', 'hi']).optional(),
+  photoUrl: z.string().url().nullable().optional(),
 });
 
-// Self-service: edit your own phone number (used for Call/WhatsApp buttons).
+// Self-service profile edits: phone, name, nickname, designation, language,
+// profile photo. Anything omitted from the body is left untouched.
 authRouter.patch('/me', requireAuth, async (req, res, next) => {
   try {
     const parsed = updateMeSchema.safeParse(req.body);
@@ -87,8 +95,12 @@ authRouter.patch('/me', requireAuth, async (req, res, next) => {
 
     const user = await prisma.user.update({
       where: { id: req.user!.userId },
-      data: { phone: parsed.data.phone },
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      data: parsed.data,
+      select: {
+        id: true, name: true, email: true, phone: true, role: true,
+        nickname: true, designation: true, language: true, photoUrl: true,
+        department: { select: { id: true, name: true } },
+      },
     });
     res.json(user);
   } catch (err) {

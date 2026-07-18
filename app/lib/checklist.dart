@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'filters.dart';
 import 'template_setup.dart';
+import 'responsive.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -62,7 +63,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     if (choice == null) return;
 
     if (choice == 'blank') {
-      final ok = await showModalBottomSheet<bool>(
+      final ok = await showAdaptiveSheet<bool>(
         context: context,
         isScrollControlled: true,
         builder: (_) => const _NewChecklistSheet(),

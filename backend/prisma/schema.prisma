@@ -88,6 +88,8 @@ model User {
   departmentId String?
   photoUrl     String?
   language     String        @default("en")
+  nickname     String?
+  designation  String?
 
   // Cross-org platform capability, separate from org Role. Never settable via
   // any API — only ever flipped by a direct DB script. See scripts/set-superadmin.mjs.

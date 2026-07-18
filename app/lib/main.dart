@@ -8,19 +8,20 @@ import 'inventory.dart';
 import 'push.dart';
 import 'stuck.dart';
 import 'settings.dart';
-import 'change_password.dart';
-import 'reset_requests.dart';
+import 'profile.dart';
 import 'analytics.dart';
 import 'admin.dart';
 import 'signup.dart';
-import 'legal.dart';
-import 'deletion_requests.dart';
+import 'reset_requests.dart';
+import 'responsive.dart';
+import 'theme_controller.dart';
 import 'offline/write_queue.dart';
 import 'offline/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Api.loadToken();
+  await ThemeController.load();
   await PushService.init();
   await WriteQueue.init();
   ConnectivityService.start(Api.flushQueue);
@@ -32,15 +33,24 @@ class NavishApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Navish',
-      debugShowCheckedModeBanner: false,
-      scaffoldMessengerKey: PushService.scaffoldMessengerKey,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F5132)),
-        useMaterial3: true,
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: ThemeController.mode,
+      builder: (_, mode, __) => MaterialApp(
+        title: 'Navish',
+        debugShowCheckedModeBanner: false,
+        scaffoldMessengerKey: PushService.scaffoldMessengerKey,
+        themeMode: mode,
+        theme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F5132)),
+          useMaterial3: true,
+        ),
+        darkTheme: ThemeData(
+          colorScheme: ColorScheme.fromSeed(
+              seedColor: const Color(0xFF0F5132), brightness: Brightness.dark),
+          useMaterial3: true,
+        ),
+        home: Api.isLoggedIn ? const HomeScreen() : const LoginScreen(),
       ),
-      home: Api.isLoggedIn ? const HomeScreen() : const LoginScreen(),
     );
   }
 }
@@ -196,6 +206,14 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   bool get _isOwnerRole => _user?['role'] == 'OWNER';
   bool get _isSuperAdmin => _user?['isSuperAdmin'] == true;
 
+  // Module tabs, "Home" hub always first. Owner/Manager get the full module
+  // set; Employee gets a trimmed one. Profile/Settings/Admin are reached via
+  // the More menu (compact) or the rail's trailing icons (medium/expanded) —
+  // they're pushed screens, not part of this index.
+  List<String> get _moduleLabels => _isOwner
+      ? const ['Home', 'Stuck', 'Tasks', 'Checklists', 'Flows', 'Inventory', 'Analytics']
+      : const ['Home', 'Tasks', 'Inventory'];
+
   @override
   void initState() {
     super.initState();
@@ -258,25 +276,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   int _tabForPushType(String? type) {
     if (_isOwner) {
       switch (type) {
-        case 'CHECKLIST_DUE': return 2;
-        case 'FMS_STAGE': return 3;
-        case 'INVENTORY_ALERT': return 4;
-        default: return 1; // CHASE, TASK_ASSIGNED, ESCALATION
+        case 'CHECKLIST_DUE': return 3;
+        case 'FMS_STAGE': return 4;
+        case 'INVENTORY_ALERT': return 5;
+        default: return 2; // CHASE, TASK_ASSIGNED, ESCALATION
       }
     }
     switch (type) {
-      case 'INVENTORY_ALERT': return 1;
-      default: return 0;
+      case 'INVENTORY_ALERT': return 2;
+      default: return 1;
     }
   }
 
   // Stuck tab rows deep-link into a sibling owner tab.
   int _tabForModule(String module) {
     switch (module) {
-      case 'CHECKLISTS': return 2;
-      case 'FMS': return 3;
-      case 'INVENTORY': return 4;
-      default: return 1; // TASKS
+      case 'CHECKLISTS': return 3;
+      case 'FMS': return 4;
+      case 'INVENTORY': return 5;
+      default: return 2; // TASKS
     }
   }
 
@@ -300,164 +318,308 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  Future<void> _editPhone() async {
-    final controller = TextEditingController(text: _user?['phone'] as String? ?? '');
-    final result = await showDialog<String>(
+  Future<void> _logout() async {
+    await PushService.unregisterToken();
+    await Api.logout();
+    if (!mounted) return;
+    // Called from Profile, which sits on top of Home in the nav stack —
+    // pushReplacement would only swap out Profile and leave a stale,
+    // still-"logged-in" Home screen buried underneath. Clear everything
+    // down to a single fresh LoginScreen instead.
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      (route) => false,
+    );
+  }
+
+  void _openProfile() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(onLogout: _logout)))
+        .then((_) => _load());
+  }
+
+  void _openSettings() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+  }
+
+  void _openResetRequests() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen()));
+  }
+
+  void _openAdmin() {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminScreen()));
+  }
+
+  void _openNotifications() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => _NotificationsScreen(notifs: _notifs)),
+    ).then((_) => _load());
+  }
+
+  // Compact phones can't fit Profile/Settings/Admin as their own bottom
+  // destinations alongside every module — they collapse into this sheet.
+  void _showMoreSheet() {
+    showAdaptiveSheet(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Your phone number'),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.phone,
-          decoration: const InputDecoration(
-            labelText: 'Phone',
-            hintText: '9876543210',
-            border: OutlineInputBorder(),
-          ),
+      builder: (_) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(height: 8),
+            ListTile(
+              leading: const Icon(Icons.person_outline),
+              title: const Text('Profile'),
+              onTap: () { Navigator.pop(context); _openProfile(); },
+            ),
+            if (_isOwnerRole)
+              ListTile(
+                leading: const Icon(Icons.settings_outlined),
+                title: const Text('Company settings'),
+                onTap: () { Navigator.pop(context); _openSettings(); },
+              ),
+            if (_isOwner && !_isOwnerRole)
+              ListTile(
+                leading: const Icon(Icons.lock_reset),
+                title: const Text('Password reset requests'),
+                onTap: () { Navigator.pop(context); _openResetRequests(); },
+              ),
+            if (_isSuperAdmin)
+              ListTile(
+                leading: const Icon(Icons.admin_panel_settings),
+                title: const Text('Navish Admin'),
+                onTap: () { Navigator.pop(context); _openAdmin(); },
+              ),
+            const SizedBox(height: 8),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Save'),
-          ),
-        ],
       ),
     );
-    if (result == null) return;
-    try {
-      await Api.updateMyPhone(result.isEmpty ? null : result);
-      _load();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
+  }
+
+  IconData _moduleIcon(String label) {
+    switch (label) {
+      case 'Stuck': return Icons.warning_amber;
+      case 'Tasks': return Icons.list_alt;
+      case 'Checklists': return Icons.event_repeat;
+      case 'Flows': return Icons.account_tree;
+      case 'Inventory': return Icons.inventory_2;
+      case 'Analytics': return Icons.analytics;
+      default: return Icons.home;
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
+    if (_loading && _user == null) {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
-    return Scaffold(
-      appBar: AppBar(
-        title: GestureDetector(
-          onTap: _editPhone,
-          child: Text(_user?['name'] ?? 'Navish'),
+    final size = screenSizeOf(context);
+    final labels = _moduleLabels;
+    final body = Column(
+      children: [
+        _offlineBanner(),
+        Expanded(child: MaxWidthCenter(child: _bodyForTab(labels))),
+      ],
+    );
+
+    final appBar = AppBar(
+      title: GestureDetector(
+        onTap: _openProfile,
+        child: Text(_user?['nickname'] as String? ?? _user?['name'] ?? 'Navish'),
+      ),
+      actions: [_notificationBell()],
+    );
+
+    if (size == ScreenSize.compact) {
+      return Scaffold(
+        appBar: appBar,
+        body: body,
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _tab,
+          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
+          onDestinationSelected: (i) {
+            if (i == labels.length) {
+              _showMoreSheet();
+            } else {
+              setState(() => _tab = i);
+            }
+          },
+          destinations: [
+            for (final l in labels)
+              NavigationDestination(icon: Icon(_moduleIcon(l)), label: l),
+            const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
+          ],
         ),
-        actions: [
-          if (_isSuperAdmin)
-            IconButton(
-              icon: const Icon(Icons.admin_panel_settings),
-              tooltip: 'Navish Admin',
-              onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+      );
+    }
+
+    // Medium/expanded: a side rail replaces the bottom bar, and there's room
+    // to show Profile/Settings/Admin directly instead of behind a menu.
+    return Scaffold(
+      appBar: appBar,
+      body: Row(
+        children: [
+          // A short window (many modules + a maximized owner/superadmin
+          // trailing icon set) can exceed the viewport height — scroll
+          // instead of overflowing, same as the rail would on a real device.
+          LayoutBuilder(
+            builder: (context, constraints) => SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: IntrinsicHeight(
+                  child: NavigationRail(
+                    selectedIndex: _tab,
+                    onDestinationSelected: (i) => setState(() => _tab = i),
+                    labelType: size == ScreenSize.expanded
+                        ? NavigationRailLabelType.none
+                        : NavigationRailLabelType.all,
+                    extended: size == ScreenSize.expanded,
+                    destinations: [
+                      for (final l in labels)
+                        NavigationRailDestination(icon: Icon(_moduleIcon(l)), label: Text(l)),
+                    ],
+                    trailing: Expanded(
+                      child: Align(
+                        alignment: Alignment.bottomCenter,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                icon: const Icon(Icons.person_outline),
+                                tooltip: 'Profile',
+                                onPressed: _openProfile,
+                              ),
+                              if (_isOwnerRole)
+                                IconButton(
+                                  icon: const Icon(Icons.settings_outlined),
+                                  tooltip: 'Company settings',
+                                  onPressed: _openSettings,
+                                ),
+                              if (_isOwner && !_isOwnerRole)
+                                IconButton(
+                                  icon: const Icon(Icons.lock_reset),
+                                  tooltip: 'Password reset requests',
+                                  onPressed: _openResetRequests,
+                                ),
+                              if (_isSuperAdmin)
+                                IconButton(
+                                  icon: const Icon(Icons.admin_panel_settings),
+                                  tooltip: 'Navish Admin',
+                                  onPressed: _openAdmin,
+                                ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
             ),
-          if (_isOwnerRole)
-            IconButton(
-              icon: const Icon(Icons.settings_outlined),
-              tooltip: 'Company settings',
-              onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
-            ),
-          if (_isOwner)
-            IconButton(
-              icon: const Icon(Icons.lock_reset),
-              tooltip: 'Password reset requests',
-              onPressed: () => Navigator.push(
-                  context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen())),
-            ),
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.person_outline),
-            tooltip: 'Profile',
-            onSelected: (choice) {
-              if (choice == 'phone') _editPhone();
-              if (choice == 'password') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
-              }
-              if (choice == 'legal') {
-                Navigator.push(context, MaterialPageRoute(builder: (_) => const LegalScreen()));
-              }
-              if (choice == 'deletion_requests') {
-                Navigator.push(context,
-                    MaterialPageRoute(builder: (_) => const DeletionRequestsScreen()));
-              }
-            },
-            itemBuilder: (_) => [
-              const PopupMenuItem(value: 'phone', child: Text('Edit phone number')),
-              const PopupMenuItem(value: 'password', child: Text('Change password')),
-              const PopupMenuItem(value: 'legal', child: Text('Legal (Terms / Privacy / Delete account)')),
-              if (_isOwnerRole)
-                const PopupMenuItem(value: 'deletion_requests', child: Text('Account deletion requests')),
+          ),
+          const VerticalDivider(width: 1),
+          Expanded(child: body),
+        ],
+      ),
+    );
+  }
+
+  Widget _notificationBell() {
+    final unread = _notifs.length;
+    return IconButton(
+      tooltip: 'Alerts',
+      onPressed: _openNotifications,
+      icon: Badge(
+        label: Text('$unread'),
+        isLabelVisible: unread > 0,
+        child: const Icon(Icons.notifications_outlined),
+      ),
+    );
+  }
+
+  Widget _bodyForTab(List<String> labels) {
+    final label = labels[_tab];
+    switch (label) {
+      case 'Home':
+        return _homeHub(labels);
+      case 'Stuck':
+        return StuckScreen(onNavigateToModule: (m) => setState(() => _tab = _tabForModule(m)));
+      case 'Tasks':
+        return _isOwner ? const OwnerScreen() : _tasksView();
+      case 'Checklists':
+        return const ChecklistScreen();
+      case 'Flows':
+        return FmsScreen(currentUserId: _user?['id'] as String?, role: _user?['role'] as String?);
+      case 'Inventory':
+        return InventoryScreen(
+          role: _user?['role'] as String?,
+          canStockIn: _user?['canStockIn'] == true,
+          canStockOut: _user?['canStockOut'] == true,
+        );
+      case 'Analytics':
+        return const AnalyticsScreen();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
+  // Clean landing hub: a greeting plus a centered grid of module cards, so
+  // "where do I go" is answered before the user even touches the nav.
+  Widget _homeHub(List<String> labels) {
+    final modules = labels.where((l) => l != 'Home').toList();
+    final crossAxisCount = switch (screenSizeOf(context)) {
+      ScreenSize.compact => 2,
+      ScreenSize.medium => 3,
+      ScreenSize.expanded => 4,
+    };
+    return RefreshIndicator(
+      onRefresh: _load,
+      child: ListView(
+        padding: const EdgeInsets.all(20),
+        children: [
+          Text(
+            'Hello, ${_user?['nickname'] as String? ?? _user?['name'] ?? ''}',
+            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            _user?['organization']?['name'] as String? ?? '',
+            style: TextStyle(color: Colors.grey.shade600),
+          ),
+          const SizedBox(height: 24),
+          GridView.count(
+            crossAxisCount: crossAxisCount,
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            mainAxisSpacing: 12,
+            crossAxisSpacing: 12,
+            childAspectRatio: 1.3,
+            children: [
+              for (final m in modules)
+                Card(
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(12),
+                    onTap: () => setState(() => _tab = labels.indexOf(m)),
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(_moduleIcon(m), size: 32,
+                              color: Theme.of(context).colorScheme.primary),
+                          const SizedBox(height: 10),
+                          Text(m, style: const TextStyle(fontWeight: FontWeight.w600)),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
-          IconButton(
-            icon: const Icon(Icons.logout),
-            onPressed: () async {
-              await PushService.unregisterToken();
-              await Api.logout();
-              if (!mounted) return;
-              Navigator.pushReplacement(
-                  context, MaterialPageRoute(builder: (_) => const LoginScreen()));
-            },
-          ),
         ],
-      ),
-      body: Column(
-        children: [
-          _offlineBanner(),
-          Expanded(
-            child: _isOwner
-                ? [
-                    StuckScreen(onNavigateToModule: (m) => setState(() => _tab = _tabForModule(m))),
-                    const OwnerScreen(),
-                    const ChecklistScreen(),
-                    FmsScreen(currentUserId: _user?['id'] as String?, role: _user?['role'] as String?),
-                    InventoryScreen(
-                      role: _user?['role'] as String?,
-                      canStockIn: _user?['canStockIn'] == true,
-                      canStockOut: _user?['canStockOut'] == true,
-                    ),
-                    const AnalyticsScreen(),
-                    _notifsView(),
-                  ][_tab]
-                : [
-                    _tasksView(),
-                    InventoryScreen(
-                      role: _user?['role'] as String?,
-                      canStockIn: _user?['canStockIn'] == true,
-                      canStockOut: _user?['canStockOut'] == true,
-                    ),
-                    _notifsView(),
-                  ][_tab],
-          ),
-        ],
-      ),
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: _tab,
-        onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: _isOwner
-            ? const [
-                NavigationDestination(icon: Icon(Icons.warning_amber), label: 'Stuck'),
-                NavigationDestination(icon: Icon(Icons.list_alt), label: 'Tasks'),
-                NavigationDestination(icon: Icon(Icons.event_repeat), label: 'Checklists'),
-                NavigationDestination(icon: Icon(Icons.account_tree), label: 'Flows'),
-                NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
-                NavigationDestination(icon: Icon(Icons.analytics), label: 'Analytics'),
-                NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
-              ]
-            : const [
-                NavigationDestination(icon: Icon(Icons.checklist), label: 'Tasks'),
-                NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
-                NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
-              ],
       ),
     );
   }
@@ -571,25 +733,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ),
     );
   }
+}
 
-  Widget _notifsView() {
-    if (_notifs.isEmpty) return const Center(child: Text('No alerts'));
-    return ListView.builder(
-      padding: const EdgeInsets.all(12),
-      itemCount: _notifs.length,
-      itemBuilder: (_, i) {
-        final n = _notifs[i];
-        return Card(
-          child: ListTile(
-            leading: Icon(
-              n['type'] == 'ESCALATION' ? Icons.warning : Icons.notifications,
-              color: n['type'] == 'ESCALATION' ? Colors.red : Colors.blue,
-            ),
-            title: Text(n['title']),
-            subtitle: Text(n['body']),
-          ),
-        );
-      },
+// Alerts — reachable only via the bell in the AppBar now, never a bottom tab.
+class _NotificationsScreen extends StatelessWidget {
+  final List<dynamic> notifs;
+  const _NotificationsScreen({required this.notifs});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('Alerts')),
+      body: MaxWidthCenter(
+        maxWidth: 800,
+        child: notifs.isEmpty
+            ? const Center(child: Text('No alerts'))
+            : ListView.builder(
+                padding: const EdgeInsets.all(12),
+                itemCount: notifs.length,
+                itemBuilder: (_, i) {
+                  final n = notifs[i];
+                  return Card(
+                    child: ListTile(
+                      leading: Icon(
+                        n['type'] == 'ESCALATION' ? Icons.warning : Icons.notifications,
+                        color: n['type'] == 'ESCALATION' ? Colors.red : Colors.blue,
+                      ),
+                      title: Text(n['title']),
+                      subtitle: Text(n['body']),
+                    ),
+                  );
+                },
+              ),
+      ),
     );
   }
 }

@@ -13,7 +13,7 @@ settingsRouter.get('/', requireRole('OWNER'), async (req, res, next) => {
     const org = await prisma.organization.findUnique({
       where: { id: req.user!.orgId },
       select: {
-        id: true, name: true, timezone: true,
+        id: true, name: true, timezone: true, industry: true, logoUrl: true,
         workingDays: true, shiftStart: true, shiftEnd: true, holidays: true,
       },
     });
@@ -26,6 +26,9 @@ const timeRegex = /^([01]\d|2[0-3]):([0-5]\d)$/;
 const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 const updateSchema = z.object({
+  name: z.string().min(2).max(120).optional(),
+  industry: z.string().max(80).nullable().optional(),
+  logoUrl: z.string().url().nullable().optional(),
   timezone: z.string().min(1).optional(),
   workingDays: z.array(z.number().int().min(1).max(7)).optional(),
   shiftStart: z.string().regex(timeRegex, 'Expected HH:mm').optional(),
@@ -42,7 +45,7 @@ settingsRouter.patch('/', requireRole('OWNER'), async (req, res, next) => {
       where: { id: req.user!.orgId },
       data: parsed.data,
       select: {
-        id: true, name: true, timezone: true,
+        id: true, name: true, timezone: true, industry: true, logoUrl: true,
         workingDays: true, shiftStart: true, shiftEnd: true, holidays: true,
       },
     });
