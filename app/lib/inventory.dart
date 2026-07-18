@@ -1,9 +1,16 @@
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
+import 'package:barcode_widget/barcode_widget.dart';
 import 'api.dart';
+import 'export_actions.dart';
+import 'offline/write_queue.dart';
 
 class InventoryScreen extends StatefulWidget {
   final String? role;
-  const InventoryScreen({super.key, this.role});
+  final bool canStockIn;
+  final bool canStockOut;
+  const InventoryScreen({super.key, this.role, this.canStockIn = false, this.canStockOut = false});
   @override
   State<InventoryScreen> createState() => _InventoryScreenState();
 }
@@ -86,8 +93,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Inventory summary',
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text('Inventory summary',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+                IconButton(
+                  icon: const Icon(Icons.ios_share, size: 20),
+                  tooltip: 'Export movements',
+                  onPressed: _exportMovements,
+                ),
+              ],
+            ),
             const SizedBox(height: 12),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -179,6 +197,29 @@ class _InventoryScreenState extends State<InventoryScreen> {
     );
   }
 
+  Future<void> _exportMovements() async {
+    final format = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Export format'),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'csv'), child: const Text('CSV')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'xlsx'), child: const Text('Excel (.xlsx)')),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    try {
+      final (bytes, filename) = await Api.exportInventoryMovements(format);
+      await shareExportedFile(bytes, filename);
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
   Future<void> _openAddSku() async {
     final ok = await showModalBottomSheet<bool>(
       context: context,
@@ -192,7 +233,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final changed = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _SkuDetailSheet(sku: sku),
+      builder: (_) => _SkuDetailSheet(
+        sku: sku,
+        allowIn: _canManage || widget.canStockIn,
+        allowOut: _canManage || widget.canStockOut,
+      ),
     );
     if (changed == true) _load();
   }
@@ -217,9 +262,9 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
   bool _saving = false;
 
   Future<void> _save() async {
-    if (_name.text.trim().isEmpty || _code.text.trim().isEmpty) {
+    if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Name and code are required')),
+        const SnackBar(content: Text('Name is required')),
       );
       return;
     }
@@ -227,7 +272,7 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
     try {
       await Api.createSku(
         name: _name.text.trim(),
-        code: _code.text.trim(),
+        code: _code.text.trim().isEmpty ? null : _code.text.trim(),
         category: _category.text.trim().isEmpty ? null : _category.text.trim(),
         unit: _unit.text.trim().isEmpty ? 'pcs' : _unit.text.trim(),
         currentStock: double.tryParse(_openingStock.text.trim()),
@@ -265,7 +310,9 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
             const SizedBox(height: 12),
             TextField(
               controller: _code,
-              decoration: const InputDecoration(labelText: 'Code', border: OutlineInputBorder()),
+              decoration: const InputDecoration(
+                  labelText: 'Code (optional — auto-generated if blank)',
+                  border: OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -334,7 +381,9 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
 // ---------------- SKU DETAIL ----------------
 class _SkuDetailSheet extends StatefulWidget {
   final dynamic sku;
-  const _SkuDetailSheet({required this.sku});
+  final bool allowIn;
+  final bool allowOut;
+  const _SkuDetailSheet({required this.sku, required this.allowIn, required this.allowOut});
   @override
   State<_SkuDetailSheet> createState() => _SkuDetailSheetState();
 }
@@ -343,6 +392,8 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
   Map<String, dynamic>? _history;
   bool _loading = true;
   bool _changed = false;
+  bool _showQr = false;
+  final _barcodeKey = GlobalKey();
 
   @override
   void initState() {
@@ -384,9 +435,92 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
         );
       }
       await _loadHistory();
+    } on OfflineQueuedException {
+      // Queued — the history list won't reflect it until sync, so skip reloading.
+      _changed = true;
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved offline — will sync when back online')),
+        );
+      }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     }
+  }
+
+  Future<void> _shareBarcode() async {
+    try {
+      final boundary = _barcodeKey.currentContext?.findRenderObject() as RenderRepaintBoundary?;
+      if (boundary == null) return;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      if (byteData == null) return;
+      final bytes = byteData.buffer.asUint8List();
+      final code = widget.sku['code'] as String;
+      await shareExportedFile(bytes, '$code.png');
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Widget _barcodeSection() {
+    final code = widget.sku['code'] as String;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Row(
+          children: [
+            const Expanded(
+              child: Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
+            ),
+            ToggleButtons(
+              isSelected: [!_showQr, _showQr],
+              onPressed: (i) => setState(() => _showQr = i == 1),
+              constraints: const BoxConstraints(minHeight: 28, minWidth: 44),
+              children: const [Text('Bars'), Text('QR')],
+            ),
+            IconButton(
+              icon: const Icon(Icons.ios_share),
+              tooltip: 'Print / Share',
+              onPressed: _shareBarcode,
+            ),
+          ],
+        ),
+        Container(
+          width: double.infinity,
+          alignment: Alignment.center,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            border: Border.all(color: Colors.grey.shade300),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: RepaintBoundary(
+            key: _barcodeKey,
+            child: Container(
+              color: Colors.white,
+              padding: const EdgeInsets.all(12),
+              child: _showQr
+                  ? BarcodeWidget(
+                      barcode: Barcode.qrCode(),
+                      data: code,
+                      width: 160,
+                      height: 160,
+                      drawText: true,
+                    )
+                  : BarcodeWidget(
+                      barcode: Barcode.code128(),
+                      data: code,
+                      width: 260,
+                      height: 100,
+                      drawText: true,
+                    ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+      ],
+    );
   }
 
   @override
@@ -418,34 +552,38 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
               Text('${widget.sku['code']} · $currentStock ${widget.sku['unit']}',
                   style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _move('IN'),
-                      icon: const Icon(Icons.arrow_downward),
-                      label: const Text('Stock IN'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.green,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+              if (widget.allowIn || widget.allowOut)
+                Row(
+                  children: [
+                    if (widget.allowIn)
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => _move('IN'),
+                          icon: const Icon(Icons.arrow_downward),
+                          label: const Text('Stock IN'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: () => _move('OUT'),
-                      icon: const Icon(Icons.arrow_upward),
-                      label: const Text('Stock OUT'),
-                      style: FilledButton.styleFrom(
-                        backgroundColor: Colors.red,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
+                    if (widget.allowIn && widget.allowOut) const SizedBox(width: 12),
+                    if (widget.allowOut)
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: () => _move('OUT'),
+                          icon: const Icon(Icons.arrow_upward),
+                          label: const Text('Stock OUT'),
+                          style: FilledButton.styleFrom(
+                            backgroundColor: Colors.red,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
+                  ],
+                ),
+              if (widget.allowIn || widget.allowOut) const SizedBox(height: 20),
+              _barcodeSection(),
               const Align(
                 alignment: Alignment.centerLeft,
                 child: Text('History', style: TextStyle(fontWeight: FontWeight.bold)),

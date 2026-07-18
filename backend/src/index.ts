@@ -9,6 +9,14 @@ import { checklistRouter } from './modules/checklist/checklist.routes';
 import { fmsRouter } from './modules/fms/fms.routes';
 import { uploadsRouter } from './modules/uploads/uploads.routes';
 import { inventoryRouter } from './modules/inventory/inventory.routes';
+import { devicesRouter } from './modules/devices/devices.routes';
+import { stuckRouter } from './modules/stuck/stuck.routes';
+import { settingsRouter } from './modules/settings/settings.routes';
+import { adminRouter } from './modules/admin/admin.routes';
+import { analyticsRouter } from './modules/analytics/analytics.routes';
+import { exportRouter } from './modules/export/export.routes';
+import { templatesRouter } from './modules/templates/templates.routes';
+import { legalRouter } from './modules/legal/legal.routes';
 
 const app = express();
 app.use(express.json());
@@ -25,6 +33,14 @@ app.use('/api/auth', authRouter);
 app.use('/api/tasks', taskRouter);
 app.use('/api/uploads', uploadsRouter);
 app.use('/api/inventory', inventoryRouter);
+app.use('/api/devices', devicesRouter);
+app.use('/api/stuck', stuckRouter);
+app.use('/api/settings', settingsRouter);
+app.use('/api/admin', adminRouter);
+app.use('/api/analytics', analyticsRouter);
+app.use('/api/export', exportRouter);
+app.use('/api/templates', templatesRouter);
+app.use('/legal', legalRouter);
 
 
 app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));

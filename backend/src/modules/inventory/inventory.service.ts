@@ -1,8 +1,39 @@
 import { Sku, MovementType } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
-import { computeFirstAction } from '../engine/engine.service';
+import { computeFirstAction, notify } from '../engine/engine.service';
 
 export type LiquidClass = 'LIQUID' | 'SLOW' | 'DEAD';
+
+// OWNER/MANAGER can always move stock. An EMPLOYEE needs the matching flag —
+// ADJUST is treated as an inbound-style reconciliation action (setting the
+// record straight, closer in spirit to a stock-IN correction than a removal),
+// so it's gated by canStockIn, not a separate capability.
+export function canRecordMovement(
+  role: 'OWNER' | 'MANAGER' | 'EMPLOYEE',
+  flags: { canStockIn: boolean; canStockOut: boolean },
+  type: 'IN' | 'OUT' | 'ADJUST',
+): boolean {
+  if (role === 'OWNER' || role === 'MANAGER') return true;
+  return type === 'OUT' ? flags.canStockOut : flags.canStockIn;
+}
+
+// Used when a SKU is created without a code — a scannable Code128/QR value
+// needs SOME code, so we can't just leave it blank. Random, not sequential,
+// so two people creating SKUs at the same moment never race on the same value.
+function randomSkuCode(): string {
+  return 'SKU' + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+export async function generateUniqueSkuCode(orgId: string): Promise<string> {
+  for (let i = 0; i < 5; i++) {
+    const code = randomSkuCode();
+    const clash = await prisma.sku.findFirst({ where: { orgId, code } });
+    if (!clash) return code;
+  }
+  // Astronomically unlikely to still be colliding after 5 tries — fall back
+  // to a timestamp-suffixed value that's unique by construction.
+  return `${randomSkuCode()}${Date.now().toString(36).toUpperCase()}`;
+}
 
 // LIQUID: moved in the last 30 days. DEAD: 90+ days (or never moved). SLOW: in between.
 export function classifyLiquidVsDead(sku: { lastMovedAt: Date | null }): LiquidClass {
@@ -86,22 +117,20 @@ async function checkSkuAlert(sku: Sku) {
         ruleId: sku.id,
         dueAt,
         priority: 'HIGH',
-        nextActionAt: computeFirstAction(dueAt),
+        nextActionAt: await computeFirstAction(sku.orgId, dueAt),
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        orgId: sku.orgId,
-        userId: owner.id,
-        type: 'INVENTORY_ALERT',
-        title,
-        body: isLow
-          ? 'Stock has dropped to or below the minimum level.'
-          : 'Stock has risen to or above the maximum level.',
-        taskId: task.id,
-      },
-    });
+    await notify(
+      sku.orgId,
+      owner.id,
+      'INVENTORY_ALERT',
+      title,
+      isLow
+        ? 'Stock has dropped to or below the minimum level.'
+        : 'Stock has risen to or above the maximum level.',
+      task.id,
+    );
 
     console.log(`📦 Inventory alert: ${title}`);
   } else if (openAlert) {

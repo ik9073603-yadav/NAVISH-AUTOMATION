@@ -8,6 +8,9 @@ export interface AuthUser {
   userId: string;
   orgId: string;
   role: Role;
+  // Cross-org platform capability, set only at login time from the DB flag —
+  // never settable through any request. See scripts/set-superadmin.mjs.
+  isSuperAdmin: boolean;
 }
 
 declare global {
@@ -43,4 +46,13 @@ export function requireRole(...allowed: Role[]) {
     }
     next();
   };
+}
+
+// Gate for /api/admin/* only — the sole place cross-org access is permitted.
+export function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: 'Not authenticated' });
+  if (!req.user.isSuperAdmin) {
+    return res.status(403).json({ error: 'Insufficient permissions' });
+  }
+  next();
 }

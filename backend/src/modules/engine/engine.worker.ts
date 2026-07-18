@@ -22,27 +22,33 @@ new Worker(
 // SCHEDULER: har 30 sec — "kiska time aa gaya?"
 export function startScheduler() {
   setInterval(async () => {
-    await fireDueChecklists();
-    await checkStockAlerts();
-    const due = await prisma.task.findMany({
-      where: {
-        nextActionAt: { lte: new Date() },
-        status: { in: ['PENDING', 'IN_PROGRESS', 'STUCK'] },
-      },
-      take: 100,
-    });
-
-    for (const task of due) {
-      const action = task.chaseCount >= MAX_CHASES_BEFORE_ESCALATE ? 'ESCALATE' : 'CHASE';
-
-      // Lock: turant nextActionAt aage badha do, taaki dobara na uthe
-      await prisma.task.update({
-        where: { id: task.id },
-        data: { nextActionAt: new Date(Date.now() + 5 * 60_000) },
+    // A transient DB/network blip must skip this tick, not crash the whole
+    // process — the scheduler just tries again in 30s either way.
+    try {
+      await fireDueChecklists();
+      await checkStockAlerts();
+      const due = await prisma.task.findMany({
+        where: {
+          nextActionAt: { lte: new Date() },
+          status: { in: ['PENDING', 'IN_PROGRESS', 'STUCK'] },
+        },
+        take: 100,
       });
 
-      await taskQueue.add(action, { taskId: task.id, action });
-      console.log(`⚙️  Queued ${action} for task ${task.id}`);
+      for (const task of due) {
+        const action = task.chaseCount >= MAX_CHASES_BEFORE_ESCALATE ? 'ESCALATE' : 'CHASE';
+
+        // Lock: turant nextActionAt aage badha do, taaki dobara na uthe
+        await prisma.task.update({
+          where: { id: task.id },
+          data: { nextActionAt: new Date(Date.now() + 5 * 60_000) },
+        });
+
+        await taskQueue.add(action, { taskId: task.id, action });
+        console.log(`⚙️  Queued ${action} for task ${task.id}`);
+      }
+    } catch (err) {
+      console.error('⚠️  Scheduler tick failed, will retry in 30s:', err);
     }
   }, 30_000);
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'filters.dart';
+import 'contact_actions.dart';
 
 class OwnerScreen extends StatefulWidget {
   const OwnerScreen({super.key});
@@ -105,6 +106,9 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Widget _tasksList() {
+    final phoneByAssignee = <String, String?>{
+      for (final u in _users) u['id'] as String: u['phone'] as String?,
+    };
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -126,7 +130,17 @@ class _OwnerScreenState extends State<OwnerScreen> {
                 '${t['chaseCount'] > 0 ? " · chased ${t['chaseCount']}x" : ""}'
                 '${escalated ? " · ESCALATED" : ""}',
               ),
-              trailing: Text(t['priority'], style: const TextStyle(fontSize: 11)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(t['priority'], style: const TextStyle(fontSize: 11)),
+                  ContactButtons(
+                    phone: phoneByAssignee[t['assigneeId']],
+                    message: 'Hi ${t['assigneeName']}, checking on: ${t['title']}.',
+                    iconSize: 20,
+                  ),
+                ],
+              ),
             ),
           );
         },
@@ -135,35 +149,112 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Widget _teamView() {
-    if (_stats.isEmpty) {
+    if (_users.isEmpty) {
       return const Center(child: Text('No data yet'));
     }
+    // /stats only returns users with at least one task ever — a freshly
+    // added person with none yet must still show up here to be manageable.
+    final statsByUserId = <String, dynamic>{
+      for (final s in _stats) s['userId'] as String: s,
+    };
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
         padding: const EdgeInsets.all(12),
-        itemCount: _stats.length,
+        itemCount: _users.length,
         itemBuilder: (_, i) {
-          final s = _stats[i];
+          final u = _users[i];
+          final s = statsByUserId[u['id']];
+          final role = u['role'] as String;
+          final hasInventoryAccess = u['canStockIn'] == true || u['canStockOut'] == true;
           return Card(
             child: ListTile(
-              title: Text(s['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
+              title: Text(u['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
               subtitle: Text(
-                'Done ${s['done']}/${s['total']} · On-time ${s['onTimePct']}%'
-                '${s['escalated'] > 0 ? " · ${s['escalated']} escalated" : ""}',
+                s == null
+                    ? 'No tasks yet · $role'
+                    : 'Done ${s['done']}/${s['total']} · On-time ${s['onTimePct']}%'
+                      '${s['escalated'] > 0 ? " · ${s['escalated']} escalated" : ""}',
               ),
-              trailing: CircleAvatar(
-                backgroundColor: s['onTimePct'] >= 80
-                    ? Colors.green
-                    : (s['onTimePct'] >= 50 ? Colors.orange : Colors.red),
-                child: Text('${s['onTimePct']}',
-                    style: const TextStyle(color: Colors.white, fontSize: 12)),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (role == 'EMPLOYEE')
+                    IconButton(
+                      icon: Icon(
+                        hasInventoryAccess ? Icons.inventory : Icons.inventory_2_outlined,
+                        color: hasInventoryAccess ? Colors.green : null,
+                      ),
+                      tooltip: 'Inventory permissions',
+                      onPressed: () => _editInventoryPermissions(u),
+                    ),
+                  ContactButtons(
+                    phone: u['phone'] as String?,
+                    message: 'Hi ${u['name']}, ',
+                    iconSize: 20,
+                  ),
+                  if (s != null)
+                    CircleAvatar(
+                      backgroundColor: s['onTimePct'] >= 80
+                          ? Colors.green
+                          : (s['onTimePct'] >= 50 ? Colors.orange : Colors.red),
+                      child: Text('${s['onTimePct']}',
+                          style: const TextStyle(color: Colors.white, fontSize: 12)),
+                    ),
+                ],
               ),
             ),
           );
         },
       ),
     );
+  }
+
+  Future<void> _editInventoryPermissions(Map user) async {
+    bool canIn = user['canStockIn'] == true;
+    bool canOut = user['canStockOut'] == true;
+    final save = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: Text('Inventory permissions — ${user['name']}'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Can add stock (Stock IN)'),
+                value: canIn,
+                onChanged: (v) => setDialogState(() => canIn = v),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Can remove stock (Stock OUT)'),
+                value: canOut,
+                onChanged: (v) => setDialogState(() => canOut = v),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+          ],
+        ),
+      ),
+    );
+    if (save != true) return;
+
+    try {
+      await Api.updateInventoryPermissions(user['id'] as String, canStockIn: canIn, canStockOut: canOut);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Updated permissions for ${user['name']}')),
+        );
+      }
+      _load();
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
   }
 
   Future<void> _openAssign() async {
@@ -321,6 +412,7 @@ class _AddUserSheet extends StatefulWidget {
 class _AddUserSheetState extends State<_AddUserSheet> {
   final _name = TextEditingController();
   final _email = TextEditingController();
+  final _phone = TextEditingController();
   final _password = TextEditingController(text: 'password123');
   String _role = 'EMPLOYEE';
   bool _saving = false;
@@ -333,6 +425,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
         email: _email.text.trim(),
         password: _password.text,
         role: _role,
+        phone: _phone.text.trim(),
       );
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
@@ -367,6 +460,15 @@ class _AddUserSheetState extends State<_AddUserSheet> {
             controller: _email,
             decoration: const InputDecoration(
                 labelText: 'Email', border: OutlineInputBorder()),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _phone,
+            keyboardType: TextInputType.phone,
+            decoration: const InputDecoration(
+                labelText: 'Phone (optional)',
+                hintText: '9876543210',
+                border: OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           TextField(

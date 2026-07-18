@@ -1,19 +1,23 @@
 import { prisma } from '../../lib/prisma';
+import { sendPush } from '../../lib/fcm';
 import {
   CHASE_AFTER_MINUTES,
   CHASE_REPEAT_MINUTES,
   MAX_CHASES_BEFORE_ESCALATE,
   ESCALATE_AFTER_MINUTES,
 } from './engine.config';
+import { applyWorkingHours } from './working-hours';
 
 const mins = (n: number) => new Date(Date.now() + n * 60_000);
 
-async function notify(orgId: string, userId: string, type: string, title: string, body: string, taskId?: string) {
+// The ONE place every module funnels through to reach a user — in-app row +
+// real push, together. Wire new alert types here, never call sendPush() directly.
+export async function notify(orgId: string, userId: string, type: string, title: string, body: string, taskId?: string) {
   await prisma.notification.create({
     data: { orgId, userId, type, title, body, taskId },
   });
   console.log(`🔔 [${type}] → user ${userId}: ${title}`);
-  // TODO: FCM push (Stage E)
+  await sendPush(userId, title, body, { type, taskId: taskId ?? '' });
 }
 
 // Overdue task → responsible person ko ping
@@ -33,11 +37,13 @@ export async function chaseTask(taskId: string) {
     task.id,
   );
 
+  const naive = shouldEscalateNext ? mins(ESCALATE_AFTER_MINUTES) : mins(CHASE_REPEAT_MINUTES);
+
   await prisma.task.update({
     where: { id: task.id },
     data: {
       chaseCount,
-      nextActionAt: shouldEscalateNext ? mins(ESCALATE_AFTER_MINUTES) : mins(CHASE_REPEAT_MINUTES),
+      nextActionAt: await applyWorkingHours(task.orgId, naive),
     },
   });
 
@@ -79,8 +85,9 @@ export async function escalateTask(taskId: string) {
   });
 }
 
-// Har task ka pehla nextActionAt set karna
-export function computeFirstAction(dueAt: Date | null): Date | null {
+// Har task ka pehla nextActionAt set karna — pushed out of dead hours if needed.
+export async function computeFirstAction(orgId: string, dueAt: Date | null): Promise<Date | null> {
   if (!dueAt) return null;
-  return new Date(dueAt.getTime() + CHASE_AFTER_MINUTES * 60_000);
+  const naive = new Date(dueAt.getTime() + CHASE_AFTER_MINUTES * 60_000);
+  return applyWorkingHours(orgId, naive);
 }

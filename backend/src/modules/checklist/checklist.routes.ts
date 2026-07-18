@@ -86,6 +86,46 @@ checklistRouter.get('/:id/compliance', requireRole('OWNER', 'MANAGER'), async (r
   } catch (err) { next(err); }
 });
 
+const updateSchema = z.object({
+  assigneeId: z.string().uuid().optional(),
+  timeOfDay: z.string().regex(/^\d{2}:\d{2}$/).optional(),
+  weekday: z.number().min(1).max(7).optional(),
+  dayOfMonth: z.number().min(1).max(28).optional(),
+  priority: z.enum(['HIGH', 'NORMAL', 'LOW']).optional(),
+  active: z.boolean().optional(),
+});
+
+// Used to finish setting up a template-applied rule — assign the real person
+// and (optionally) activate it. Also usable as a general small-edit endpoint.
+checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const parsed = updateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId } = req.user!;
+    const rule = await prisma.checklistRule.findFirst({ where: { id: req.params.id, orgId } });
+    if (!rule) return res.status(404).json({ error: 'Not found' });
+
+    if (parsed.data.assigneeId) {
+      const assignee = await prisma.user.findFirst({ where: { id: parsed.data.assigneeId, orgId } });
+      if (!assignee) return res.status(404).json({ error: 'Assignee not found in your company' });
+    }
+
+    const merged = { ...rule, ...parsed.data };
+    const willBeActive = parsed.data.active ?? rule.active;
+
+    const updated = await prisma.checklistRule.update({
+      where: { id: rule.id },
+      data: {
+        ...parsed.data,
+        nextFireAt: willBeActive ? computeNextFire(merged as any) : null,
+      },
+    });
+
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
 checklistRouter.post('/:id/toggle', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const rule = await prisma.checklistRule.findFirst({

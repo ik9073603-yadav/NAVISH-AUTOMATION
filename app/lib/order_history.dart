@@ -59,6 +59,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     return '${(mins / 1440).toStringAsFixed(1)} days';
   }
 
+  String? _plannedMinsLabel(int? plannedMins) {
+    if (plannedMins == null) return null;
+    if (plannedMins < 60) return '$plannedMins min';
+    if (plannedMins < 1440) return '${(plannedMins / 60).toStringAsFixed(1)} hrs';
+    return '${(plannedMins / 1440).toStringAsFixed(1)} days';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -67,7 +74,60 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _error != null
               ? Center(child: Text(_error!))
-              : _buildTimeline(),
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _slaBanner(),
+                    Expanded(child: _buildTimeline()),
+                  ],
+                ),
+    );
+  }
+
+  Widget _slaBanner() {
+    final sla = _history?['slaStatus'] as String?;
+    if (sla == null) return const SizedBox.shrink();
+
+    final stages = (_history?['stages'] as List?) ?? [];
+    final lateStages = stages.cast<Map>().where((s) {
+      final delayMins = s['delayMins'] as int?;
+      return delayMins != null && delayMins > 0;
+    }).toList();
+
+    late final String text;
+    late final Color color;
+    late final IconData icon;
+    switch (sla) {
+      case 'DELAYED':
+        color = Colors.red;
+        icon = Icons.warning;
+        final names = lateStages.map((s) => s['name'] as String).join(', ');
+        text = lateStages.length == 1
+            ? 'Delayed — late at: $names'
+            : 'Delayed — late at ${lateStages.length} stages: $names';
+        break;
+      case 'ON_TIME':
+        color = Colors.green;
+        icon = Icons.check_circle;
+        text = 'On time so far';
+        break;
+      default:
+        color = Colors.grey.shade700;
+        icon = Icons.info_outline;
+        text = 'No SLA — every stage here is unplanned';
+    }
+
+    return Container(
+      width: double.infinity,
+      color: color.withValues(alpha: 0.1),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      child: Row(
+        children: [
+          Icon(icon, color: color, size: 18),
+          const SizedBox(width: 8),
+          Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+        ],
+      ),
     );
   }
 
@@ -120,8 +180,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       duration: s['enteredAt'] != null
                           ? _duration(s['enteredAt'] as String?, s['completedAt'] as String?)
                           : null,
+                      plannedLabel: _plannedMinsLabel(s['plannedMins'] as int?),
                       delayMins: delayMins,
                       delayed: delayed,
+                      completedByName: s['completedByName'] as String?,
                       data: (s['data'] as Map?)?.cast<String, dynamic>() ?? {},
                     ),
                   ),
@@ -140,8 +202,10 @@ class _StageCard extends StatelessWidget {
   final String entered;
   final String completedText;
   final String? duration;
+  final String? plannedLabel;
   final int? delayMins;
   final bool delayed;
+  final String? completedByName;
   final Map<String, dynamic> data;
 
   const _StageCard({
@@ -149,8 +213,10 @@ class _StageCard extends StatelessWidget {
     required this.entered,
     required this.completedText,
     required this.duration,
+    required this.plannedLabel,
     required this.delayMins,
     required this.delayed,
+    required this.completedByName,
     required this.data,
   });
 
@@ -167,10 +233,14 @@ class _StageCard extends StatelessWidget {
           children: [
             Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 6),
+            Text('Planned: ${plannedLabel ?? "no deadline (unplanned)"}',
+                style: const TextStyle(fontSize: 12, color: Colors.grey)),
             Text('Entered: $entered', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             Text('Completed: $completedText', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (duration != null)
               Text('Time taken: $duration', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            if (completedByName != null)
+              Text('Done by: $completedByName', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (delayMins != null)
               Text(
                 delayed ? 'Delayed by $delayMins min' : 'On time (${-delayMins!} min to spare)',

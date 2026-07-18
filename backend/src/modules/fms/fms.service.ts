@@ -1,5 +1,6 @@
 import { prisma } from '../../lib/prisma';
-import { computeFirstAction } from '../engine/engine.service';
+import { computeFirstAction, notify } from '../engine/engine.service';
+import { addWorkingTimeForOrg } from '../engine/working-hours';
 
 // Order ko agle stage pe le jao (ya complete karo)
 export async function advanceOrder(orderId: string, orgId: string) {
@@ -11,7 +12,7 @@ export async function advanceOrder(orderId: string, orgId: string) {
 
   const done = await prisma.orderStage.findMany({
     where: { orderId, completedAt: { not: null } },
-    select: { sequence: true },
+    select: { sequence: true, completedAt: true },
   });
   const doneSeqs = new Set(done.map(d => d.sequence));
 
@@ -26,9 +27,17 @@ export async function advanceOrder(orderId: string, orgId: string) {
     return null;
   }
 
-  // Agle stage ka task banao — engine isko chase karega
-  const dueAt = next.plannedMins
-    ? new Date(Date.now() + next.plannedMins * 60_000)
+  // The clock for THIS stage starts at the PREVIOUS stage's actual completion
+  // (order.startedAt for the very first stage) — never at "now", so a late
+  // upstream stage correctly pushes every downstream deadline out with it.
+  const previousStage = done.find(d => d.sequence === next.sequence - 1);
+  const previousCompletion = previousStage?.completedAt ?? order.startedAt;
+
+  // Unplanned stages (plannedMins == null) get no deadline and are never
+  // chased — but previousCompletion above still flows into them and out the
+  // other side via their own completedAt when the NEXT stage is computed.
+  const plannedDeadline = next.plannedMins
+    ? await addWorkingTimeForOrg(orgId, previousCompletion, next.plannedMins)
     : null;
 
   const task = next.responsibleId
@@ -39,8 +48,8 @@ export async function advanceOrder(orderId: string, orgId: string) {
           source: 'FMS_STAGE',
           assigneeId: next.responsibleId,
           createdById: next.responsibleId,
-          dueAt,
-          nextActionAt: computeFirstAction(dueAt),
+          dueAt: plannedDeadline,
+          nextActionAt: plannedDeadline ? await computeFirstAction(orgId, plannedDeadline) : null,
         },
       })
     : null;
@@ -53,6 +62,7 @@ export async function advanceOrder(orderId: string, orgId: string) {
       sequence: next.sequence,
       taskId: task?.id,
       enteredAt: new Date(),
+      plannedDeadline,
     },
   });
 
@@ -62,16 +72,7 @@ export async function advanceOrder(orderId: string, orgId: string) {
   });
 
   if (next.responsibleId) {
-    await prisma.notification.create({
-      data: {
-        orgId,
-        userId: next.responsibleId,
-        type: 'FMS_STAGE',
-        title: `${order.orderNumber} — ${next.name}`,
-        body: 'An order has reached your stage.',
-        taskId: task?.id,
-      },
-    });
+    await notify(orgId, next.responsibleId, 'FMS_STAGE', `${order.orderNumber} — ${next.name}`, 'An order has reached your stage.', task?.id);
   }
 
   console.log(`🏭 ${order.orderNumber} → ${next.name}`);

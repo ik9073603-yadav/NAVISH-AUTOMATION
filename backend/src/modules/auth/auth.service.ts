@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { signToken } from '../../middleware/auth';
+import { LEGAL_VERSION } from '../legal/legal.routes';
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
@@ -36,6 +37,8 @@ export async function signup(input: {
         passwordHash,
         role: 'OWNER',
         status: 'ACTIVE',
+        termsAcceptedAt: new Date(),
+        termsVersion: LEGAL_VERSION,
       },
     });
 
@@ -57,6 +60,7 @@ export async function signup(input: {
     userId: result.owner.id,
     orgId: result.org.id,
     role: 'OWNER',
+    isSuperAdmin: false,
   });
 
   return {
@@ -89,10 +93,17 @@ export async function login(input: { email: string; password: string }) {
     throw Object.assign(new Error('Account is not active'), { status: 403 });
   }
 
+  // Suspended org — blocks new logins. Superadmins bypass this so they can
+  // still investigate a suspended org if ever needed.
+  if (!user.organization.enabled && !user.isSuperAdmin) {
+    throw Object.assign(new Error('This company account has been suspended'), { status: 403 });
+  }
+
   const token = signToken({
     userId: user.id,
     orgId: user.orgId,
     role: user.role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
+    isSuperAdmin: user.isSuperAdmin,
   });
 
   await prisma.activityLog.create({
@@ -101,7 +112,7 @@ export async function login(input: { email: string; password: string }) {
 
   return {
     token,
-    user: { id: user.id, name: user.name, email: user.email, role: user.role },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: user.isSuperAdmin },
     organization: { id: user.organization.id, name: user.organization.name },
   };
 }

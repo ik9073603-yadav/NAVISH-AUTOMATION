@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'filters.dart';
+import 'template_setup.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -39,6 +40,44 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  Future<void> _newChecklist() async {
+    final choice = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('New checklist'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'template'),
+            child: const Text('Start from template'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'blank'),
+            child: const Text('Start from scratch'),
+          ),
+        ],
+      ),
+    );
+    if (choice == null) return;
+
+    if (choice == 'blank') {
+      final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const _NewChecklistSheet(),
+      );
+      if (ok == true) _load();
+      return;
+    }
+
+    final applied = await pickAndApplyTemplate(context, 'CHECKLIST');
+    if (applied == null || !mounted) return;
+    final done = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => TemplateAssignChecklistScreen(ruleId: applied['ruleId'] as String)),
+    );
+    if (done == true) _load();
   }
 
   String _schedule(Map r) {
@@ -96,14 +135,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () async {
-          final ok = await showModalBottomSheet<bool>(
-            context: context,
-            isScrollControlled: true,
-            builder: (_) => const _NewChecklistSheet(),
-          );
-          if (ok == true) _load();
-        },
+        onPressed: _newChecklist,
         icon: const Icon(Icons.add),
         label: const Text('New checklist'),
       ),

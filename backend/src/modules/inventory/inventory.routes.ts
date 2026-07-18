@@ -2,14 +2,14 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
-import { recordMovement, checkStockAlertForSku, classifyLiquidVsDead } from './inventory.service';
+import { recordMovement, checkStockAlertForSku, classifyLiquidVsDead, generateUniqueSkuCode, canRecordMovement } from './inventory.service';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(requireAuth);
 
 const skuCreateSchema = z.object({
   name: z.string().min(1),
-  code: z.string().min(1),
+  code: z.string().min(1).optional(),
   category: z.string().optional(),
   unit: z.string().min(1).optional(),
   imageUrl: z.string().optional(),
@@ -88,12 +88,13 @@ inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req, res, 
 
     const { orgId } = req.user!;
     const opening = parsed.data.currentStock ?? 0;
+    const code = parsed.data.code?.trim() || await generateUniqueSkuCode(orgId);
 
     const sku = await prisma.sku.create({
       data: {
         orgId,
         name: parsed.data.name,
-        code: parsed.data.code.trim(),
+        code,
         category: parsed.data.category,
         unit: parsed.data.unit ?? 'pcs',
         imageUrl: parsed.data.imageUrl,
@@ -135,7 +136,10 @@ inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req, 
   }
 });
 
-// Shop-floor work — any authenticated org member can record a movement.
+// Shop-floor work — gated per-person. Owner/manager always allowed; an
+// employee needs canStockIn/canStockOut granted (see PATCH /users/:id/inventory-permissions).
+// Never trust the UI to have hidden the button — flags are re-read from the
+// DB here, not from the JWT, so a permission change takes effect immediately.
 inventoryRouter.post('/skus/:id/movement', async (req, res, next) => {
   try {
     const parsed = movementSchema.safeParse(req.body);
@@ -144,7 +148,18 @@ inventoryRouter.post('/skus/:id/movement', async (req, res, next) => {
       return res.status(400).json({ error: 'Quantity must be positive' });
     }
 
-    const { orgId, userId } = req.user!;
+    const { orgId, userId, role } = req.user!;
+
+    if (role !== 'OWNER' && role !== 'MANAGER') {
+      const actor = await prisma.user.findFirst({
+        where: { id: userId, orgId },
+        select: { canStockIn: true, canStockOut: true },
+      });
+      if (!actor || !canRecordMovement(role, actor, parsed.data.type)) {
+        return res.status(403).json({ error: `You don't have permission to record ${parsed.data.type} stock movements` });
+      }
+    }
+
     const movement = await recordMovement(
       orgId, req.params.id, parsed.data.type, parsed.data.quantity, parsed.data.reason, userId,
     );

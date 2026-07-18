@@ -37,8 +37,27 @@ model Organization {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  users       User[]
-  departments Department[]
+  // Working-hours gate for the automation engine (Feature: no 2 AM pings).
+  workingDays Int[]    @default([1, 2, 3, 4, 5, 6]) // ISO weekday: 1=Mon ... 7=Sun
+  shiftStart  String   @default("09:00")
+  shiftEnd    String   @default("18:00")
+  holidays    String[] @default([])                  // "YYYY-MM-DD", org-local calendar date
+
+  // Superadmin suspend switch — distinct from "active recently" usage metric.
+  // Blocks new logins for this org when false; existing sessions expire naturally.
+  enabled     Boolean  @default(true)
+
+  users             User[]
+  departments       Department[]
+  activityLogs      ActivityLog[]
+  resetRequests     ResetRequest[]
+  deletionRequests  DeletionRequest[]
+  tasks             Task[]
+  notifications     Notification[]
+  deviceTokens      DeviceToken[]
+  checklistRules    ChecklistRule[]
+  flows             Flow[]
+  skus              Sku[]
 
   @@map("organizations")
 }
@@ -69,6 +88,21 @@ model User {
   departmentId String?
   photoUrl     String?
   language     String        @default("en")
+
+  // Cross-org platform capability, separate from org Role. Never settable via
+  // any API — only ever flipped by a direct DB script. See scripts/set-superadmin.mjs.
+  isSuperAdmin Boolean       @default(false)
+
+  // Recorded at signup — the checkbox is mandatory, this is the audit trail.
+  termsAcceptedAt DateTime?
+  termsVersion    String?
+
+  // Per-person inventory write permissions — OWNER/MANAGER are always allowed
+  // regardless of these flags (checked in code, not stored here); these only
+  // gate EMPLOYEE. Both default false: nobody can move stock until granted.
+  canStockIn  Boolean @default(false)
+  canStockOut Boolean @default(false)
+
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -93,6 +127,8 @@ model ActivityLog {
   meta      Json?
   createdAt DateTime @default(now())
 
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   @@index([orgId, createdAt])
   @@map("activity_logs")
 }
@@ -110,6 +146,53 @@ enum TaskSource {
   CHECKLIST
   FMS_STAGE
   INVENTORY_ALERT
+}
+
+enum ResetRequestStatus {
+  PENDING
+  APPROVED
+  DENIED
+}
+
+// Employee forgot password (logged out, can't use change-password) → asks
+// their org's owner/manager to reset it for them. Distinct from change-password.
+model ResetRequest {
+  id           String              @id @default(uuid())
+  orgId        String
+  userId       String
+  status       ResetRequestStatus  @default(PENDING)
+  requestedAt  DateTime            @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status])
+  @@map("reset_requests")
+}
+
+enum DeletionRequestStatus {
+  PENDING
+  COMPLETED
+  DENIED
+}
+
+// Feature 176 — consent + data-deletion. Files a request; the org owner (or
+// superadmin) actions it manually. For now "completed" means the account is
+// deactivated, not a hard data wipe — scaffolding, not a full erasure pipeline.
+model DeletionRequest {
+  id           String                 @id @default(uuid())
+  orgId        String
+  userId       String
+  status       DeletionRequestStatus  @default(PENDING)
+  requestedAt  DateTime               @default(now())
+  resolvedAt   DateTime?
+  resolvedById String?
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, status])
+  @@map("deletion_requests")
 }
 
 model Task {
@@ -139,6 +222,8 @@ model Task {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   @@index([orgId, status])
   @@index([nextActionAt])
   @@index([assigneeId, status])
@@ -156,8 +241,25 @@ model Notification {
   readAt    DateTime?
   createdAt DateTime @default(now())
 
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
   @@index([orgId, userId, createdAt])
   @@map("notifications")
+}
+
+model DeviceToken {
+  id        String   @id @default(uuid())
+  orgId     String
+  userId    String
+  token     String   @unique
+  platform  String                  // android / ios / web
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([orgId])
+  @@map("device_tokens")
 }
 
 enum Recurrence {
@@ -187,6 +289,8 @@ model ChecklistRule {
 
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
 
   @@index([orgId, active])
   @@index([nextFireAt])
@@ -218,6 +322,7 @@ model Flow {
   orderCount  Int      @default(0)
   createdAt   DateTime @default(now())
 
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   stages StageDef[]
   orders Order[]
 
@@ -288,7 +393,13 @@ model OrderStage {
   completedAt  DateTime?
   completedById String?
   data         Json?       // custom fields ka data
-  delayMins    Int?        // planned vs actual
+  delayMins    Int?        // planned vs actual (actual − plannedDeadline, working-time aware)
+
+  // The working-time deadline computed on entry: addWorkingTime(previous
+  // stage's actual completion, this stage's plannedMins). Null when the
+  // stage itself is unplanned (plannedMins == null on its StageDef) — no
+  // deadline, no chasing, but completedAt still feeds the next stage's clock.
+  plannedDeadline DateTime?
 
   order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
 
@@ -314,6 +425,7 @@ model Sku {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   movements StockMovement[]
 
   @@unique([orgId, code])

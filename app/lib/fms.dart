@@ -4,6 +4,11 @@ import 'package:image_picker/image_picker.dart';
 import 'api.dart';
 import 'order_history.dart';
 import 'filters.dart';
+import 'contact_actions.dart';
+import 'export_actions.dart';
+import 'template_setup.dart';
+import 'offline/write_queue.dart';
+import 'flow_analytics.dart';
 
 class FmsScreen extends StatefulWidget {
   final String? currentUserId;
@@ -32,6 +37,8 @@ class _FmsScreenState extends State<FmsScreen> {
     final responsibleId = o['responsibleId'];
     return responsibleId == null || responsibleId == widget.currentUserId;
   }
+
+  bool get _canSeeAnalytics => widget.role == 'OWNER' || widget.role == 'MANAGER';
 
   @override
   void initState() {
@@ -74,16 +81,35 @@ class _FmsScreenState extends State<FmsScreen> {
         children: [
           Padding(
             padding: const EdgeInsets.all(8),
-            child: SegmentedButton<int>(
-              segments: const [
-                ButtonSegment(value: 0, label: Text('Live board')),
-                ButtonSegment(value: 1, label: Text('Bottlenecks')),
+            child: Row(
+              children: [
+                Expanded(
+                  child: SegmentedButton<int>(
+                    segments: [
+                      const ButtonSegment(value: 0, label: Text('Live board')),
+                      const ButtonSegment(value: 1, label: Text('Bottlenecks')),
+                      if (_canSeeAnalytics) const ButtonSegment(value: 2, label: Text('Analytics')),
+                    ],
+                    selected: {_view},
+                    onSelectionChanged: (s) => setState(() => _view = s.first),
+                  ),
+                ),
+                if (_flows.isNotEmpty)
+                  IconButton(
+                    icon: const Icon(Icons.ios_share),
+                    tooltip: 'Export orders',
+                    onPressed: _exportOrders,
+                  ),
               ],
-              selected: {_view},
-              onSelectionChanged: (s) => setState(() => _view = s.first),
             ),
           ),
-          Expanded(child: _view == 0 ? _board() : _bottleneckView()),
+          Expanded(
+            child: switch (_view) {
+              1 => _bottleneckView(),
+              2 when _canSeeAnalytics => const FlowAnalyticsView(),
+              _ => _board(),
+            },
+          ),
         ],
       ),
       floatingActionButton: _flows.isEmpty
@@ -154,6 +180,9 @@ class _FmsScreenState extends State<FmsScreen> {
   }
 
   Widget _ordersList() {
+    final phoneByUserId = <String, String?>{
+      for (final u in _users) u['id'] as String: u['phone'] as String?,
+    };
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -163,6 +192,7 @@ class _FmsScreenState extends State<FmsScreen> {
           final o = _orders[i];
           final done = o['status'] == 'COMPLETED';
           final delayed = o['delayed'] == true;
+          final canComplete = !done && o['orderStageId'] != null && _canComplete(o);
           return Card(
             child: ListTile(
               onTap: () => Navigator.push(
@@ -200,12 +230,22 @@ class _FmsScreenState extends State<FmsScreen> {
                     ),
                 ],
               ),
-              trailing: done || o['orderStageId'] == null || !_canComplete(o)
-                  ? null
-                  : FilledButton(
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (!done)
+                    ContactButtons(
+                      phone: phoneByUserId[o['responsibleId']],
+                      message: 'Hi, checking on: ${o['orderNumber']} — ${o['currentStage']}.',
+                      iconSize: 20,
+                    ),
+                  if (canComplete)
+                    FilledButton(
                       onPressed: () => _completeStage(o),
                       child: const Text('Complete'),
                     ),
+                ],
+              ),
             ),
           );
         },
@@ -307,6 +347,52 @@ class _FmsScreenState extends State<FmsScreen> {
         const SnackBar(content: Text('Stage done. Order moved forward.')),
       );
       _load();
+    } on OfflineQueuedException {
+      // Queued — the order's real position won't change until sync, so we
+      // deliberately don't guess where it'll land. The pending-count banner
+      // is the signal here.
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Saved offline — will sync when back online')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
+  }
+
+  Future<void> _exportOrders() async {
+    final flowId = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Export which flow?'),
+        children: _flows
+            .map((f) => SimpleDialogOption(
+                  onPressed: () => Navigator.pop(context, f['id'] as String),
+                  child: Text(f['name'] as String),
+                ))
+            .toList(),
+      ),
+    );
+    if (flowId == null || !mounted) return;
+
+    final format = await showDialog<String>(
+      context: context,
+      builder: (_) => SimpleDialog(
+        title: const Text('Format'),
+        children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'csv'), child: const Text('CSV')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'xlsx'), child: const Text('Excel (.xlsx)')),
+        ],
+      ),
+    );
+    if (format == null || !mounted) return;
+
+    try {
+      final (bytes, filename) = await Api.exportFms(flowId, format);
+      await shareExportedFile(bytes, filename);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -315,12 +401,41 @@ class _FmsScreenState extends State<FmsScreen> {
   }
 
   Future<void> _newFlow() async {
-    final ok = await showModalBottomSheet<bool>(
+    final choice = await showDialog<String>(
       context: context,
-      isScrollControlled: true,
-      builder: (_) => const _FlowBuilderSheet(),
+      builder: (_) => SimpleDialog(
+        title: const Text('New flow'),
+        children: [
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'template'),
+            child: const Text('Start from template'),
+          ),
+          SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, 'blank'),
+            child: const Text('Start from scratch'),
+          ),
+        ],
+      ),
     );
-    if (ok == true) _load();
+    if (choice == null) return;
+
+    if (choice == 'blank') {
+      final ok = await showModalBottomSheet<bool>(
+        context: context,
+        isScrollControlled: true,
+        builder: (_) => const _FlowBuilderSheet(),
+      );
+      if (ok == true) _load();
+      return;
+    }
+
+    final applied = await pickAndApplyTemplate(context, 'FMS');
+    if (applied == null || !mounted) return;
+    final done = await Navigator.push<bool>(
+      context,
+      MaterialPageRoute(builder: (_) => TemplateAssignStagesScreen(flowId: applied['flowId'] as String)),
+    );
+    if (done == true) _load();
   }
 }
 

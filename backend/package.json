@@ -9,6 +9,7 @@
     "start": "node dist/index.js"
   },
   "devDependencies": {
+    "@types/archiver": "^8.0.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^5.0.6",
@@ -22,11 +23,14 @@
   "dependencies": {
     "@prisma/client": "^6.16.2",
     "@supabase/supabase-js": "^2.110.2",
+    "archiver": "^8.0.0",
     "bcryptjs": "^3.0.3",
     "bullmq": "^5.80.1",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
+    "exceljs": "^4.4.0",
     "express": "^5.2.1",
+    "firebase-admin": "^14.1.0",
     "ioredis": "^5.11.1",
     "jsonwebtoken": "^9.0.3",
     "multer": "^2.2.0",

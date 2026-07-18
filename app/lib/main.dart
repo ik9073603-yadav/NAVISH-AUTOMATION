@@ -5,10 +5,25 @@ import 'checklist.dart';
 import 'fms.dart';
 import 'filters.dart';
 import 'inventory.dart';
+import 'push.dart';
+import 'stuck.dart';
+import 'settings.dart';
+import 'change_password.dart';
+import 'reset_requests.dart';
+import 'analytics.dart';
+import 'admin.dart';
+import 'signup.dart';
+import 'legal.dart';
+import 'deletion_requests.dart';
+import 'offline/write_queue.dart';
+import 'offline/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Api.loadToken();
+  await PushService.init();
+  await WriteQueue.init();
+  ConnectivityService.start(Api.flushQueue);
   runApp(const NavishApp());
 }
 
@@ -20,6 +35,7 @@ class NavishApp extends StatelessWidget {
     return MaterialApp(
       title: 'Navish',
       debugShowCheckedModeBanner: false,
+      scaffoldMessengerKey: PushService.scaffoldMessengerKey,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F5132)),
         useMaterial3: true,
@@ -46,6 +62,7 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() { _loading = true; _error = null; });
     try {
       await Api.login(_email.text.trim(), _password.text);
+      await PushService.registerToken();
       if (!mounted) return;
       Navigator.pushReplacement(
         context, MaterialPageRoute(builder: (_) => const HomeScreen()),
@@ -54,6 +71,42 @@ class _LoginScreenState extends State<LoginScreen> {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _forgotPassword() async {
+    final controller = TextEditingController(text: _email.text.trim());
+    final email = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Forgot password'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.emailAddress,
+          decoration: const InputDecoration(
+            labelText: 'Your email', border: OutlineInputBorder()),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Request reset'),
+          ),
+        ],
+      ),
+    );
+    if (email == null || email.isEmpty) return;
+    try {
+      final message = await Api.requestPasswordReset(email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
     }
   }
 
@@ -105,6 +158,16 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                       : const Text('Log in'),
                 ),
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _forgotPassword,
+                  child: const Text('Forgot password?'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.push(
+                      context, MaterialPageRoute(builder: (_) => const SignupScreen())),
+                  child: const Text("New company? Create an account"),
+                ),
               ],
             ),
           ),
@@ -121,7 +184,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _user;
   List<dynamic> _tasks = [];
   List<dynamic> _notifs = [];
@@ -130,10 +193,36 @@ class _HomeScreenState extends State<HomeScreen> {
   String _taskStatus = 'ACTIVE';
   DateRangePreset _datePreset = DateRangePreset.all;
   bool get _isOwner => _user?['role'] == 'OWNER' || _user?['role'] == 'MANAGER';
+  bool get _isOwnerRole => _user?['role'] == 'OWNER';
+  bool get _isSuperAdmin => _user?['isSuperAdmin'] == true;
 
   @override
   void initState() {
     super.initState();
+    _load();
+    PushService.pendingTap.addListener(_onPushTapLive);
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  // Extra reliability alongside the connectivity-change trigger: a resumed
+  // app is a natural moment to try flushing anything still queued.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) Api.flushQueue();
+  }
+
+  @override
+  void dispose() {
+    PushService.pendingTap.removeListener(_onPushTapLive);
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  // A tap that arrives while this screen is already alive (app was only
+  // backgrounded, not relaunched) needs a fresh _load() — otherwise we'd
+  // switch tabs onto whatever stale list was fetched before the push fired.
+  void _onPushTapLive() {
+    if (PushService.pendingTap.value == null) return;
     _load();
   }
 
@@ -144,6 +233,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final tasks = await Api.myTasks(status: _taskStatus, from: _datePreset.from);
       final notifs = await Api.notifications();
       setState(() { _user = user; _tasks = tasks; _notifs = notifs; });
+      _consumePendingTap();
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context)
@@ -154,13 +244,98 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  // Deep link from a tapped push: jump to the tab for whatever fired it.
+  // No per-task detail screen exists yet, so we land on the relevant module
+  // (the item itself is right there at the top of that list).
+  void _consumePendingTap() {
+    final data = PushService.pendingTap.value;
+    if (data == null || _user == null) return;
+    final type = data['type'] as String?;
+    setState(() => _tab = _tabForPushType(type));
+    PushService.pendingTap.value = null;
+  }
+
+  int _tabForPushType(String? type) {
+    if (_isOwner) {
+      switch (type) {
+        case 'CHECKLIST_DUE': return 2;
+        case 'FMS_STAGE': return 3;
+        case 'INVENTORY_ALERT': return 4;
+        default: return 1; // CHASE, TASK_ASSIGNED, ESCALATION
+      }
+    }
+    switch (type) {
+      case 'INVENTORY_ALERT': return 1;
+      default: return 0;
+    }
+  }
+
+  // Stuck tab rows deep-link into a sibling owner tab.
+  int _tabForModule(String module) {
+    switch (module) {
+      case 'CHECKLISTS': return 2;
+      case 'FMS': return 3;
+      case 'INVENTORY': return 4;
+      default: return 1; // TASKS
+    }
+  }
+
   Future<void> _done(String id) async {
-    await Api.markDone(id);
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Done ✅  Chasing stopped.')),
+    try {
+      await Api.markDone(id);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Done ✅  Chasing stopped.')),
+      );
+      _load();
+    } on OfflineQueuedException {
+      // Still offline — reflect it locally now; the real sync happens later.
+      if (!mounted) return;
+      setState(() => _tasks = _tasks.where((t) => t['id'] != id).toList());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Saved offline — will sync when back online')),
+      );
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    }
+  }
+
+  Future<void> _editPhone() async {
+    final controller = TextEditingController(text: _user?['phone'] as String? ?? '');
+    final result = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('Your phone number'),
+        content: TextField(
+          controller: controller,
+          keyboardType: TextInputType.phone,
+          decoration: const InputDecoration(
+            labelText: 'Phone',
+            hintText: '9876543210',
+            border: OutlineInputBorder(),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
     );
-    _load();
+    if (result == null) return;
+    try {
+      await Api.updateMyPhone(result.isEmpty ? null : result);
+      _load();
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      }
+    }
   }
 
   @override
@@ -171,12 +346,62 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(_user?['name'] ?? 'Navish'),
+        title: GestureDetector(
+          onTap: _editPhone,
+          child: Text(_user?['name'] ?? 'Navish'),
+        ),
         actions: [
+          if (_isSuperAdmin)
+            IconButton(
+              icon: const Icon(Icons.admin_panel_settings),
+              tooltip: 'Navish Admin',
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const AdminScreen())),
+            ),
+          if (_isOwnerRole)
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Company settings',
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const SettingsScreen())),
+            ),
+          if (_isOwner)
+            IconButton(
+              icon: const Icon(Icons.lock_reset),
+              tooltip: 'Password reset requests',
+              onPressed: () => Navigator.push(
+                  context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen())),
+            ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.person_outline),
+            tooltip: 'Profile',
+            onSelected: (choice) {
+              if (choice == 'phone') _editPhone();
+              if (choice == 'password') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ChangePasswordScreen()));
+              }
+              if (choice == 'legal') {
+                Navigator.push(context, MaterialPageRoute(builder: (_) => const LegalScreen()));
+              }
+              if (choice == 'deletion_requests') {
+                Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const DeletionRequestsScreen()));
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'phone', child: Text('Edit phone number')),
+              const PopupMenuItem(value: 'password', child: Text('Change password')),
+              const PopupMenuItem(value: 'legal', child: Text('Legal (Terms / Privacy / Delete account)')),
+              if (_isOwnerRole)
+                const PopupMenuItem(value: 'deletion_requests', child: Text('Account deletion requests')),
+            ],
+          ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () async {
+              await PushService.unregisterToken();
               await Api.logout();
               if (!mounted) return;
               Navigator.pushReplacement(
@@ -185,28 +410,47 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: _isOwner
-          ? [
-              const OwnerScreen(),
-              const ChecklistScreen(),
-              FmsScreen(currentUserId: _user?['id'] as String?, role: _user?['role'] as String?),
-              InventoryScreen(role: _user?['role'] as String?),
-              _notifsView(),
-            ][_tab]
-          : [
-              _tasksView(),
-              InventoryScreen(role: _user?['role'] as String?),
-              _notifsView(),
-            ][_tab],
+      body: Column(
+        children: [
+          _offlineBanner(),
+          Expanded(
+            child: _isOwner
+                ? [
+                    StuckScreen(onNavigateToModule: (m) => setState(() => _tab = _tabForModule(m))),
+                    const OwnerScreen(),
+                    const ChecklistScreen(),
+                    FmsScreen(currentUserId: _user?['id'] as String?, role: _user?['role'] as String?),
+                    InventoryScreen(
+                      role: _user?['role'] as String?,
+                      canStockIn: _user?['canStockIn'] == true,
+                      canStockOut: _user?['canStockOut'] == true,
+                    ),
+                    const AnalyticsScreen(),
+                    _notifsView(),
+                  ][_tab]
+                : [
+                    _tasksView(),
+                    InventoryScreen(
+                      role: _user?['role'] as String?,
+                      canStockIn: _user?['canStockIn'] == true,
+                      canStockOut: _user?['canStockOut'] == true,
+                    ),
+                    _notifsView(),
+                  ][_tab],
+          ),
+        ],
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
         destinations: _isOwner
             ? const [
+                NavigationDestination(icon: Icon(Icons.warning_amber), label: 'Stuck'),
                 NavigationDestination(icon: Icon(Icons.list_alt), label: 'Tasks'),
                 NavigationDestination(icon: Icon(Icons.event_repeat), label: 'Checklists'),
-                NavigationDestination(icon: Icon(Icons.account_tree), label: 'FMS'),
+                NavigationDestination(icon: Icon(Icons.account_tree), label: 'Flows'),
                 NavigationDestination(icon: Icon(Icons.inventory_2), label: 'Inventory'),
+                NavigationDestination(icon: Icon(Icons.analytics), label: 'Analytics'),
                 NavigationDestination(icon: Icon(Icons.notifications), label: 'Alerts'),
               ]
             : const [
@@ -281,6 +525,49 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  // Slim status strip: offline, pending-sync count, or actively syncing.
+  // Never blocks the UI — just tells the user what's going on.
+  Widget _offlineBanner() {
+    return ValueListenableBuilder<bool>(
+      valueListenable: ConnectivityService.isOnline,
+      builder: (_, online, __) => ValueListenableBuilder<int>(
+        valueListenable: WriteQueue.pendingCount,
+        builder: (_, pending, ___) => ValueListenableBuilder<bool>(
+          valueListenable: WriteQueue.syncing,
+          builder: (_, syncing, ____) {
+            if (online && pending == 0 && !syncing) return const SizedBox.shrink();
+
+            final String text;
+            final Color color;
+            if (syncing) {
+              text = 'Syncing $pending change${pending == 1 ? '' : 's'}...';
+              color = Colors.blue.shade700;
+            } else if (!online) {
+              text = pending > 0
+                  ? 'Offline — $pending change${pending == 1 ? '' : 's'} will sync'
+                  : 'Offline — will sync';
+              color = Colors.orange.shade800;
+            } else {
+              text = '$pending change${pending == 1 ? '' : 's'} pending sync';
+              color = Colors.orange.shade800;
+            }
+
+            return Container(
+              width: double.infinity,
+              color: color,
+              padding: const EdgeInsets.symmetric(vertical: 6),
+              child: Text(
+                text,
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+              ),
+            );
+          },
+        ),
       ),
     );
   }

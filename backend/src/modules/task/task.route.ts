@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
-import { computeFirstAction } from '../engine/engine.service';
+import { computeFirstAction, notify } from '../engine/engine.service';
 import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 
 export const taskRouter = Router();
@@ -39,16 +39,11 @@ taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next) => 
         createdById: userId,
         dueAt,
         priority: parsed.data.priority ?? 'NORMAL',
-        nextActionAt: computeFirstAction(dueAt),
+        nextActionAt: await computeFirstAction(orgId, dueAt),
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        orgId, userId: assignee.id, type: 'TASK_ASSIGNED',
-        title: `New task: ${task.title}`, body: 'You have been assigned a new task.', taskId: task.id,
-      },
-    });
+    await notify(orgId, assignee.id, 'TASK_ASSIGNED', `New task: ${task.title}`, 'You have been assigned a new task.', task.id);
 
     res.status(201).json(task);
   } catch (err) { next(err); }
@@ -183,6 +178,8 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next)
       select: { id: true },
     });
 
+    const nextActionAt = await computeFirstAction(orgId, dueAt);
+
     const created = await Promise.all(valid.map(u =>
       prisma.task.create({
         data: {
@@ -193,7 +190,7 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next)
           createdById: userId,
           dueAt,
           priority: parsed.data.priority ?? 'NORMAL',
-          nextActionAt: computeFirstAction(dueAt),
+          nextActionAt,
         },
       })
     ));

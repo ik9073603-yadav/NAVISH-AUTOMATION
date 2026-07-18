@@ -1,5 +1,5 @@
 import { prisma } from '../../lib/prisma';
-import { computeFirstAction } from '../engine/engine.service';
+import { computeFirstAction, notify } from '../engine/engine.service';
 
 // Agla occurrence kab? (sirf agla — infinite rows nahi banate)
 export function computeNextFire(rule: {
@@ -44,7 +44,7 @@ export async function fireDueChecklists() {
   for (const rule of due) {
     const dueAt = rule.nextFireAt!;
 
-    await prisma.task.create({
+    const task = await prisma.task.create({
       data: {
         orgId: rule.orgId,
         title: rule.title,
@@ -55,19 +55,11 @@ export async function fireDueChecklists() {
         dueAt,
         priority: rule.priority,
         ruleId: rule.id,
-        nextActionAt: computeFirstAction(dueAt),   // engine yahan se chase karega
+        nextActionAt: await computeFirstAction(rule.orgId, dueAt),   // engine yahan se chase karega
       },
     });
 
-    await prisma.notification.create({
-      data: {
-        orgId: rule.orgId,
-        userId: rule.assigneeId,
-        type: 'CHECKLIST_DUE',
-        title: rule.title,
-        body: 'Your recurring checklist is due.',
-      },
-    });
+    await notify(rule.orgId, rule.assigneeId, 'CHECKLIST_DUE', rule.title, 'Your recurring checklist is due.', task.id);
 
     // Agla occurrence set karo
     await prisma.checklistRule.update({

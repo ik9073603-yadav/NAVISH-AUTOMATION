@@ -12,7 +12,10 @@ userRouter.get('/', async (req, res, next) => {
   try {
     const users = await prisma.user.findMany({
       where: { orgId: req.user!.orgId, status: 'ACTIVE' },
-      select: { id: true, name: true, email: true, role: true, managerId: true },
+      select: {
+        id: true, name: true, email: true, phone: true, role: true, managerId: true,
+        canStockIn: true, canStockOut: true,
+      },
       orderBy: { name: 'asc' },
     });
     res.json(users);
@@ -58,5 +61,39 @@ userRouter.post('/', requireRole('OWNER'), async (req, res, next) => {
     });
 
     res.status(201).json(user);
+  } catch (err) { next(err); }
+});
+
+const inventoryPermissionsSchema = z.object({
+  canStockIn: z.boolean(),
+  canStockOut: z.boolean(),
+});
+
+// Grants/revokes an employee's Stock IN / Stock OUT capability. OWNER and
+// MANAGER always have both regardless of these flags (enforced in code, not
+// stored) — this only matters for EMPLOYEE, but is harmless to set on anyone.
+userRouter.patch('/:id/inventory-permissions', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const parsed = inventoryPermissionsSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId, userId: actorId } = req.user!;
+    const target = await prisma.user.findFirst({ where: { id: req.params.id, orgId } });
+    if (!target) return res.status(404).json({ error: 'Person not found in your company' });
+
+    const updated = await prisma.user.update({
+      where: { id: target.id },
+      data: { canStockIn: parsed.data.canStockIn, canStockOut: parsed.data.canStockOut },
+      select: { id: true, name: true, canStockIn: true, canStockOut: true },
+    });
+
+    await prisma.activityLog.create({
+      data: {
+        orgId, actorId, action: 'INVENTORY_PERMISSIONS_UPDATED', entity: 'User', entityId: target.id,
+        meta: { canStockIn: updated.canStockIn, canStockOut: updated.canStockOut },
+      },
+    });
+
+    res.json(updated);
   } catch (err) { next(err); }
 });
