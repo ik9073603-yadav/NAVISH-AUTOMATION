@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 
 // Cross-org platform view. Only ever pushed onto the nav for accounts where
 // isSuperAdmin is true (checked in main.dart) — regular users never see this.
@@ -69,9 +71,9 @@ class _AdminScreenState extends State<AdminScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Navish Admin')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerSkeletonList()
           : _error != null
-              ? Center(child: Text(_error!, style: const TextStyle(color: Colors.red)))
+              ? Center(child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger)))
               : RefreshIndicator(
                   onRefresh: _load,
                   child: ListView(

@@ -3,6 +3,7 @@ import 'api.dart';
 import 'filters.dart';
 import 'contact_actions.dart';
 import 'responsive.dart';
+import 'widgets/motion.dart';
 
 class OwnerScreen extends StatefulWidget {
   const OwnerScreen({super.key});
@@ -49,7 +50,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Center(child: CircularProgressIndicator());
+      return const ShimmerSkeletonList();
     }
 
     return Scaffold(
@@ -119,28 +120,31 @@ class _OwnerScreenState extends State<OwnerScreen> {
           final t = _tasks[i];
           final escalated = t['escalatedAt'] != null;
           final done = t['status'] == 'DONE';
-          return Card(
-            child: ListTile(
-              leading: Icon(
-                done ? Icons.check_circle : (escalated ? Icons.warning : Icons.schedule),
-                color: done ? Colors.green : (escalated ? Colors.red : Colors.orange),
-              ),
-              title: Text(t['title']),
-              subtitle: Text(
-                '${t['assigneeName']} · ${t['status']}'
-                '${t['chaseCount'] > 0 ? " · chased ${t['chaseCount']}x" : ""}'
-                '${escalated ? " · ESCALATED" : ""}',
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(t['priority'], style: const TextStyle(fontSize: 11)),
-                  ContactButtons(
-                    phone: phoneByAssignee[t['assigneeId']],
-                    message: 'Hi ${t['assigneeName']}, checking on: ${t['title']}.',
-                    iconSize: 20,
-                  ),
-                ],
+          return StaggeredListItem(
+            index: i,
+            child: Card(
+              child: ListTile(
+                leading: Icon(
+                  done ? Icons.check_circle : (escalated ? Icons.warning : Icons.schedule),
+                  color: done ? Colors.green : (escalated ? Colors.red : Colors.orange),
+                ),
+                title: Text(t['title']),
+                subtitle: Text(
+                  '${t['assigneeName']} · ${t['status']}'
+                  '${t['chaseCount'] > 0 ? " · chased ${t['chaseCount']}x" : ""}'
+                  '${escalated ? " · ESCALATED" : ""}',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(t['priority'], style: const TextStyle(fontSize: 11)),
+                    ContactButtons(
+                      phone: phoneByAssignee[t['assigneeId']],
+                      message: 'Hi ${t['assigneeName']}, checking on: ${t['title']}.',
+                      iconSize: 20,
+                    ),
+                  ],
+                ),
               ),
             ),
           );
@@ -168,41 +172,44 @@ class _OwnerScreenState extends State<OwnerScreen> {
           final s = statsByUserId[u['id']];
           final role = u['role'] as String;
           final hasInventoryAccess = u['canStockIn'] == true || u['canStockOut'] == true;
-          return Card(
-            child: ListTile(
-              title: Text(u['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                s == null
-                    ? 'No tasks yet · $role'
-                    : 'Done ${s['done']}/${s['total']} · On-time ${s['onTimePct']}%'
-                      '${s['escalated'] > 0 ? " · ${s['escalated']} escalated" : ""}',
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (role == 'EMPLOYEE')
-                    IconButton(
-                      icon: Icon(
-                        hasInventoryAccess ? Icons.inventory : Icons.inventory_2_outlined,
-                        color: hasInventoryAccess ? Colors.green : null,
+          return StaggeredListItem(
+            index: i,
+            child: Card(
+              child: ListTile(
+                title: Text(u['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  s == null
+                      ? 'No tasks yet · $role'
+                      : 'Done ${s['done']}/${s['total']} · On-time ${s['onTimePct']}%'
+                        '${s['escalated'] > 0 ? " · ${s['escalated']} escalated" : ""}',
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (role == 'EMPLOYEE')
+                      IconButton(
+                        icon: Icon(
+                          hasInventoryAccess ? Icons.inventory : Icons.inventory_2_outlined,
+                          color: hasInventoryAccess ? Colors.green : null,
+                        ),
+                        tooltip: 'Inventory permissions',
+                        onPressed: () => _editInventoryPermissions(u),
                       ),
-                      tooltip: 'Inventory permissions',
-                      onPressed: () => _editInventoryPermissions(u),
+                    ContactButtons(
+                      phone: u['phone'] as String?,
+                      message: 'Hi ${u['name']}, ',
+                      iconSize: 20,
                     ),
-                  ContactButtons(
-                    phone: u['phone'] as String?,
-                    message: 'Hi ${u['name']}, ',
-                    iconSize: 20,
-                  ),
-                  if (s != null)
-                    CircleAvatar(
-                      backgroundColor: s['onTimePct'] >= 80
-                          ? Colors.green
-                          : (s['onTimePct'] >= 50 ? Colors.orange : Colors.red),
-                      child: Text('${s['onTimePct']}',
-                          style: const TextStyle(color: Colors.white, fontSize: 12)),
-                    ),
-                ],
+                    if (s != null)
+                      CircleAvatar(
+                        backgroundColor: s['onTimePct'] >= 80
+                            ? Colors.green
+                            : (s['onTimePct'] >= 50 ? Colors.orange : Colors.red),
+                        child: Text('${s['onTimePct']}',
+                            style: const TextStyle(color: Colors.white, fontSize: 12)),
+                      ),
+                  ],
+                ),
               ),
             ),
           );

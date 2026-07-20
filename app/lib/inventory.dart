@@ -5,6 +5,8 @@ import 'package:barcode_widget/barcode_widget.dart';
 import 'api.dart';
 import 'export_actions.dart';
 import 'responsive.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 import 'offline/write_queue.dart';
 
 class InventoryScreen extends StatefulWidget {
@@ -49,7 +51,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const Scaffold(body: ShimmerSkeletonList());
 
     return Scaffold(
       body: RefreshIndicator(
@@ -69,7 +71,8 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 child: Center(child: Text('No SKUs found')),
               )
             else
-              ..._skus.map(_skuTile),
+              for (final (i, sku) in _skus.indexed)
+                StaggeredListItem(index: i, child: _skuTile(sku)),
             const SizedBox(height: 80),
           ],
         ),
@@ -112,7 +115,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _statTile('₹${(s['totalStockValue'] as num).toStringAsFixed(0)}', 'Stock value'),
-                _statTile('$lowCount', 'Low stock', color: lowCount > 0 ? Colors.red : null),
+                _statTile('$lowCount', 'Low stock', color: lowCount > 0 ? AppColors.of(context).danger : null),
                 _statTile(
                   '$deadCount',
                   'Dead (₹${(s['deadStockValue'] as num).toStringAsFixed(0)})',
@@ -168,9 +171,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _skuTile(dynamic sku) {
     final liquidClass = sku['liquidClass'] as String;
     final isLow = sku['isLow'] == true;
+    final semantic = AppColors.of(context);
     final badgeColor = switch (liquidClass) {
-      'LIQUID' => Colors.green,
-      'SLOW' => Colors.amber.shade800,
+      'LIQUID' => semantic.success,
+      'SLOW' => semantic.warning,
       _ => Colors.grey,
     };
 
@@ -181,7 +185,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
         subtitle: Text(
           '${sku['code']} · ${sku['currentStock']} ${sku['unit']}',
           style: TextStyle(
-            color: isLow ? Colors.red : null,
+            color: isLow ? semantic.danger : null,
             fontWeight: isLow ? FontWeight.w600 : null,
           ),
         ),

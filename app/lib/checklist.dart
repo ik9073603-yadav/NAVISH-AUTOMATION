@@ -3,6 +3,7 @@ import 'api.dart';
 import 'filters.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
+import 'widgets/motion.dart';
 
 class ChecklistScreen extends StatefulWidget {
   const ChecklistScreen({super.key});
@@ -97,7 +98,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const Scaffold(body: ShimmerSkeletonList());
 
     return Scaffold(
       body: Column(
@@ -152,21 +153,24 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 itemBuilder: (_, i) {
                   final r = _rules[i];
                   final active = r['active'] == true;
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(Icons.event_repeat,
-                          color: active ? Colors.green : Colors.grey),
-                      title: Text(r['title'],
-                          style: TextStyle(
-                              fontWeight: FontWeight.w600,
-                              color: active ? null : Colors.grey)),
-                      subtitle: Text('${r['assigneeName']} · ${_schedule(r)}'),
-                      trailing: Switch(
-                        value: active,
-                        onChanged: (_) async {
-                          await Api.toggleChecklist(r['id']);
-                          _load();
-                        },
+                  return StaggeredListItem(
+                    index: i,
+                    child: Card(
+                      child: ListTile(
+                        leading: Icon(Icons.event_repeat,
+                            color: active ? Colors.green : Colors.grey),
+                        title: Text(r['title'],
+                            style: TextStyle(
+                                fontWeight: FontWeight.w600,
+                                color: active ? null : Colors.grey)),
+                        subtitle: Text('${r['assigneeName']} · ${_schedule(r)}'),
+                        trailing: Switch(
+                          value: active,
+                          onChanged: (_) async {
+                            await Api.toggleChecklist(r['id']);
+                            _load();
+                          },
+                        ),
                       ),
                     ),
                   );

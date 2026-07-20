@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'api.dart';
 import 'contact_actions.dart';
 import 'order_history.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 
 class StuckScreen extends StatefulWidget {
   // Lets the Stuck tab jump to a sibling tab in the owner's bottom nav
@@ -52,6 +55,17 @@ class _StuckScreenState extends State<StuckScreen> {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_items.isEmpty) {
+      final reduced = reducedMotion(context);
+      final theme = Theme.of(context);
+
+      Widget title = Text('Nothing is stuck.', style: theme.textTheme.headlineMedium);
+      Widget subtitle = Text('Everything is running.',
+          style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant));
+      if (!reduced) {
+        title = title.animate().fadeIn(delay: 300.ms, duration: 400.ms);
+        subtitle = subtitle.animate().fadeIn(delay: 420.ms, duration: 400.ms);
+      }
+
       return RefreshIndicator(
         onRefresh: _load,
         child: ListView(
@@ -63,13 +77,11 @@ class _StuckScreenState extends State<StuckScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.check_circle_outline, size: 72, color: Colors.green.shade400),
-                    const SizedBox(height: 20),
-                    const Text('Nothing is stuck.',
-                        style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                    const BreathingCheck(size: 110),
+                    const SizedBox(height: 24),
+                    title,
                     const SizedBox(height: 6),
-                    Text('Everything is running.',
-                        style: TextStyle(fontSize: 15, color: Colors.grey.shade600)),
+                    subtitle,
                   ],
                 ),
               ),
@@ -111,10 +123,13 @@ class _StuckScreenState extends State<StuckScreen> {
                   ],
                 ),
               ),
-              ...items.map((item) => _StuckRow(
-                    item: item,
-                    phone: _phoneById[item['whoId']],
-                    onTap: () => _openItem(item),
+              ...items.indexed.map((entry) => StaggeredListItem(
+                    index: entry.$1,
+                    child: _StuckRow(
+                      item: entry.$2,
+                      phone: _phoneById[entry.$2['whoId']],
+                      onTap: () => _openItem(entry.$2),
+                    ),
                   )),
             ],
           );
@@ -168,11 +183,12 @@ class _StuckRow extends StatelessWidget {
 
   const _StuckRow({required this.item, required this.phone, required this.onTap});
 
-  Color _severityColor() {
+  Color _severityColor(BuildContext context) {
+    final semantic = AppColors.of(context);
     switch (item['severity']) {
-      case 'HIGH': return Colors.red;
-      case 'MEDIUM': return Colors.orange;
-      default: return Colors.amber.shade700;
+      case 'HIGH': return semantic.danger;
+      case 'MEDIUM': return semantic.warning;
+      default: return semantic.warning;
     }
   }
 
@@ -186,7 +202,7 @@ class _StuckRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final who = item['who'] as String;
     final stuckForMins = item['stuckForMins'] as int;
-    final color = _severityColor();
+    final color = _severityColor(context);
 
     return Card(
       color: color.withValues(alpha: 0.06),

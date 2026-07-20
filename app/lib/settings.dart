@@ -8,6 +8,7 @@ import 'push.dart';
 import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
+import 'widgets/motion.dart';
 
 const _commonTimezones = [
   'Asia/Kolkata',
@@ -201,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return const Scaffold(body: ShimmerSkeletonList());
     }
 
     return Scaffold(
@@ -324,7 +325,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: const Text('Approve or deny employees who forgot their password'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen())),
+                    context, sharedAxisRoute(const ResetRequestsScreen())),
               ),
             ),
             const SizedBox(height: 28),

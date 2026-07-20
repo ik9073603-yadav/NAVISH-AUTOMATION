@@ -7,6 +7,8 @@ import 'change_password.dart';
 import 'legal.dart';
 import 'deletion_requests.dart';
 import 'responsive.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 
 // The account's own profile — picture, identity fields, preferences, and the
 // entry points (change password / performance / logout) that used to live in
@@ -125,9 +127,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _openPerformance() {
     if (_isOwnerOrManager) {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const AnalyticsScreen()));
+      Navigator.push(context, sharedAxisRoute(const AnalyticsScreen()));
     } else {
-      Navigator.push(context, MaterialPageRoute(builder: (_) => const MyStatsScreen()));
+      Navigator.push(context, sharedAxisRoute(const MyStatsScreen()));
     }
   }
 
@@ -136,7 +138,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerSkeletonList()
           : RefreshIndicator(
               onRefresh: _load,
               child: MaxWidthCenter(
@@ -196,7 +198,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             title: const Text('Change password'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.push(context,
-                                MaterialPageRoute(builder: (_) => const ChangePasswordScreen())),
+                                sharedAxisRoute(const ChangePasswordScreen())),
                           ),
                           const Divider(height: 1),
                           ListTile(
@@ -211,7 +213,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             title: const Text('Legal (Terms / Privacy / Delete account)'),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.push(
-                                context, MaterialPageRoute(builder: (_) => const LegalScreen())),
+                                context, sharedAxisRoute(const LegalScreen())),
                           ),
                           if (_isOwner) ...[
                             const Divider(height: 1),
@@ -220,7 +222,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                               title: const Text('Account deletion requests'),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () => Navigator.push(context,
-                                  MaterialPageRoute(builder: (_) => const DeletionRequestsScreen())),
+                                  sharedAxisRoute(const DeletionRequestsScreen())),
                             ),
                           ],
                         ],
@@ -228,7 +230,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                     const SizedBox(height: 28),
                     OutlinedButton.icon(
-                      style: OutlinedButton.styleFrom(foregroundColor: Colors.red),
+                      style: OutlinedButton.styleFrom(foregroundColor: AppColors.of(context).danger),
                       onPressed: widget.onLogout,
                       icon: const Icon(Icons.logout),
                       label: const Text('Logout'),
@@ -281,9 +283,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             ],
           ),
           const SizedBox(height: 12),
-          Text(displayName, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(displayName, style: Theme.of(context).textTheme.headlineSmall),
           if (_user?['designation'] != null && (_user!['designation'] as String).isNotEmpty)
-            Text(_user!['designation'] as String, style: TextStyle(color: Colors.grey.shade600)),
+            Text(_user!['designation'] as String,
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -384,7 +387,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('My performance')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerSkeletonList()
           : _error != null
               ? Center(child: Text(_error!))
               : MaxWidthCenter(
@@ -396,17 +399,17 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: _statCard('Active tasks', '$_activeCount', Colors.orange)),
+                            Expanded(child: _statCard('Active tasks', '$_activeCount', AppColors.of(context).warning)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard('Completed', '$_doneCount', Colors.green)),
+                            Expanded(child: _statCard('Completed', '$_doneCount', AppColors.of(context).success)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(child: _statCard('On-time %', '$onTimePct%', Colors.blue)),
+                            Expanded(child: _statCard('On-time %', '$onTimePct%', AppColors.of(context).info)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard('Escalated', '$_escalatedCount', Colors.red)),
+                            Expanded(child: _statCard('Escalated', '$_escalatedCount', AppColors.of(context).danger)),
                           ],
                         ),
                       ],
@@ -425,7 +428,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
           children: [
             Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Colors.grey.shade600)),
+            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       ),

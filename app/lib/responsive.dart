@@ -55,12 +55,17 @@ Future<T?> showAdaptiveSheet<T>({
       builder: builder,
     );
   }
+  // Sized relative to the real viewport, not a fixed constant — widgets like
+  // DraggableScrollableSheet size their fixed (non-scrolling) content against
+  // whatever height they're given, and a too-small fixed box makes that
+  // content overflow on short windows.
+  final screenHeight = MediaQuery.sizeOf(context).height;
   return showDialog<T>(
     context: context,
     builder: (ctx) => Dialog(
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 560, maxHeight: 720),
+        constraints: BoxConstraints(maxWidth: 560, maxHeight: screenHeight * 0.88),
         child: Material(
           type: MaterialType.transparency,
           child: builder(ctx),

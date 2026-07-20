@@ -48,6 +48,10 @@ dependencies:
   connectivity_plus: ^7.3.0
   uuid: ^4.6.0
   barcode_widget: ^2.0.4
+  google_fonts: ^6.2.1
+  flutter_animate: ^4.5.2
+  animations: ^2.0.11
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:

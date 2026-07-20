@@ -8,6 +8,7 @@ import 'contact_actions.dart';
 import 'export_actions.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
+import 'widgets/motion.dart';
 import 'offline/write_queue.dart';
 import 'flow_analytics.dart';
 
@@ -75,7 +76,7 @@ class _FmsScreenState extends State<FmsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) return const Center(child: CircularProgressIndicator());
+    if (_loading) return const Scaffold(body: ShimmerSkeletonList());
 
     return Scaffold(
       body: Column(
@@ -194,58 +195,59 @@ class _FmsScreenState extends State<FmsScreen> {
           final done = o['status'] == 'COMPLETED';
           final delayed = o['delayed'] == true;
           final canComplete = !done && o['orderStageId'] != null && _canComplete(o);
-          return Card(
-            child: ListTile(
-              onTap: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => OrderHistoryScreen(
+          return StaggeredListItem(
+            index: i,
+            child: Card(
+              child: ListTile(
+                onTap: () => Navigator.push(
+                  context,
+                  sharedAxisRoute(OrderHistoryScreen(
                     orderId: o['id'] as String,
                     orderNumber: o['orderNumber'] as String,
-                  ),
+                  )),
                 ),
-              ),
-              leading: Icon(
-                done
-                    ? Icons.check_circle
-                    : (delayed ? Icons.warning : Icons.local_shipping),
-                color: done
-                    ? Colors.green
-                    : (delayed ? Colors.red : Colors.blue),
-              ),
-              title: Text(o['orderNumber'],
-                  style: const TextStyle(fontWeight: FontWeight.bold)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(done
-                      ? 'Completed'
-                      : 'At: ${o['currentStage']}  (${o['doneStages']}/${o['totalStages']})'),
-                  if (!done)
-                    Text(
-                      _sitting(o['sittingMins'] as int),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: delayed ? Colors.red : Colors.grey,
+                leading: Icon(
+                  done
+                      ? Icons.check_circle
+                      : (delayed ? Icons.warning : Icons.local_shipping),
+                  color: done
+                      ? Colors.green
+                      : (delayed ? Colors.red : Colors.blue),
+                ),
+                title: Text(o['orderNumber'],
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(done
+                        ? 'Completed'
+                        : 'At: ${o['currentStage']}  (${o['doneStages']}/${o['totalStages']})'),
+                    if (!done)
+                      Text(
+                        _sitting(o['sittingMins'] as int),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: delayed ? Colors.red : Colors.grey,
+                        ),
                       ),
-                    ),
-                ],
-              ),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  if (!done)
-                    ContactButtons(
-                      phone: phoneByUserId[o['responsibleId']],
-                      message: 'Hi, checking on: ${o['orderNumber']} — ${o['currentStage']}.',
-                      iconSize: 20,
-                    ),
-                  if (canComplete)
-                    FilledButton(
-                      onPressed: () => _completeStage(o),
-                      child: const Text('Complete'),
-                    ),
-                ],
+                  ],
+                ),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (!done)
+                      ContactButtons(
+                        phone: phoneByUserId[o['responsibleId']],
+                        message: 'Hi, checking on: ${o['orderNumber']} — ${o['currentStage']}.',
+                        iconSize: 20,
+                      ),
+                    if (canComplete)
+                      FilledButton(
+                        onPressed: () => _completeStage(o),
+                        child: const Text('Complete'),
+                      ),
+                  ],
+                ),
               ),
             ),
           );
@@ -271,22 +273,25 @@ class _FmsScreenState extends State<FmsScreen> {
           final b = _bottlenecks[i];
           final stuck = b['ordersStuck'] as int;
           final planned = b['plannedMins'];
-          return Card(
-            color: stuck > 0 ? Colors.red.shade50 : null,
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: stuck > 2
-                    ? Colors.red
-                    : (stuck > 0 ? Colors.orange : Colors.green),
-                child: Text('$stuck',
-                    style: const TextStyle(color: Colors.white)),
-              ),
-              title: Text(b['stageName'],
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text(
-                '${b['flowName']} · $stuck order(s) here'
-                '${planned == null ? " · unplanned" : ""}'
-                '${b['avgDelayMins'] != 0 ? " · avg delay ${b['avgDelayMins']} min" : ""}',
+          return StaggeredListItem(
+            index: i,
+            child: Card(
+              color: stuck > 0 ? Colors.red.shade50 : null,
+              child: ListTile(
+                leading: CircleAvatar(
+                  backgroundColor: stuck > 2
+                      ? Colors.red
+                      : (stuck > 0 ? Colors.orange : Colors.green),
+                  child: Text('$stuck',
+                      style: const TextStyle(color: Colors.white)),
+                ),
+                title: Text(b['stageName'],
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text(
+                  '${b['flowName']} · $stuck order(s) here'
+                  '${planned == null ? " · unplanned" : ""}'
+                  '${b['avgDelayMins'] != 0 ? " · avg delay ${b['avgDelayMins']} min" : ""}',
+                ),
               ),
             ),
           );
@@ -335,32 +340,48 @@ class _FmsScreenState extends State<FmsScreen> {
         fields: fields,
       ),
     );
-    if (result == null) return;
+    if (result == null || !mounted) return;
 
-    try {
-      await Api.completeStage(
-        o['orderStageId'],
-        result['data'] as Map<String, dynamic>,
-        remarks: result['remarks'] as String?,
-      );
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Stage done. Order moved forward.')),
-      );
-      _load();
-    } on OfflineQueuedException {
-      // Queued — the order's real position won't change until sync, so we
-      // deliberately don't guess where it'll land. The pending-count banner
-      // is the signal here.
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Saved offline — will sync when back online')),
+    // Only the final stage of an order gets the bigger celebration — every
+    // other stage gets the same quick confirmation as marking a task done.
+    final isLastStage = (o['doneStages'] as int) + 1 >= (o['totalStages'] as int);
+
+    // Self-contained, same as the original: the confirmation animation
+    // fires this immediately and plays concurrently, so the real network
+    // call is never delayed by the animation. Errors are handled here, not
+    // by the animation helper, exactly as before this pass.
+    Future<void> submit() async {
+      try {
+        await Api.completeStage(
+          o['orderStageId'],
+          result['data'] as Map<String, dynamic>,
+          remarks: result['remarks'] as String?,
         );
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(isLastStage ? 'Order complete! 🎉' : 'Stage done. Order moved forward.')),
+        );
+        _load();
+      } on OfflineQueuedException {
+        // Queued — the order's real position won't change until sync, so we
+        // deliberately don't guess where it'll land. The pending-count banner
+        // is the signal here.
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Saved offline — will sync when back online')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        }
       }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
+    }
+
+    if (isLastStage) {
+      await playCelebration(context, onFinished: submit);
+    } else {
+      await playDoneConfirmation(context, onFinished: submit);
     }
   }
 
@@ -434,7 +455,7 @@ class _FmsScreenState extends State<FmsScreen> {
     if (applied == null || !mounted) return;
     final done = await Navigator.push<bool>(
       context,
-      MaterialPageRoute(builder: (_) => TemplateAssignStagesScreen(flowId: applied['flowId'] as String)),
+      sharedAxisRoute(TemplateAssignStagesScreen(flowId: applied['flowId'] as String)),
     );
     if (done == true) _load();
   }

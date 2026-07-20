@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'api.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 import 'owner.dart';
 import 'checklist.dart';
 import 'fms.dart';
@@ -40,15 +43,8 @@ class NavishApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         scaffoldMessengerKey: PushService.scaffoldMessengerKey,
         themeMode: mode,
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF0F5132)),
-          useMaterial3: true,
-        ),
-        darkTheme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-              seedColor: const Color(0xFF0F5132), brightness: Brightness.dark),
-          useMaterial3: true,
-        ),
+        theme: AppTheme.light(),
+        darkTheme: AppTheme.dark(),
         home: Api.isLoggedIn ? const HomeScreen() : const LoginScreen(),
       ),
     );
@@ -74,9 +70,7 @@ class _LoginScreenState extends State<LoginScreen> {
       await Api.login(_email.text.trim(), _password.text);
       await PushService.registerToken();
       if (!mounted) return;
-      Navigator.pushReplacement(
-        context, MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
+      Navigator.pushReplacement(context, sharedAxisRoute(const HomeScreen()));
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
@@ -122,63 +116,121 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final reduced = reducedMotion(context);
+
+    Widget stagger(Widget child, int step) {
+      if (reduced) return child;
+      return child
+          .animate(delay: (80 * step).ms)
+          .fadeIn(duration: 380.ms, curve: Curves.easeOut)
+          .slideY(begin: 0.12, end: 0, duration: 420.ms, curve: Curves.easeOutCubic);
+    }
+
     return Scaffold(
       body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 400),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                const Text('Navish',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.bold),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 8),
-                const Text('Your operations, on autopilot',
-                    style: TextStyle(color: Colors.grey),
-                    textAlign: TextAlign.center),
-                const SizedBox(height: 32),
-                TextField(
-                  controller: _email,
-                  decoration: const InputDecoration(
-                      labelText: 'Email', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: _password,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                      labelText: 'Password', border: OutlineInputBorder()),
-                ),
-                const SizedBox(height: 20),
-                if (_error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Text(_error!, style: const TextStyle(color: Colors.red)),
+        child: SingleChildScrollView(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 400),
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  stagger(
+                    Center(
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(AppRadius.md),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
+                          ),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Text('N',
+                            style: TextStyle(
+                                color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
+                      ),
+                    ),
+                    0,
                   ),
-                FilledButton(
-                  onPressed: _loading ? null : _login,
-                  style: FilledButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 16)),
-                  child: _loading
-                      ? const SizedBox(
-                          height: 20, width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Log in'),
-                ),
-                const SizedBox(height: 8),
-                TextButton(
-                  onPressed: _forgotPassword,
-                  child: const Text('Forgot password?'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.push(
-                      context, MaterialPageRoute(builder: (_) => const SignupScreen())),
-                  child: const Text("New company? Create an account"),
-                ),
-              ],
+                  const SizedBox(height: 20),
+                  stagger(
+                    Text('Navish',
+                        style: theme.textTheme.displaySmall, textAlign: TextAlign.center),
+                    1,
+                  ),
+                  const SizedBox(height: 6),
+                  stagger(
+                    Text('Your operations, on autopilot',
+                        style: theme.textTheme.bodyMedium
+                            ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                        textAlign: TextAlign.center),
+                    2,
+                  ),
+                  const SizedBox(height: 36),
+                  stagger(
+                    TextField(
+                      controller: _email,
+                      decoration: const InputDecoration(labelText: 'Email'),
+                    ),
+                    3,
+                  ),
+                  const SizedBox(height: 12),
+                  stagger(
+                    TextField(
+                      controller: _password,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Password'),
+                    ),
+                    4,
+                  ),
+                  const SizedBox(height: 20),
+                  if (_error != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger))
+                          .animate()
+                          .fadeIn(duration: 200.ms)
+                          .shakeX(hz: 6, amount: 4),
+                    ),
+                  stagger(
+                    FilledButton(
+                      onPressed: _loading ? null : _login,
+                      style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16)),
+                      child: _loading
+                          ? const SizedBox(
+                              height: 20, width: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          : const Text('Log in'),
+                    ),
+                    5,
+                  ),
+                  const SizedBox(height: 8),
+                  stagger(
+                    Column(
+                      children: [
+                        TextButton(
+                          onPressed: _forgotPassword,
+                          child: const Text('Forgot password?'),
+                        ),
+                        TextButton(
+                          onPressed: () =>
+                              Navigator.push(context, sharedAxisRoute(const SignupScreen())),
+                          child: const Text("New company? Create an account"),
+                        ),
+                      ],
+                    ),
+                    6,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -198,6 +250,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _user;
   List<dynamic> _tasks = [];
   List<dynamic> _notifs = [];
+  int _stuckCount = 0;
   bool _loading = true;
   int _tab = 0;
   String _taskStatus = 'ACTIVE';
@@ -250,7 +303,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final user = await Api.me();
       final tasks = await Api.myTasks(status: _taskStatus, from: _datePreset.from);
       final notifs = await Api.notifications();
-      setState(() { _user = user; _tasks = tasks; _notifs = notifs; });
+      // Stuck endpoint is OWNER/MANAGER-only server-side — matches _isOwner.
+      // Best-effort: the at-a-glance strip just shows 0 if this fails.
+      final isOwnerOrManager = user['role'] == 'OWNER' || user['role'] == 'MANAGER';
+      final stuckCount = isOwnerOrManager
+          ? await Api.stuckList().then((l) => l.length).catchError((_) => 0)
+          : 0;
+      setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; });
       _consumePendingTap();
     } catch (e) {
       if (mounted) {
@@ -327,32 +386,32 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     // still-"logged-in" Home screen buried underneath. Clear everything
     // down to a single fresh LoginScreen instead.
     Navigator.of(context).pushAndRemoveUntil(
-      MaterialPageRoute(builder: (_) => const LoginScreen()),
+      sharedAxisRoute(const LoginScreen()),
       (route) => false,
     );
   }
 
   void _openProfile() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen(onLogout: _logout)))
+    Navigator.push(context, sharedAxisRoute(ProfileScreen(onLogout: _logout)))
         .then((_) => _load());
   }
 
   void _openSettings() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const SettingsScreen()));
+    Navigator.push(context, sharedAxisRoute(const SettingsScreen()));
   }
 
   void _openResetRequests() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const ResetRequestsScreen()));
+    Navigator.push(context, sharedAxisRoute(const ResetRequestsScreen()));
   }
 
   void _openAdmin() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminScreen()));
+    Navigator.push(context, sharedAxisRoute(const AdminScreen()));
   }
 
   void _openNotifications() {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => _NotificationsScreen(notifs: _notifs)),
+      sharedAxisRoute(_NotificationsScreen(notifs: _notifs)),
     ).then((_) => _load());
   }
 
@@ -419,7 +478,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final body = Column(
       children: [
         _offlineBanner(),
-        Expanded(child: MaxWidthCenter(child: _bodyForTab(labels))),
+        Expanded(
+          child: MaxWidthCenter(
+            child: FadeThroughSwitcher(tabKey: _tab, child: _bodyForTab(labels)),
+          ),
+        ),
       ],
     );
 
@@ -532,10 +595,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return IconButton(
       tooltip: 'Alerts',
       onPressed: _openNotifications,
-      icon: Badge(
-        label: Text('$unread'),
-        isLabelVisible: unread > 0,
-        child: const Icon(Icons.notifications_outlined),
+      icon: PulseOnChange(
+        value: unread,
+        child: Badge(
+          label: Text('$unread'),
+          isLabelVisible: unread > 0,
+          child: const Icon(Icons.notifications_outlined),
+        ),
       ),
     );
   }
@@ -566,8 +632,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Clean landing hub: a greeting plus a centered grid of module cards, so
-  // "where do I go" is answered before the user even touches the nav.
+  int get _dueTodayCount {
+    final now = DateTime.now();
+    return _tasks.where((t) {
+      final dueAt = t['dueAt'];
+      if (dueAt == null) return false;
+      final d = DateTime.parse(dueAt).toLocal();
+      return d.year == now.year && d.month == now.month && d.day == now.day;
+    }).length;
+  }
+
+  // Dashboard-style landing hub: a greeting, an at-a-glance strip pulled
+  // from data already loaded this session, then a centered grid of module
+  // cards so "where do I go" is answered before the nav is even touched.
   Widget _homeHub(List<String> labels) {
     final modules = labels.where((l) => l != 'Home').toList();
     final crossAxisCount = switch (screenSizeOf(context)) {
@@ -575,19 +652,67 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       ScreenSize.medium => 3,
       ScreenSize.expanded => 4,
     };
+    final theme = Theme.of(context);
+    final semantic = AppColors.of(context);
+    final reduced = reducedMotion(context);
+
+    Widget entrance(Widget child, int index) {
+      if (reduced) return child;
+      return child
+          .animate(delay: (40 * index).ms)
+          .fadeIn(duration: 320.ms, curve: Curves.easeOut)
+          .slideY(begin: 0.08, end: 0, duration: 360.ms, curve: Curves.easeOutCubic);
+    }
+
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(20),
         children: [
-          Text(
-            'Hello, ${_user?['nickname'] as String? ?? _user?['name'] ?? ''}',
-            style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          entrance(
+            Text(
+              'Hello, ${_user?['nickname'] as String? ?? _user?['name'] ?? ''}',
+              style: theme.textTheme.displaySmall,
+            ),
+            0,
           ),
           const SizedBox(height: 4),
-          Text(
-            _user?['organization']?['name'] as String? ?? '',
-            style: TextStyle(color: Colors.grey.shade600),
+          entrance(
+            Text(
+              _user?['organization']?['name'] as String? ?? '',
+              style: theme.textTheme.bodyMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            1,
+          ),
+          const SizedBox(height: 20),
+          entrance(
+            Row(
+              children: [
+                if (_isOwner)
+                  Expanded(
+                    child: _glanceStat(
+                      icon: Icons.warning_amber_rounded,
+                      label: 'Stuck',
+                      value: _stuckCount,
+                      color: _stuckCount > 0 ? semantic.danger : semantic.success,
+                      onTap: _stuckCount > 0
+                          ? () => setState(() => _tab = labels.indexOf('Stuck'))
+                          : null,
+                    ),
+                  ),
+                if (_isOwner) const SizedBox(width: 12),
+                Expanded(
+                  child: _glanceStat(
+                    icon: Icons.today_outlined,
+                    label: 'Due today',
+                    value: _dueTodayCount,
+                    color: semantic.info,
+                  ),
+                ),
+              ],
+            ),
+            2,
           ),
           const SizedBox(height: 24),
           GridView.count(
@@ -598,28 +723,72 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             crossAxisSpacing: 12,
             childAspectRatio: 1.3,
             children: [
-              for (final m in modules)
-                Card(
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(12),
+              for (final (i, m) in modules.indexed)
+                entrance(
+                  PressableScale(
                     onTap: () => setState(() => _tab = labels.indexOf(m)),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(_moduleIcon(m), size: 32,
-                              color: Theme.of(context).colorScheme.primary),
-                          const SizedBox(height: 10),
-                          Text(m, style: const TextStyle(fontWeight: FontWeight.w600)),
-                        ],
+                    child: Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.primaryContainer,
+                                borderRadius: BorderRadius.circular(AppRadius.sm),
+                              ),
+                              child: Icon(_moduleIcon(m), size: 26,
+                                  color: theme.colorScheme.onPrimaryContainer),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(m, style: theme.textTheme.titleMedium),
+                          ],
+                        ),
                       ),
                     ),
                   ),
+                  3 + i,
                 ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _glanceStat({
+    required IconData icon,
+    required String label,
+    required int value,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    return PressableScale(
+      onTap: onTap,
+      child: Card(
+        color: color.withValues(alpha: 0.1),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(icon, color: color, size: 22),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('$value',
+                      style: Theme.of(context)
+                          .textTheme
+                          .headlineSmall
+                          ?.copyWith(color: color)),
+                  Text(label, style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -662,28 +831,34 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           final t = _tasks[i];
           final overdue = t['dueAt'] != null &&
               DateTime.parse(t['dueAt']).isBefore(DateTime.now());
-          return Card(
-            child: ListTile(
-              title: Text(t['title'],
-                  style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (t['dueAt'] != null)
-                    Text('Due: ${DateTime.parse(t['dueAt']).toLocal()}',
-                        style: TextStyle(
-                            color: overdue ? Colors.red : Colors.grey,
-                            fontSize: 12)),
-                  Text('Chased ${t['chaseCount']} times · ${t['priority']}',
-                      style: const TextStyle(fontSize: 12)),
-                ],
+          return StaggeredListItem(
+            index: i,
+            child: Card(
+              child: ListTile(
+                title: Text(t['title'],
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (t['dueAt'] != null)
+                      Text('Due: ${DateTime.parse(t['dueAt']).toLocal()}',
+                          style: TextStyle(
+                              color: overdue ? AppColors.of(context).danger : Colors.grey,
+                              fontSize: 12)),
+                    Text('Chased ${t['chaseCount']} times · ${t['priority']}',
+                        style: const TextStyle(fontSize: 12)),
+                  ],
+                ),
+                trailing: _taskStatus == 'ACTIVE'
+                    ? FilledButton(
+                        onPressed: () => playDoneConfirmation(
+                          context,
+                          onFinished: () => _done(t['id']),
+                        ),
+                        child: const Text('Done'),
+                      )
+                    : null,
               ),
-              trailing: _taskStatus == 'ACTIVE'
-                  ? FilledButton(
-                      onPressed: () => _done(t['id']),
-                      child: const Text('Done'),
-                    )
-                  : null,
             ),
           );
         },
@@ -753,14 +928,19 @@ class _NotificationsScreen extends StatelessWidget {
                 itemCount: notifs.length,
                 itemBuilder: (_, i) {
                   final n = notifs[i];
-                  return Card(
-                    child: ListTile(
-                      leading: Icon(
-                        n['type'] == 'ESCALATION' ? Icons.warning : Icons.notifications,
-                        color: n['type'] == 'ESCALATION' ? Colors.red : Colors.blue,
+                  return StaggeredListItem(
+                    index: i,
+                    child: Card(
+                      child: ListTile(
+                        leading: Icon(
+                          n['type'] == 'ESCALATION' ? Icons.warning : Icons.notifications,
+                          color: n['type'] == 'ESCALATION'
+                              ? AppColors.of(context).danger
+                              : AppColors.of(context).info,
+                        ),
+                        title: Text(n['title']),
+                        subtitle: Text(n['body']),
                       ),
-                      title: Text(n['title']),
-                      subtitle: Text(n['body']),
                     ),
                   );
                 },

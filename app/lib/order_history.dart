@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:animations/animations.dart';
 import 'api.dart';
+import 'theme/app_theme.dart';
+import 'widgets/motion.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   final String orderId;
@@ -71,7 +74,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.orderNumber} — history')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const ShimmerSkeletonList()
           : _error != null
               ? Center(child: Text(_error!))
               : Column(
@@ -94,12 +97,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       return delayMins != null && delayMins > 0;
     }).toList();
 
+    final semantic = AppColors.of(context);
     late final String text;
     late final Color color;
     late final IconData icon;
     switch (sla) {
       case 'DELAYED':
-        color = Colors.red;
+        color = semantic.danger;
         icon = Icons.warning;
         final names = lateStages.map((s) => s['name'] as String).join(', ');
         text = lateStages.length == 1
@@ -107,12 +111,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             : 'Delayed — late at ${lateStages.length} stages: $names';
         break;
       case 'ON_TIME':
-        color = Colors.green;
+        color = semantic.success;
         icon = Icons.check_circle;
         text = 'On time so far';
         break;
       default:
-        color = Colors.grey.shade700;
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
         icon = Icons.info_outline;
         text = 'No SLA — every stage here is unplanned';
     }
@@ -148,7 +152,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
           final delayMins = s['delayMins'] as int?;
           final delayed = delayMins != null && delayMins > 0;
 
-          return IntrinsicHeight(
+          return StaggeredListItem(index: i, child: IntrinsicHeight(
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -190,7 +194,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 ),
               ],
             ),
-          );
+          ));
         },
       ),
     );
@@ -284,7 +288,8 @@ class _StageCard extends StatelessWidget {
                 return GestureDetector(
                   onTap: () => Navigator.push(
                     context,
-                    MaterialPageRoute(builder: (_) => _FullScreenPhoto(url: url)),
+                    sharedAxisRoute(_FullScreenPhoto(url: url),
+                        type: SharedAxisTransitionType.scaled),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
