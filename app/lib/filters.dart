@@ -1,19 +1,20 @@
 import 'package:flutter/material.dart';
+import 'l10n/gen/app_localizations.dart';
 
 // Pull, not push: default view is ACTIVE only; historical data is one filter away.
 enum DateRangePreset { today, thisWeek, thisMonth, all }
 
 extension DateRangePresetX on DateRangePreset {
-  String get label {
+  String label(AppLocalizations l10n) {
     switch (this) {
       case DateRangePreset.today:
-        return 'Today';
+        return l10n.todayPreset;
       case DateRangePreset.thisWeek:
-        return 'This week';
+        return l10n.thisWeekPreset;
       case DateRangePreset.thisMonth:
-        return 'This month';
+        return l10n.thisMonthPreset;
       case DateRangePreset.all:
-        return 'All time';
+        return l10n.allTimePreset;
     }
   }
 
@@ -61,6 +62,7 @@ class FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
       child: Column(
@@ -81,13 +83,13 @@ class FilterBar extends StatelessWidget {
                 child: DropdownButtonFormField<DateRangePreset>(
                   initialValue: datePreset,
                   isDense: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Date range',
-                    border: OutlineInputBorder(),
-                    contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: InputDecoration(
+                    labelText: l10n.dateRange,
+                    border: const OutlineInputBorder(),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   items: DateRangePreset.values
-                      .map((p) => DropdownMenuItem(value: p, child: Text(p.label)))
+                      .map((p) => DropdownMenuItem(value: p, child: Text(p.label(l10n))))
                       .toList(),
                   onChanged: (v) {
                     if (v != null) onDatePresetChanged(v);
@@ -100,13 +102,13 @@ class FilterBar extends StatelessWidget {
                   child: DropdownButtonFormField<String?>(
                     initialValue: assigneeId,
                     isDense: true,
-                    decoration: const InputDecoration(
-                      labelText: 'Assignee',
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: InputDecoration(
+                      labelText: l10n.assignee,
+                      border: const OutlineInputBorder(),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     ),
                     items: [
-                      const DropdownMenuItem<String?>(value: null, child: Text('Everyone')),
+                      DropdownMenuItem<String?>(value: null, child: Text(l10n.everyone)),
                       ...users!.map((u) => DropdownMenuItem<String?>(
                             value: u['id'] as String,
                             child: Text('${u['name']}'),

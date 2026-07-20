@@ -4,6 +4,7 @@ import 'filters.dart';
 import 'contact_actions.dart';
 import 'responsive.dart';
 import 'widgets/motion.dart';
+import 'l10n/gen/app_localizations.dart';
 
 class OwnerScreen extends StatefulWidget {
   const OwnerScreen({super.key});
@@ -52,6 +53,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
     if (_loading) {
       return const ShimmerSkeletonList();
     }
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
       body: _tab == 0 ? _tasksView() : _teamView(),
@@ -59,25 +61,26 @@ class _OwnerScreenState extends State<OwnerScreen> {
           ? FloatingActionButton.extended(
               onPressed: _openAssign,
               icon: const Icon(Icons.add),
-              label: const Text('Assign task'),
+              label: Text(l10n.assignTaskAction),
             )
           : FloatingActionButton.extended(
               onPressed: _openAddUser,
               icon: const Icon(Icons.person_add),
-              label: const Text('Add person'),
+              label: Text(l10n.addPerson),
             ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tab,
         onDestinationSelected: (i) => setState(() => _tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.list_alt), label: 'All tasks'),
-          NavigationDestination(icon: Icon(Icons.groups), label: 'Team'),
+        destinations: [
+          NavigationDestination(icon: const Icon(Icons.list_alt), label: l10n.allTasks),
+          NavigationDestination(icon: const Icon(Icons.groups), label: l10n.team),
         ],
       ),
     );
   }
 
   Widget _tasksView() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         FilterBar(
@@ -86,6 +89,8 @@ class _OwnerScreenState extends State<OwnerScreen> {
             setState(() => _taskStatus = s);
             _load();
           },
+          activeLabel: l10n.activeFilter,
+          doneLabel: l10n.doneFilter,
           datePreset: _datePreset,
           onDatePresetChanged: (p) {
             setState(() => _datePreset = p);
@@ -100,7 +105,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
         ),
         Expanded(
           child: _tasks.isEmpty
-              ? const Center(child: Text('No tasks yet. Assign one 👇'))
+              ? Center(child: Text(l10n.noTasksAssignOne))
               : _tasksList(),
         ),
       ],
@@ -154,8 +159,9 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Widget _teamView() {
+    final l10n = AppLocalizations.of(context);
     if (_users.isEmpty) {
-      return const Center(child: Text('No data yet'));
+      return Center(child: Text(l10n.noDataYet));
     }
     // /stats only returns users with at least one task ever — a freshly
     // added person with none yet must still show up here to be manageable.
@@ -179,7 +185,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
                 title: Text(u['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
                 subtitle: Text(
                   s == null
-                      ? 'No tasks yet · $role'
+                      ? l10n.noTasksYetRole(role)
                       : 'Done ${s['done']}/${s['total']} · On-time ${s['onTimePct']}%'
                         '${s['escalated'] > 0 ? " · ${s['escalated']} escalated" : ""}',
                 ),
@@ -192,7 +198,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
                           hasInventoryAccess ? Icons.inventory : Icons.inventory_2_outlined,
                           color: hasInventoryAccess ? Colors.green : null,
                         ),
-                        tooltip: 'Inventory permissions',
+                        tooltip: l10n.inventoryPermissionsTooltip,
                         onPressed: () => _editInventoryPermissions(u),
                       ),
                     ContactButtons(
@@ -219,33 +225,34 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Future<void> _editInventoryPermissions(Map user) async {
+    final l10n = AppLocalizations.of(context);
     bool canIn = user['canStockIn'] == true;
     bool canOut = user['canStockOut'] == true;
     final save = await showDialog<bool>(
       context: context,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setDialogState) => AlertDialog(
-          title: Text('Inventory permissions — ${user['name']}'),
+          title: Text(l10n.inventoryPermissionsTitle(user['name'])),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Can add stock (Stock IN)'),
+                title: Text(l10n.canAddStock),
                 value: canIn,
                 onChanged: (v) => setDialogState(() => canIn = v),
               ),
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Can remove stock (Stock OUT)'),
+                title: Text(l10n.canRemoveStock),
                 value: canOut,
                 onChanged: (v) => setDialogState(() => canOut = v),
               ),
             ],
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Save')),
+            TextButton(onPressed: () => Navigator.pop(ctx, false), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text(l10n.save)),
           ],
         ),
       ),
@@ -328,6 +335,7 @@ class _AssignSheetState extends State<_AssignSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 20,
@@ -338,22 +346,22 @@ class _AssignSheetState extends State<_AssignSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Assign a task',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(l10n.assignATask,
+                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             TextField(
               controller: _title,
-              decoration: const InputDecoration(
-                  labelText: 'What needs doing?', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: l10n.whatNeedsDoing, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _desc,
-              decoration: const InputDecoration(
-                  labelText: 'Details (optional)', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                  labelText: l10n.detailsOptional, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
-            const Align(alignment: Alignment.centerLeft, child: Text('Assign to')),
+            Align(alignment: Alignment.centerLeft, child: Text(l10n.assignTo)),
             ..._users.map((u) => CheckboxListTile(
                   dense: true,
                   value: _selected.contains(u['id']),
@@ -365,14 +373,14 @@ class _AssignSheetState extends State<_AssignSheet> {
             const SizedBox(height: 8),
             Row(
               children: [
-                const Text('Priority: '),
+                Text(l10n.priorityLabel),
                 const SizedBox(width: 8),
                 DropdownButton<String>(
                   value: _priority,
-                  items: const [
-                    DropdownMenuItem(value: 'HIGH', child: Text('High')),
-                    DropdownMenuItem(value: 'NORMAL', child: Text('Normal')),
-                    DropdownMenuItem(value: 'LOW', child: Text('Low')),
+                  items: [
+                    DropdownMenuItem(value: 'HIGH', child: Text(l10n.priorityHigh)),
+                    DropdownMenuItem(value: 'NORMAL', child: Text(l10n.priorityNormal)),
+                    DropdownMenuItem(value: 'LOW', child: Text(l10n.priorityLow)),
                   ],
                   onChanged: (v) => setState(() => _priority = v!),
                 ),
@@ -380,15 +388,15 @@ class _AssignSheetState extends State<_AssignSheet> {
             ),
             Row(
               children: [
-                const Text('Due in: '),
+                Text(l10n.dueIn),
                 const SizedBox(width: 8),
                 DropdownButton<int>(
                   value: _dueMinutes,
-                  items: const [
-                    DropdownMenuItem(value: 2, child: Text('2 min (test)')),
-                    DropdownMenuItem(value: 60, child: Text('1 hour')),
-                    DropdownMenuItem(value: 240, child: Text('4 hours')),
-                    DropdownMenuItem(value: 1440, child: Text('Tomorrow')),
+                  items: [
+                    DropdownMenuItem(value: 2, child: Text(l10n.dueIn2Min)),
+                    DropdownMenuItem(value: 60, child: Text(l10n.dueIn1Hour)),
+                    DropdownMenuItem(value: 240, child: Text(l10n.dueIn4Hours)),
+                    DropdownMenuItem(value: 1440, child: Text(l10n.dueInTomorrow)),
                   ],
                   onChanged: (v) => setState(() => _dueMinutes = v!),
                 ),
@@ -400,8 +408,8 @@ class _AssignSheetState extends State<_AssignSheet> {
               style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 16)),
               child: Text(_saving
-                  ? 'Assigning...'
-                  : 'Assign to ${_selected.length} person(s)'),
+                  ? l10n.assigning
+                  : l10n.assignToNPeople(_selected.length)),
             ),
           ],
         ),
@@ -446,6 +454,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 20,
@@ -455,43 +464,43 @@ class _AddUserSheetState extends State<_AddUserSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Text('Add a person',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(l10n.addAPerson,
+              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
           const SizedBox(height: 16),
           TextField(
             controller: _name,
-            decoration: const InputDecoration(
-                labelText: 'Name', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.nameLabel, border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _email,
-            decoration: const InputDecoration(
-                labelText: 'Email', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.emailLabel, border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _phone,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-                labelText: 'Phone (optional)',
+            decoration: InputDecoration(
+                labelText: l10n.phoneOptionalLabel,
                 hintText: '9876543210',
-                border: OutlineInputBorder()),
+                border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _password,
-            decoration: const InputDecoration(
-                labelText: 'Temporary password', border: OutlineInputBorder()),
+            decoration: InputDecoration(
+                labelText: l10n.temporaryPassword, border: const OutlineInputBorder()),
           ),
           const SizedBox(height: 12),
           DropdownButtonFormField<String>(
             initialValue: _role,
-            decoration: const InputDecoration(
-                labelText: 'Role', border: OutlineInputBorder()),
-            items: const [
-              DropdownMenuItem(value: 'EMPLOYEE', child: Text('Employee')),
-              DropdownMenuItem(value: 'MANAGER', child: Text('Manager')),
+            decoration: InputDecoration(
+                labelText: l10n.roleFieldLabel, border: const OutlineInputBorder()),
+            items: [
+              DropdownMenuItem(value: 'EMPLOYEE', child: Text(l10n.roleEmployee)),
+              DropdownMenuItem(value: 'MANAGER', child: Text(l10n.roleManager)),
             ],
             onChanged: (v) => setState(() => _role = v!),
           ),
@@ -500,7 +509,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
             onPressed: _saving ? null : _save,
             style: FilledButton.styleFrom(
                 padding: const EdgeInsets.symmetric(vertical: 16)),
-            child: Text(_saving ? 'Adding...' : 'Add person'),
+            child: Text(_saving ? l10n.adding : l10n.addPerson),
           ),
         ],
       ),

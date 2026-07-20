@@ -9,6 +9,7 @@ import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
 import 'widgets/motion.dart';
+import 'l10n/gen/app_localizations.dart';
 
 const _commonTimezones = [
   'Asia/Kolkata',
@@ -21,9 +22,15 @@ const _commonTimezones = [
   'America/New_York',
 ];
 
-const _weekdayLabels = {
-  1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun',
-};
+Map<int, String> _weekdayLabels(AppLocalizations l10n) => {
+      1: l10n.weekdayMon,
+      2: l10n.weekdayTue,
+      3: l10n.weekdayWed,
+      4: l10n.weekdayThu,
+      5: l10n.weekdayFri,
+      6: l10n.weekdaySat,
+      7: l10n.weekdaySun,
+    };
 
 // Owner-only: company profile + working hours that gate the automation
 // engine's chasing, plus reset-request approvals, notification and
@@ -145,8 +152,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         holidays: _holidays,
       );
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Settings saved')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.of(context).settingsSaved)));
       }
     } catch (e) {
       if (mounted) {
@@ -204,29 +211,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_loading) {
       return const Scaffold(body: ShimmerSkeletonList());
     }
+    final l10n = AppLocalizations.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Company settings')),
+      appBar: AppBar(title: Text(l10n.companySettingsTitle)),
       body: MaxWidthCenter(
         maxWidth: 760,
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _sectionLabel('Company profile'),
+            _sectionLabel(l10n.companyProfile),
             Center(child: _logoPicker()),
             const SizedBox(height: 16),
             TextField(
               controller: _companyName,
-              decoration: const InputDecoration(labelText: 'Company name', border: OutlineInputBorder()),
+              decoration: InputDecoration(labelText: l10n.companyNameLabel, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _industry,
-              decoration: const InputDecoration(
-                labelText: 'Industry', hintText: 'e.g. Manufacturing, Retail', border: OutlineInputBorder()),
+              decoration: InputDecoration(
+                labelText: l10n.industryLabel, hintText: l10n.industryHint, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 28),
-            _sectionLabel('Timezone'),
+            _sectionLabel(l10n.timezone),
             DropdownButtonFormField<String>(
               initialValue: _commonTimezones.contains(_timezone) ? _timezone : null,
               decoration: const InputDecoration(border: OutlineInputBorder()),
@@ -239,10 +247,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             const SizedBox(height: 28),
-            _sectionLabel('Working days'),
+            _sectionLabel(l10n.workingDays),
             Wrap(
               spacing: 8,
-              children: _weekdayLabels.entries.map((e) {
+              children: _weekdayLabels(l10n).entries.map((e) {
                 final selected = _workingDays.contains(e.key);
                 return FilterChip(
                   label: Text(e.value),
@@ -260,20 +268,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
               }).toList(),
             ),
             const SizedBox(height: 28),
-            _sectionLabel('Shift hours'),
+            _sectionLabel(l10n.shiftHours),
             Row(
               children: [
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _pickShiftStart,
-                    child: Text('Start: ${_fmtTime(_shiftStart)}'),
+                    child: Text(l10n.startTime(_fmtTime(_shiftStart))),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: OutlinedButton(
                     onPressed: _pickShiftEnd,
-                    child: Text('End: ${_fmtTime(_shiftEnd)}'),
+                    child: Text(l10n.endTime(_fmtTime(_shiftEnd))),
                   ),
                 ),
               ],
@@ -282,18 +290,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _sectionLabel('Holidays'),
+                _sectionLabel(l10n.holidays),
                 TextButton.icon(
                   onPressed: _addHoliday,
                   icon: const Icon(Icons.add),
-                  label: const Text('Add'),
+                  label: Text(l10n.add),
                 ),
               ],
             ),
             if (_holidays.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 8),
-                child: Text('No holidays added', style: TextStyle(color: Colors.grey)),
+              Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Text(l10n.noHolidaysAdded, style: const TextStyle(color: Colors.grey)),
               )
             else
               Wrap(
@@ -314,40 +322,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ? const SizedBox(
                       height: 20, width: 20,
                       child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Text('Save settings'),
+                  : Text(l10n.saveSettings),
             ),
             const SizedBox(height: 32),
-            _sectionLabel('Requests'),
+            _sectionLabel(l10n.requests),
             Card(
               child: ListTile(
                 leading: const Icon(Icons.lock_reset),
-                title: const Text('Password reset requests'),
-                subtitle: const Text('Approve or deny employees who forgot their password'),
+                title: Text(l10n.navPasswordResetRequests),
+                subtitle: Text(l10n.passwordResetRequestsSubtitle),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
                     context, sharedAxisRoute(const ResetRequestsScreen())),
               ),
             ),
             const SizedBox(height: 28),
-            _sectionLabel('Notifications'),
+            _sectionLabel(l10n.notifications),
             Card(
               child: SwitchListTile(
                 secondary: const Icon(Icons.notifications_active_outlined),
-                title: const Text('Push notifications on this device'),
-                subtitle: const Text('Chases, escalations and alerts'),
+                title: Text(l10n.pushNotificationsTitle),
+                subtitle: Text(l10n.pushNotificationsSubtitle),
                 value: _pushEnabled,
                 onChanged: _togglePush,
               ),
             ),
             const SizedBox(height: 28),
-            _sectionLabel('Appearance'),
+            _sectionLabel(l10n.appearance),
             ValueListenableBuilder<ThemeMode>(
               valueListenable: ThemeController.mode,
               builder: (_, mode, __) => SegmentedButton<ThemeMode>(
-                segments: const [
-                  ButtonSegment(value: ThemeMode.light, icon: Icon(Icons.light_mode), label: Text('Light')),
-                  ButtonSegment(value: ThemeMode.dark, icon: Icon(Icons.dark_mode), label: Text('Dark')),
-                  ButtonSegment(value: ThemeMode.system, icon: Icon(Icons.brightness_auto), label: Text('System')),
+                segments: [
+                  ButtonSegment(value: ThemeMode.light, icon: const Icon(Icons.light_mode), label: Text(l10n.light)),
+                  ButtonSegment(value: ThemeMode.dark, icon: const Icon(Icons.dark_mode), label: Text(l10n.dark)),
+                  ButtonSegment(value: ThemeMode.system, icon: const Icon(Icons.brightness_auto), label: Text(l10n.system)),
                 ],
                 selected: {mode},
                 onSelectionChanged: (s) => ThemeController.set(s.first),
@@ -356,10 +364,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 32),
             const Divider(),
             const SizedBox(height: 8),
-            _sectionLabel('Data'),
-            const Text(
-              'A full export of your company\'s data — users, tasks, checklists, flow monitoring orders, inventory.',
-              style: TextStyle(fontSize: 12, color: Colors.grey),
+            _sectionLabel(l10n.dataSection),
+            Text(
+              l10n.dataExportDescription,
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -367,7 +375,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               icon: _backingUp
                   ? const SizedBox(height: 16, width: 16, child: CircularProgressIndicator(strokeWidth: 2))
                   : const Icon(Icons.archive_outlined),
-              label: Text(_backingUp ? 'Preparing backup...' : 'Download full company backup'),
+              label: Text(_backingUp ? l10n.preparingBackup : l10n.downloadFullBackup),
             ),
             const SizedBox(height: 24),
           ],

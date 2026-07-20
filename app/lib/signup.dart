@@ -7,6 +7,7 @@ import 'push.dart';
 import 'main.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
+import 'l10n/gen/app_localizations.dart';
 
 // New-company signup. The Terms/Privacy checkbox is mandatory — the button
 // stays disabled until it's checked, matching the backend's acceptedTerms gate.
@@ -31,15 +32,16 @@ class _SignupScreenState extends State<SignupScreen> {
   }
 
   Future<void> _submit() async {
+    final l10n = AppLocalizations.of(context);
     if (_companyName.text.trim().length < 2 ||
         _ownerName.text.trim().length < 2 ||
         _email.text.trim().isEmpty ||
         _password.text.length < 8) {
-      setState(() => _error = 'Fill in all required fields (password: 8+ characters)');
+      setState(() => _error = l10n.fillRequiredFieldsError);
       return;
     }
     if (!_accepted) {
-      setState(() => _error = 'You must accept the Terms & Conditions and Privacy Policy');
+      setState(() => _error = l10n.acceptTermsError);
       return;
     }
 
@@ -67,6 +69,7 @@ class _SignupScreenState extends State<SignupScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final reduced = reducedMotion(context);
+    final l10n = AppLocalizations.of(context);
     Widget stagger(Widget child, int step) {
       if (reduced) return child;
       return child
@@ -76,7 +79,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Create your company')),
+      appBar: AppBar(title: Text(l10n.createYourCompany)),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
@@ -87,30 +90,30 @@ class _SignupScreenState extends State<SignupScreen> {
               children: [
                 stagger(TextField(
                   controller: _companyName,
-                  decoration: const InputDecoration(labelText: 'Company name'),
+                  decoration: InputDecoration(labelText: l10n.companyNameLabel),
                 ), 0),
                 const SizedBox(height: 12),
                 stagger(TextField(
                   controller: _ownerName,
-                  decoration: const InputDecoration(labelText: 'Your name (owner)'),
+                  decoration: InputDecoration(labelText: l10n.yourNameOwnerLabel),
                 ), 1),
                 const SizedBox(height: 12),
                 stagger(TextField(
                   controller: _email,
                   keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(labelText: 'Email'),
+                  decoration: InputDecoration(labelText: l10n.emailLabel),
                 ), 2),
                 const SizedBox(height: 12),
                 stagger(TextField(
                   controller: _password,
                   obscureText: true,
-                  decoration: const InputDecoration(labelText: 'Password (8+ characters)'),
+                  decoration: InputDecoration(labelText: l10n.passwordHintLabel),
                 ), 3),
                 const SizedBox(height: 12),
                 stagger(TextField(
                   controller: _phone,
                   keyboardType: TextInputType.phone,
-                  decoration: const InputDecoration(labelText: 'Phone (optional)'),
+                  decoration: InputDecoration(labelText: l10n.phoneOptionalLabel),
                 ), 4),
                 const SizedBox(height: 16),
                 stagger(CheckboxListTile(
@@ -120,18 +123,18 @@ class _SignupScreenState extends State<SignupScreen> {
                   onChanged: (v) => setState(() => _accepted = v ?? false),
                   title: Wrap(
                     children: [
-                      const Text('I accept the '),
+                      Text(l10n.acceptTermsPrefix),
                       GestureDetector(
                         onTap: () => _open('/legal/terms'),
-                        child: Text('Terms & Conditions',
+                        child: Text(l10n.termsAndConditions,
                             style: TextStyle(
                                 color: theme.colorScheme.primary,
                                 decoration: TextDecoration.underline)),
                       ),
-                      const Text(' and '),
+                      Text(l10n.andWord),
                       GestureDetector(
                         onTap: () => _open('/legal/privacy'),
-                        child: Text('Privacy Policy',
+                        child: Text(l10n.privacyPolicy,
                             style: TextStyle(
                                 color: theme.colorScheme.primary,
                                 decoration: TextDecoration.underline)),
@@ -152,7 +155,7 @@ class _SignupScreenState extends State<SignupScreen> {
                       ? const SizedBox(
                           height: 20, width: 20,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                      : const Text('Create account'),
+                      : Text(l10n.createAccount),
                 ), 6),
               ],
             ),

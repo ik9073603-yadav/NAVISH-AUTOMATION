@@ -116,6 +116,11 @@ class AppTheme {
 
     final displayFont = GoogleFonts.sora;
     final bodyFont = GoogleFonts.inter;
+    // Sora/Inter only cover Latin glyphs. When the Hindi locale is active,
+    // Text widgets render Devanagari — without a fallback those characters
+    // draw as tofu boxes. Noto Sans Devanagari fills in exactly those
+    // glyphs while leaving Latin text on Sora/Inter untouched.
+    final devanagariFallback = [GoogleFonts.notoSansDevanagari().fontFamily!];
 
     final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: brightness);
 
@@ -135,7 +140,11 @@ class AppTheme {
       labelLarge: bodyFont(fontSize: 14, fontWeight: FontWeight.w600),
       labelMedium: bodyFont(fontSize: 12, fontWeight: FontWeight.w600),
       labelSmall: bodyFont(fontSize: 11, fontWeight: FontWeight.w600),
-    ).apply(bodyColor: scheme.onSurface, displayColor: scheme.onSurface);
+    ).apply(
+      bodyColor: scheme.onSurface,
+      displayColor: scheme.onSurface,
+      fontFamilyFallback: devanagariFallback,
+    );
 
     final cardSurface = isDark ? const Color(0xFF1B2320) : Colors.white;
 

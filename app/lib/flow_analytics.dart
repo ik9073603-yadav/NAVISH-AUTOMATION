@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'api.dart';
 import 'filters.dart';
 import 'order_history.dart';
+import 'l10n/gen/app_localizations.dart';
 
 // KPI cards + summary — the "Analytics" segment inside the Flow Monitoring
 // System module. Tapping a card opens FlowOrdersListScreen filtered to that
@@ -222,7 +223,7 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
                           contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                         items: DateRangePreset.values
-                            .map((p) => DropdownMenuItem(value: p, child: Text(p.label)))
+                            .map((p) => DropdownMenuItem(value: p, child: Text(p.label(AppLocalizations.of(context)))))
                             .toList(),
                         onChanged: (v) {
                           if (v == null) return;

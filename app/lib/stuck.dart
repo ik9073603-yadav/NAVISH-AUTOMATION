@@ -5,6 +5,7 @@ import 'contact_actions.dart';
 import 'order_history.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
+import 'l10n/gen/app_localizations.dart';
 
 class StuckScreen extends StatefulWidget {
   // Lets the Stuck tab jump to a sibling tab in the owner's bottom nav
@@ -57,9 +58,10 @@ class _StuckScreenState extends State<StuckScreen> {
     if (_items.isEmpty) {
       final reduced = reducedMotion(context);
       final theme = Theme.of(context);
+      final l10n = AppLocalizations.of(context);
 
-      Widget title = Text('Nothing is stuck.', style: theme.textTheme.headlineMedium);
-      Widget subtitle = Text('Everything is running.',
+      Widget title = Text(l10n.nothingStuckTitle, style: theme.textTheme.headlineMedium);
+      Widget subtitle = Text(l10n.nothingStuckSubtitle,
           style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant));
       if (!reduced) {
         title = title.animate().fadeIn(delay: 300.ms, duration: 400.ms);
@@ -91,6 +93,7 @@ class _StuckScreenState extends State<StuckScreen> {
       );
     }
 
+    final l10n = AppLocalizations.of(context);
     final groups = <String, List<dynamic>>{};
     for (final item in _items) {
       groups.putIfAbsent(item['module'] as String, () => []).add(item);
@@ -115,7 +118,7 @@ class _StuckScreenState extends State<StuckScreen> {
                   children: [
                     Icon(_moduleIcon(module), size: 18, color: Colors.grey.shade700),
                     const SizedBox(width: 6),
-                    Text(_moduleLabel(module),
+                    Text(_moduleLabel(l10n, module),
                         style: TextStyle(
                             fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
                     const SizedBox(width: 6),
@@ -165,12 +168,12 @@ class _StuckScreenState extends State<StuckScreen> {
     }
   }
 
-  String _moduleLabel(String module) {
+  String _moduleLabel(AppLocalizations l10n, String module) {
     switch (module) {
-      case 'TASKS': return 'Tasks';
-      case 'CHECKLISTS': return 'Checklists';
-      case 'FMS': return 'Flows';
-      case 'INVENTORY': return 'Inventory';
+      case 'TASKS': return l10n.moduleTasks;
+      case 'CHECKLISTS': return l10n.moduleChecklists;
+      case 'FMS': return l10n.moduleFlows;
+      case 'INVENTORY': return l10n.moduleInventory;
       default: return module;
     }
   }

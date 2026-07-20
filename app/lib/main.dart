@@ -1,5 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
@@ -18,6 +20,8 @@ import 'signup.dart';
 import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
+import 'locale_controller.dart';
+import 'l10n/gen/app_localizations.dart';
 import 'offline/write_queue.dart';
 import 'offline/connectivity_service.dart';
 
@@ -25,6 +29,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Api.loadToken();
   await ThemeController.load();
+  await LocaleController.load();
   await PushService.init();
   await WriteQueue.init();
   ConnectivityService.start(Api.flushQueue);
@@ -38,14 +43,25 @@ class NavishApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return ValueListenableBuilder<ThemeMode>(
       valueListenable: ThemeController.mode,
-      builder: (_, mode, __) => MaterialApp(
-        title: 'Navish',
-        debugShowCheckedModeBanner: false,
-        scaffoldMessengerKey: PushService.scaffoldMessengerKey,
-        themeMode: mode,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        home: Api.isLoggedIn ? const HomeScreen() : const LoginScreen(),
+      builder: (_, mode, __) => ValueListenableBuilder<Locale>(
+        valueListenable: LocaleController.locale,
+        builder: (_, locale, __) => MaterialApp(
+          title: 'Navish',
+          debugShowCheckedModeBanner: false,
+          scaffoldMessengerKey: PushService.scaffoldMessengerKey,
+          themeMode: mode,
+          theme: AppTheme.light(),
+          darkTheme: AppTheme.dark(),
+          locale: locale,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+          supportedLocales: AppLocalizations.supportedLocales,
+          home: Api.isLoggedIn ? const HomeScreen() : const LoginScreen(),
+        ),
       ),
     );
   }
@@ -79,25 +95,26 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
+    final l10n = AppLocalizations.of(context);
     final controller = TextEditingController(text: _email.text.trim());
     final email = await showDialog<String>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Forgot password'),
+        title: Text(l10n.forgotPasswordDialogTitle),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.emailAddress,
-          decoration: const InputDecoration(
-            labelText: 'Your email', border: OutlineInputBorder()),
+          decoration: InputDecoration(
+            labelText: l10n.yourEmailLabel, border: const OutlineInputBorder()),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: const Text('Request reset'),
+            child: Text(l10n.requestReset),
           ),
         ],
       ),
@@ -118,6 +135,7 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final reduced = reducedMotion(context);
+    final l10n = AppLocalizations.of(context);
 
     Widget stagger(Widget child, int step) {
       if (reduced) return child;
@@ -167,7 +185,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   stagger(
-                    Text('Your operations, on autopilot',
+                    Text(l10n.loginTagline,
                         style: theme.textTheme.bodyMedium
                             ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
                         textAlign: TextAlign.center),
@@ -177,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   stagger(
                     TextField(
                       controller: _email,
-                      decoration: const InputDecoration(labelText: 'Email'),
+                      decoration: InputDecoration(labelText: l10n.emailLabel),
                     ),
                     3,
                   ),
@@ -186,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextField(
                       controller: _password,
                       obscureText: true,
-                      decoration: const InputDecoration(labelText: 'Password'),
+                      decoration: InputDecoration(labelText: l10n.passwordLabel),
                     ),
                     4,
                   ),
@@ -208,7 +226,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ? const SizedBox(
                               height: 20, width: 20,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Log in'),
+                          : Text(l10n.logIn),
                     ),
                     5,
                   ),
@@ -218,12 +236,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       children: [
                         TextButton(
                           onPressed: _forgotPassword,
-                          child: const Text('Forgot password?'),
+                          child: Text(l10n.forgotPassword),
                         ),
                         TextButton(
                           onPressed: () =>
                               Navigator.push(context, sharedAxisRoute(const SignupScreen())),
-                          child: const Text("New company? Create an account"),
+                          child: Text(l10n.newCompanyCreateAccount),
                         ),
                       ],
                     ),
@@ -310,6 +328,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ? await Api.stuckList().then((l) => l.length).catchError((_) => 0)
           : 0;
       setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; });
+      unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();
     } catch (e) {
       if (mounted) {
@@ -362,7 +381,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       await Api.markDone(id);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Done ✅  Chasing stopped.')),
+        SnackBar(content: Text(AppLocalizations.of(context).doneChasingStopped)),
       );
       _load();
     } on OfflineQueuedException {
@@ -418,6 +437,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   // Compact phones can't fit Profile/Settings/Admin as their own bottom
   // destinations alongside every module — they collapse into this sheet.
   void _showMoreSheet() {
+    final l10n = AppLocalizations.of(context);
     showAdaptiveSheet(
       context: context,
       builder: (_) => SafeArea(
@@ -427,25 +447,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 8),
             ListTile(
               leading: const Icon(Icons.person_outline),
-              title: const Text('Profile'),
+              title: Text(l10n.navProfile),
               onTap: () { Navigator.pop(context); _openProfile(); },
             ),
             if (_isOwnerRole)
               ListTile(
                 leading: const Icon(Icons.settings_outlined),
-                title: const Text('Company settings'),
+                title: Text(l10n.navCompanySettings),
                 onTap: () { Navigator.pop(context); _openSettings(); },
               ),
             if (_isOwner && !_isOwnerRole)
               ListTile(
                 leading: const Icon(Icons.lock_reset),
-                title: const Text('Password reset requests'),
+                title: Text(l10n.navPasswordResetRequests),
                 onTap: () { Navigator.pop(context); _openResetRequests(); },
               ),
             if (_isSuperAdmin)
               ListTile(
                 leading: const Icon(Icons.admin_panel_settings),
-                title: const Text('Navish Admin'),
+                title: Text(l10n.navNavishAdmin),
                 onTap: () { Navigator.pop(context); _openAdmin(); },
               ),
             const SizedBox(height: 8),
@@ -467,6 +487,23 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // _moduleLabels stays English — it's the identity used by the switch/
+  // indexOf logic throughout this screen (_bodyForTab, _homeHub tab
+  // switching, _moduleIcon). This maps that identity to display text only,
+  // so nav/dashboard labels localize without touching navigation logic.
+  String _moduleDisplayLabel(AppLocalizations l10n, String label) {
+    switch (label) {
+      case 'Home': return l10n.navHome;
+      case 'Stuck': return l10n.navStuck;
+      case 'Tasks': return l10n.navTasks;
+      case 'Checklists': return l10n.navChecklists;
+      case 'Flows': return l10n.navFlows;
+      case 'Inventory': return l10n.navInventory;
+      case 'Analytics': return l10n.navAnalytics;
+      default: return label;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _user == null) {
@@ -475,6 +512,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     final size = screenSizeOf(context);
     final labels = _moduleLabels;
+    final l10n = AppLocalizations.of(context);
     final body = Column(
       children: [
         _offlineBanner(),
@@ -489,9 +527,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final appBar = AppBar(
       title: GestureDetector(
         onTap: _openProfile,
-        child: Text(_user?['nickname'] as String? ?? _user?['name'] ?? 'Navish'),
+        child: Text(_user?['nickname'] as String? ?? _user?['name'] ?? l10n.appTitle),
       ),
-      actions: [_notificationBell()],
+      actions: [_notificationBell(l10n)],
     );
 
     if (size == ScreenSize.compact) {
@@ -510,8 +548,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           },
           destinations: [
             for (final l in labels)
-              NavigationDestination(icon: Icon(_moduleIcon(l)), label: l),
-            const NavigationDestination(icon: Icon(Icons.more_horiz), label: 'More'),
+              NavigationDestination(icon: Icon(_moduleIcon(l)), label: _moduleDisplayLabel(l10n, l)),
+            NavigationDestination(icon: const Icon(Icons.more_horiz), label: l10n.navMore),
           ],
         ),
       );
@@ -540,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     extended: size == ScreenSize.expanded,
                     destinations: [
                       for (final l in labels)
-                        NavigationRailDestination(icon: Icon(_moduleIcon(l)), label: Text(l)),
+                        NavigationRailDestination(icon: Icon(_moduleIcon(l)), label: Text(_moduleDisplayLabel(l10n, l))),
                     ],
                     trailing: Expanded(
                       child: Align(
@@ -552,25 +590,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                             children: [
                               IconButton(
                                 icon: const Icon(Icons.person_outline),
-                                tooltip: 'Profile',
+                                tooltip: l10n.navProfile,
                                 onPressed: _openProfile,
                               ),
                               if (_isOwnerRole)
                                 IconButton(
                                   icon: const Icon(Icons.settings_outlined),
-                                  tooltip: 'Company settings',
+                                  tooltip: l10n.navCompanySettings,
                                   onPressed: _openSettings,
                                 ),
                               if (_isOwner && !_isOwnerRole)
                                 IconButton(
                                   icon: const Icon(Icons.lock_reset),
-                                  tooltip: 'Password reset requests',
+                                  tooltip: l10n.navPasswordResetRequests,
                                   onPressed: _openResetRequests,
                                 ),
                               if (_isSuperAdmin)
                                 IconButton(
                                   icon: const Icon(Icons.admin_panel_settings),
-                                  tooltip: 'Navish Admin',
+                                  tooltip: l10n.navNavishAdmin,
                                   onPressed: _openAdmin,
                                 ),
                             ],
@@ -590,10 +628,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
-  Widget _notificationBell() {
+  Widget _notificationBell(AppLocalizations l10n) {
     final unread = _notifs.length;
     return IconButton(
-      tooltip: 'Alerts',
+      tooltip: l10n.alerts,
       onPressed: _openNotifications,
       icon: PulseOnChange(
         value: unread,
@@ -655,6 +693,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     final theme = Theme.of(context);
     final semantic = AppColors.of(context);
     final reduced = reducedMotion(context);
+    final l10n = AppLocalizations.of(context);
 
     Widget entrance(Widget child, int index) {
       if (reduced) return child;
@@ -671,7 +710,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         children: [
           entrance(
             Text(
-              'Hello, ${_user?['nickname'] as String? ?? _user?['name'] ?? ''}',
+              l10n.helloUser(_user?['nickname'] as String? ?? _user?['name'] ?? ''),
               style: theme.textTheme.displaySmall,
             ),
             0,
@@ -693,7 +732,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Expanded(
                     child: _glanceStat(
                       icon: Icons.warning_amber_rounded,
-                      label: 'Stuck',
+                      label: l10n.navStuck,
                       value: _stuckCount,
                       color: _stuckCount > 0 ? semantic.danger : semantic.success,
                       onTap: _stuckCount > 0
@@ -705,7 +744,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 Expanded(
                   child: _glanceStat(
                     icon: Icons.today_outlined,
-                    label: 'Due today',
+                    label: l10n.dueToday,
                     value: _dueTodayCount,
                     color: semantic.info,
                   ),
@@ -743,7 +782,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                                   color: theme.colorScheme.onPrimaryContainer),
                             ),
                             const SizedBox(height: 12),
-                            Text(m, style: theme.textTheme.titleMedium),
+                            Text(_moduleDisplayLabel(l10n, m), style: theme.textTheme.titleMedium),
                           ],
                         ),
                       ),
@@ -794,6 +833,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _tasksView() {
+    final l10n = AppLocalizations.of(context);
     return Column(
       children: [
         FilterBar(
@@ -802,6 +842,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             setState(() => _taskStatus = s);
             _load();
           },
+          activeLabel: l10n.activeFilter,
+          doneLabel: l10n.doneFilter,
           datePreset: _datePreset,
           onDatePresetChanged: (p) {
             setState(() => _datePreset = p);
@@ -812,8 +854,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           child: _tasks.isEmpty
               ? Center(
                   child: Text(_taskStatus == 'ACTIVE'
-                      ? 'No pending tasks 🎉'
-                      : 'Nothing here yet'),
+                      ? l10n.noPendingTasks
+                      : l10n.nothingHereYet),
                 )
               : _tasksList(),
         ),
@@ -822,6 +864,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _tasksList() {
+    final l10n = AppLocalizations.of(context);
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView.builder(
@@ -841,11 +884,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     if (t['dueAt'] != null)
-                      Text('Due: ${DateTime.parse(t['dueAt']).toLocal()}',
+                      Text(l10n.dueLabel('${DateTime.parse(t['dueAt']).toLocal()}'),
                           style: TextStyle(
                               color: overdue ? AppColors.of(context).danger : Colors.grey,
                               fontSize: 12)),
-                    Text('Chased ${t['chaseCount']} times · ${t['priority']}',
+                    Text(l10n.chasedTimes(t['chaseCount'], t['priority']),
                         style: const TextStyle(fontSize: 12)),
                   ],
                 ),
@@ -855,7 +898,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           context,
                           onFinished: () => _done(t['id']),
                         ),
-                        child: const Text('Done'),
+                        child: Text(l10n.done),
                       )
                     : null,
               ),
@@ -917,12 +960,13 @@ class _NotificationsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Alerts')),
+      appBar: AppBar(title: Text(l10n.alerts)),
       body: MaxWidthCenter(
         maxWidth: 800,
         child: notifs.isEmpty
-            ? const Center(child: Text('No alerts'))
+            ? Center(child: Text(l10n.noAlerts))
             : ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: notifs.length,

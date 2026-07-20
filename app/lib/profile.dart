@@ -9,6 +9,8 @@ import 'deletion_requests.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
+import 'locale_controller.dart';
+import 'l10n/gen/app_localizations.dart';
 
 // The account's own profile — picture, identity fields, preferences, and the
 // entry points (change password / performance / logout) that used to live in
@@ -99,7 +101,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _user = {..._user!, ...updated};
           _dirty = false;
         });
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Profile updated')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(AppLocalizations.of(context).profileUpdated)));
       }
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -112,11 +115,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
     if (_user?['language'] == lang) return;
     final previous = _user?['language'] as String? ?? 'en';
     setState(() => _user = {..._user!, 'language': lang});
+    // Flip the whole app's locale immediately — don't wait on the network
+    // round-trip, so the toggle feels instant. Rolled back below on failure.
+    await LocaleController.set(lang);
     try {
       await Api.updateMe(language: lang);
     } catch (e) {
       if (mounted) {
         setState(() => _user = {..._user!, 'language': previous});
+        await LocaleController.set(previous);
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     }
@@ -135,8 +142,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(title: const Text('Profile')),
+      appBar: AppBar(title: Text(l10n.profileTitle)),
       body: _loading
           ? const ShimmerSkeletonList()
           : RefreshIndicator(
@@ -148,16 +156,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   children: [
                     _photoSection(),
                     const SizedBox(height: 24),
-                    _sectionLabel('Basic info'),
-                    _textField('Name', _name, onChanged: () => setState(() => _dirty = true)),
+                    _sectionLabel(l10n.basicInfo),
+                    _textField(l10n.nameLabel, _name, onChanged: () => setState(() => _dirty = true)),
                     const SizedBox(height: 12),
-                    _textField('Nickname', _nickname, onChanged: () => setState(() => _dirty = true)),
+                    _textField(l10n.nicknameLabel, _nickname, onChanged: () => setState(() => _dirty = true)),
                     const SizedBox(height: 12),
-                    _textField('Post / designation', _designation,
-                        hint: 'e.g. Manager, Supervisor, Machine Operator',
+                    _textField(l10n.designationLabel, _designation,
+                        hint: l10n.designationHint,
                         onChanged: () => setState(() => _dirty = true)),
                     const SizedBox(height: 12),
-                    _textField('Phone', _phone,
+                    _textField(l10n.phoneLabel, _phone,
                         keyboardType: TextInputType.phone,
                         onChanged: () => setState(() => _dirty = true)),
                     const SizedBox(height: 12),
@@ -167,16 +175,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           ? const SizedBox(
                               height: 18, width: 18,
                               child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                          : const Text('Save changes'),
+                          : Text(l10n.saveChanges),
                     ),
                     const SizedBox(height: 28),
-                    _sectionLabel('Account'),
-                    _readOnlyTile(Icons.email_outlined, 'Email', _user?['email'] as String? ?? '—'),
-                    _readOnlyTile(Icons.badge_outlined, 'Role', _user?['role'] as String? ?? '—'),
-                    _readOnlyTile(Icons.apartment_outlined, 'Department',
-                        (_user?['department'] as Map?)?['name'] as String? ?? 'Not assigned'),
+                    _sectionLabel(l10n.account),
+                    _readOnlyTile(Icons.email_outlined, l10n.emailLabel, _user?['email'] as String? ?? '—'),
+                    _readOnlyTile(Icons.badge_outlined, l10n.roleLabel, _user?['role'] as String? ?? '—'),
+                    _readOnlyTile(Icons.apartment_outlined, l10n.departmentLabel,
+                        (_user?['department'] as Map?)?['name'] as String? ?? l10n.notAssigned),
                     const SizedBox(height: 28),
-                    _sectionLabel('Preferences'),
+                    _sectionLabel(l10n.preferences),
                     Padding(
                       padding: const EdgeInsets.symmetric(vertical: 4),
                       child: SegmentedButton<String>(
@@ -189,13 +197,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     ),
                     const SizedBox(height: 28),
-                    _sectionLabel('Security & activity'),
+                    _sectionLabel(l10n.securityAndActivity),
                     Card(
                       child: Column(
                         children: [
                           ListTile(
                             leading: const Icon(Icons.lock_outline),
-                            title: const Text('Change password'),
+                            title: Text(l10n.changePassword),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.push(context,
                                 sharedAxisRoute(const ChangePasswordScreen())),
@@ -203,14 +211,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                           const Divider(height: 1),
                           ListTile(
                             leading: const Icon(Icons.insights_outlined),
-                            title: const Text('My performance stats'),
+                            title: Text(l10n.myPerformanceStats),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: _openPerformance,
                           ),
                           const Divider(height: 1),
                           ListTile(
                             leading: const Icon(Icons.gavel_outlined),
-                            title: const Text('Legal (Terms / Privacy / Delete account)'),
+                            title: Text(l10n.legalMenu),
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.push(
                                 context, sharedAxisRoute(const LegalScreen())),
@@ -219,7 +227,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             const Divider(height: 1),
                             ListTile(
                               leading: const Icon(Icons.person_remove_outlined),
-                              title: const Text('Account deletion requests'),
+                              title: Text(l10n.accountDeletionRequests),
                               trailing: const Icon(Icons.chevron_right),
                               onTap: () => Navigator.push(context,
                                   sharedAxisRoute(const DeletionRequestsScreen())),
@@ -233,7 +241,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       style: OutlinedButton.styleFrom(foregroundColor: AppColors.of(context).danger),
                       onPressed: widget.onLogout,
                       icon: const Icon(Icons.logout),
-                      label: const Text('Logout'),
+                      label: Text(l10n.logout),
                     ),
                     const SizedBox(height: 24),
                   ],
@@ -383,9 +391,10 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     final onTimePct = _doneCount == 0 ? 0 : ((_onTimeCount / _doneCount) * 100).round();
     return Scaffold(
-      appBar: AppBar(title: const Text('My performance')),
+      appBar: AppBar(title: Text(l10n.myPerformance)),
       body: _loading
           ? const ShimmerSkeletonList()
           : _error != null
@@ -399,17 +408,17 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: _statCard('Active tasks', '$_activeCount', AppColors.of(context).warning)),
+                            Expanded(child: _statCard(l10n.activeTasksStat, '$_activeCount', AppColors.of(context).warning)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard('Completed', '$_doneCount', AppColors.of(context).success)),
+                            Expanded(child: _statCard(l10n.completedStat, '$_doneCount', AppColors.of(context).success)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(child: _statCard('On-time %', '$onTimePct%', AppColors.of(context).info)),
+                            Expanded(child: _statCard(l10n.onTimePctStat, '$onTimePct%', AppColors.of(context).info)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard('Escalated', '$_escalatedCount', AppColors.of(context).danger)),
+                            Expanded(child: _statCard(l10n.escalatedStat, '$_escalatedCount', AppColors.of(context).danger)),
                           ],
                         ),
                       ],
