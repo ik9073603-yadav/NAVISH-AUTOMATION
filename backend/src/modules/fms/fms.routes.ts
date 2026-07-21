@@ -6,6 +6,7 @@ import { advanceOrder } from './fms.service';
 import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 import { cached } from '../../lib/cache';
 import { classifyOrdersSla, deriveOrderDetailLabel } from './fms-analytics.service';
+import { loadOrgForCost, stageDelayHours, stageDelayCost, totalPlannedHoursForStages, round2 } from './delay-cost.service';
 
 export const fmsRouter = Router();
 fmsRouter.use(requireAuth);
@@ -97,7 +98,7 @@ fmsRouter.patch('/stages/:id', requireRole('OWNER', 'MANAGER'), async (req, res,
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId } = req.user!;
-    const stage = await prisma.stageDef.findFirst({ where: { id: req.params.id, orgId } });
+    const stage = await prisma.stageDef.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!stage) return res.status(404).json({ error: 'Stage not found' });
 
     if (parsed.data.responsibleId) {
@@ -115,8 +116,15 @@ fmsRouter.patch('/stages/:id', requireRole('OWNER', 'MANAGER'), async (req, res,
 });
 
 // ---------- ORDERS ----------
+const orderCreateSchema = z.object({
+  orderValue: z.number().positive().optional(),
+});
+
 fmsRouter.post('/flows/:flowId/orders', async (req, res, next) => {
   try {
+    const parsed = orderCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
     const { orgId } = req.user!;
 
     const flow = await prisma.flow.findFirst({ where: { id: req.params.flowId, orgId } });
@@ -126,7 +134,7 @@ fmsRouter.post('/flows/:flowId/orders', async (req, res, next) => {
     const orderNumber = `${flow.prefix}-${String(count).padStart(4, '0')}`;
 
     const order = await prisma.order.create({
-      data: { orgId, flowId: flow.id, orderNumber },
+      data: { orgId, flowId: flow.id, orderNumber, orderValue: parsed.data.orderValue },
     });
 
     await prisma.flow.update({ where: { id: flow.id }, data: { orderCount: count } });
@@ -312,20 +320,46 @@ fmsRouter.get('/orders/:id/history', async (req, res, next) => {
     );
     const slaStatus = !hasPlannedStage ? 'NO_SLA' : (anyLate ? 'DELAYED' : 'ON_TIME');
 
-    res.json({
-      orderNumber: order.orderNumber,
-      status: order.status,
-      slaStatus,
-      stages: order.stages.map(s => ({
+    // Cost of Delay: priced per-stage (rate first, then order-value formula —
+    // see delay-cost.service.ts), summed into one order-level total. If any
+    // late stage can't be priced (no rate AND no order value), the total is
+    // left null rather than showing a partial/fake number.
+    const org = await loadOrgForCost(orgId);
+    const totalPlannedHours = totalPlannedHoursForStages(order.flow.stages);
+    let orderDelayCost: number | null = 0;
+    let costUnavailable = false;
+
+    const stagesWithCost = order.stages.map(s => {
+      const delayHours = org ? stageDelayHours(s.plannedDeadline, s.completedAt, org) : 0;
+      const cost = org ? stageDelayCost(delayHours, org.delayCostPerHour, order.orderValue, totalPlannedHours) : 0;
+      if (delayHours > 0) {
+        if (cost === null) costUnavailable = true;
+        else orderDelayCost = (orderDelayCost ?? 0) + cost;
+      }
+      return {
         name: nameById[s.stageId] ?? '?',
         plannedMins: plannedMinsById[s.stageId] ?? null,
         enteredAt: s.enteredAt,
         completedAt: s.completedAt,
         plannedDeadline: s.plannedDeadline,
         delayMins: s.delayMins,
+        delayHours: round2(delayHours),
+        delayCost: cost === null ? null : round2(cost),
         completedByName: s.completedById ? (nameByUserId[s.completedById] ?? null) : null,
         data: s.data,
-      })),
+      };
+    });
+    if (costUnavailable) orderDelayCost = null;
+    else if (orderDelayCost != null) orderDelayCost = round2(orderDelayCost);
+
+    res.json({
+      orderNumber: order.orderNumber,
+      status: order.status,
+      slaStatus,
+      orderValue: order.orderValue,
+      delayCostPerHour: org?.delayCostPerHour ?? null,
+      orderDelayCost,
+      stages: stagesWithCost,
     });
   } catch (err) { next(err); }
 });
@@ -441,5 +475,131 @@ fmsRouter.get('/analytics/orders', requireRole('OWNER', 'MANAGER'), async (req, 
     });
 
     res.json(result);
+  } catch (err) { next(err); }
+});
+
+// Cost of Delay (Feature: show delay in ₹, not just time). Date-filtered
+// (order.startedAt, same convention as /analytics/orders) total ₹ lost,
+// the most expensive delayed orders, and the costliest stage/person.
+// Org-scoped, same 60s cache pattern as the other Flow analytics endpoints.
+fmsRouter.get('/analytics/cost-of-delay', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+  try {
+    const { orgId } = req.user!;
+    const from = req.query.from ? new Date(req.query.from as string) : undefined;
+    const to = req.query.to ? new Date(req.query.to as string) : undefined;
+    const key = `fms:analytics:cost:${orgId}:${from?.toISOString() ?? ''}:${to?.toISOString() ?? ''}`;
+
+    const empty = (delayCostPerHour: number | null) => ({
+      delayCostPerHour,
+      totalRupeesLost: delayCostPerHour != null ? 0 : null,
+      ordersMissingCostInfo: 0,
+      mostExpensiveOrders: [] as Array<{ orderId: string; orderNumber: string; cost: number }>,
+      costliestStages: [] as Array<{ stageId: string; stageName: string; flowName: string; cost: number }>,
+      costliestPeople: [] as Array<{ userId: string; name: string; cost: number }>,
+    });
+
+    const data = await cached(key, ANALYTICS_CACHE_TTL_MS, async () => {
+      const org = await loadOrgForCost(orgId);
+      if (!org) return empty(null);
+
+      const startedAt = dateRangeFilter(from, to);
+      const orders = await prisma.order.findMany({
+        where: { orgId, ...(startedAt && { startedAt }) },
+        select: { id: true, orderNumber: true, flowId: true, orderValue: true },
+      });
+      if (orders.length === 0) return empty(org.delayCostPerHour);
+
+      const orderById = new Map(orders.map(o => [o.id, o]));
+      const orderIds = orders.map(o => o.id);
+      const flowIds = [...new Set(orders.map(o => o.flowId))];
+
+      const stageDefs = await prisma.stageDef.findMany({
+        where: { orgId, flowId: { in: flowIds } },
+        select: { id: true, name: true, plannedMins: true, flowId: true, flow: { select: { name: true } } },
+      });
+      const stageDefById = new Map(stageDefs.map(s => [s.id, s]));
+      const plannedHoursByFlow = new Map<string, number>();
+      for (const flowId of flowIds) {
+        plannedHoursByFlow.set(flowId, totalPlannedHoursForStages(stageDefs.filter(s => s.flowId === flowId)));
+      }
+
+      const lateStages = await prisma.orderStage.findMany({
+        where: { orgId, orderId: { in: orderIds }, plannedDeadline: { not: null }, completedAt: { not: null } },
+        select: { orderId: true, stageId: true, completedAt: true, plannedDeadline: true, completedById: true },
+      });
+
+      let totalRupeesLost = 0;
+      let anyValueBasedCost = false;
+      const costByOrder = new Map<string, number>();
+      const costByStage = new Map<string, number>();
+      const costByPerson = new Map<string, number>();
+      const ordersMissingCost = new Set<string>();
+
+      for (const s of lateStages) {
+        const delayHours = stageDelayHours(s.plannedDeadline, s.completedAt, org);
+        if (delayHours <= 0) continue;
+
+        const order = orderById.get(s.orderId);
+        if (!order) continue;
+        const totalPlannedHours = plannedHoursByFlow.get(order.flowId) ?? 0;
+        const cost = stageDelayCost(delayHours, org.delayCostPerHour, order.orderValue, totalPlannedHours);
+
+        if (cost === null) {
+          ordersMissingCost.add(s.orderId);
+          continue;
+        }
+        if (org.delayCostPerHour == null) anyValueBasedCost = true;
+
+        totalRupeesLost += cost;
+        costByOrder.set(s.orderId, (costByOrder.get(s.orderId) ?? 0) + cost);
+        costByStage.set(s.stageId, (costByStage.get(s.stageId) ?? 0) + cost);
+        if (s.completedById) costByPerson.set(s.completedById, (costByPerson.get(s.completedById) ?? 0) + cost);
+      }
+
+      const mostExpensiveOrders = [...costByOrder.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([orderId, cost]) => ({
+          orderId,
+          orderNumber: orderById.get(orderId)?.orderNumber ?? '?',
+          cost: round2(cost),
+        }));
+
+      const costliestStages = [...costByStage.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([stageId, cost]) => {
+          const def = stageDefById.get(stageId);
+          return { stageId, stageName: def?.name ?? '?', flowName: def?.flow.name ?? '?', cost: round2(cost) };
+        });
+
+      const personIds = [...costByPerson.keys()];
+      const people = personIds.length
+        ? await prisma.user.findMany({ where: { id: { in: personIds } }, select: { id: true, name: true } })
+        : [];
+      const nameByPersonId = Object.fromEntries(people.map(p => [p.id, p.name]));
+      const costliestPeople = [...costByPerson.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10)
+        .map(([userId, cost]) => ({ userId, name: nameByPersonId[userId] ?? '?', cost: round2(cost) }));
+
+      // With a rate set, every late stage is priceable — total is always a
+      // real number (0 if nothing was late). Without a rate, the total is
+      // only meaningful once at least one order's value priced a stage;
+      // ordersMissingCostInfo tells the caller how many late orders were
+      // left out for lacking both a rate and a value.
+      const computable = org.delayCostPerHour != null || anyValueBasedCost;
+
+      return {
+        delayCostPerHour: org.delayCostPerHour,
+        totalRupeesLost: computable ? round2(totalRupeesLost) : null,
+        ordersMissingCostInfo: ordersMissingCost.size,
+        mostExpensiveOrders,
+        costliestStages,
+        costliestPeople,
+      };
+    });
+
+    res.json(data);
   } catch (err) { next(err); }
 });

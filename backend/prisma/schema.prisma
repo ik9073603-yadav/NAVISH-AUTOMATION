@@ -47,6 +47,11 @@ model Organization {
   // Blocks new logins for this org when false; existing sessions expire naturally.
   enabled     Boolean  @default(true)
 
+  // Cost of Delay (Feature: show delay in ₹, not just time). Owner-set ₹/hr
+  // rate used to price a stage's delay. Null = rate not configured — never
+  // fabricate a cost when this is unset (see delay-cost.service.ts).
+  delayCostPerHour Float?
+
   users             User[]
   departments       Department[]
   activityLogs      ActivityLog[]
@@ -374,6 +379,10 @@ model Order {
   currentStageId String?
   startedAt      DateTime  @default(now())
   completedAt    DateTime?
+
+  // Cost of Delay: captured on the "start new order" form, optional. Feeds
+  // the value-based delay-cost formula when no org-wide ₹/hr rate is set.
+  orderValue     Float?
 
   flow   Flow            @relation(fields: [flowId], references: [id], onDelete: Cascade)
   stages OrderStage[]

@@ -380,6 +380,20 @@ class AppLocalizationsHi extends AppLocalizations {
   String get downloadFullBackup => 'पूरा कंपनी बैकअप डाउनलोड करें';
 
   @override
+  String get delayCostPerHourLabel => 'प्रति घंटा देरी की लागत (₹)';
+
+  @override
+  String get delayCostPerHourHint =>
+      'देरी के एक काम के घंटे की कीमत — देर से पूरी हुई स्टेज की ₹ लागत निकालने के लिए इस्तेमाल होती है।';
+
+  @override
+  String get costOfDelayTooltipTitle => 'यह कैसे कैलकुलेट होता है?';
+
+  @override
+  String get costOfDelayTooltipBody =>
+      'किसी स्टेज की लागत तभी बनती है जब उसकी डेडलाइन हो और वह देर से पूरी हो। देरी सिर्फ काम के घंटों में गिनी जाती है — रात, साप्ताहिक छुट्टी और छुट्टियां कभी नहीं गिनी जातीं। लागत = देरी के घंटे × आपकी ₹/घंटा दर। अगर दर सेट नहीं है, तो ऑर्डर की वैल्यू और फ्लो के प्लान किए घंटों से अनुमान लगाया जाता है। अगर दोनों में से कुछ भी सेट नहीं है, तो कोई ₹ आंकड़ा नहीं दिखाया जाता।';
+
+  @override
   String get assignATask => 'टास्क असाइन करें';
 
   @override

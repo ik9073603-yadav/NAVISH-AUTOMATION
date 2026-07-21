@@ -812,6 +812,30 @@ abstract class AppLocalizations {
   /// **'Download full company backup'**
   String get downloadFullBackup;
 
+  /// No description provided for @delayCostPerHourLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Delay cost per hour (₹)'**
+  String get delayCostPerHourLabel;
+
+  /// No description provided for @delayCostPerHourHint.
+  ///
+  /// In en, this message translates to:
+  /// **'What one working hour of delay costs you — used to price late stages in ₹.'**
+  String get delayCostPerHourHint;
+
+  /// No description provided for @costOfDelayTooltipTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How is this calculated?'**
+  String get costOfDelayTooltipTitle;
+
+  /// No description provided for @costOfDelayTooltipBody.
+  ///
+  /// In en, this message translates to:
+  /// **'A stage costs money only if it has a deadline and finishes late. Delay is counted in working hours only — nights, week-offs and holidays never count. Cost = delay hours × your ₹/hr rate. If no rate is set, it\'s estimated instead from the order\'s value, spread over the flow\'s planned hours. If neither is set, no ₹ figure is shown.'**
+  String get costOfDelayTooltipBody;
+
   /// No description provided for @assignATask.
   ///
   /// In en, this message translates to:

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'api.dart';
 import 'filters.dart';
 import 'order_history.dart';
+import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
 
 // KPI cards + summary — the "Analytics" segment inside the Flow Monitoring
@@ -17,6 +18,7 @@ class FlowAnalyticsView extends StatefulWidget {
 
 class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
   Map<String, dynamic>? _summary;
+  Map<String, dynamic>? _costOfDelay;
   bool _loading = true;
   String? _error;
 
@@ -32,8 +34,14 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
       _error = null;
     });
     try {
-      final s = await Api.fmsAnalyticsSummary();
-      setState(() => _summary = s);
+      final results = await Future.wait([
+        Api.fmsAnalyticsSummary(),
+        Api.fmsAnalyticsCostOfDelay(),
+      ]);
+      setState(() {
+        _summary = results[0];
+        _costOfDelay = results[1];
+      });
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
@@ -91,6 +99,90 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
               ),
             ),
           ),
+          const SizedBox(height: 16),
+          _costOfDelaySection(),
+        ],
+      ),
+    );
+  }
+
+  Widget _costOfDelaySection() {
+    final c = _costOfDelay;
+    if (c == null) return const SizedBox.shrink();
+
+    final total = c['totalRupeesLost'] as num?;
+    final missing = c['ordersMissingCostInfo'] as int? ?? 0;
+    final mostExpensive = (c['mostExpensiveOrders'] as List?) ?? [];
+    final costliestStages = (c['costliestStages'] as List?) ?? [];
+    final costliestPeople = (c['costliestPeople'] as List?) ?? [];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Text('Cost of Delay', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            const CostOfDelayInfoButton(),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Card(
+          color: Colors.red.withValues(alpha: 0.06),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  formatRupeesOrPrompt(total),
+                  style: TextStyle(
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    color: total == null ? Colors.grey.shade600 : Colors.red.shade700,
+                  ),
+                ),
+                Text(
+                  total == null ? 'Set a ₹/hr rate or capture order values to see ₹ lost to delay' : 'Total ₹ lost to delay',
+                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+                if (missing > 0) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    '$missing delayed order(s) not counted — no rate or order value set',
+                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ),
+        if (mostExpensive.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('Most expensive delayed orders', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          ...mostExpensive.take(5).map((o) => _costRow(o['orderNumber'] as String, o['cost'] as num)),
+        ],
+        if (costliestStages.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('Costliest stage', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          ...costliestStages.take(3).map((s) => _costRow('${s['stageName']} (${s['flowName']})', s['cost'] as num)),
+        ],
+        if (costliestPeople.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          const Text('Costliest person', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          ...costliestPeople.take(3).map((p) => _costRow(p['name'] as String, p['cost'] as num)),
+        ],
+      ],
+    );
+  }
+
+  Widget _costRow(String label, num cost) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 3),
+      child: Row(
+        children: [
+          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
+          Text('₹${cost.toStringAsFixed(0)}',
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red.shade700)),
         ],
       ),
     );

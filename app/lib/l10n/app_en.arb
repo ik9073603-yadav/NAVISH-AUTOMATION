@@ -135,6 +135,11 @@
   "preparingBackup": "Preparing backup...",
   "downloadFullBackup": "Download full company backup",
 
+  "delayCostPerHourLabel": "Delay cost per hour (₹)",
+  "delayCostPerHourHint": "What one working hour of delay costs you — used to price late stages in ₹.",
+  "costOfDelayTooltipTitle": "How is this calculated?",
+  "costOfDelayTooltipBody": "A stage costs money only if it has a deadline and finishes late. Delay is counted in working hours only — nights, week-offs and holidays never count. Cost = delay hours × your ₹/hr rate. If no rate is set, it's estimated instead from the order's value, spread over the flow's planned hours. If neither is set, no ₹ figure is shown.",
+
   "assignATask": "Assign a task",
   "whatNeedsDoing": "What needs doing?",
   "detailsOptional": "Details (optional)",

@@ -380,6 +380,20 @@ class AppLocalizationsEn extends AppLocalizations {
   String get downloadFullBackup => 'Download full company backup';
 
   @override
+  String get delayCostPerHourLabel => 'Delay cost per hour (₹)';
+
+  @override
+  String get delayCostPerHourHint =>
+      'What one working hour of delay costs you — used to price late stages in ₹.';
+
+  @override
+  String get costOfDelayTooltipTitle => 'How is this calculated?';
+
+  @override
+  String get costOfDelayTooltipBody =>
+      'A stage costs money only if it has a deadline and finishes late. Delay is counted in working hours only — nights, week-offs and holidays never count. Cost = delay hours × your ₹/hr rate. If no rate is set, it\'s estimated instead from the order\'s value, spread over the flow\'s planned hours. If neither is set, no ₹ figure is shown.';
+
+  @override
   String get assignATask => 'Assign a task';
 
   @override

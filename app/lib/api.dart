@@ -323,10 +323,11 @@ class Api {
     }
   }
 
-  static Future<void> createOrder(String flowId) async {
+  static Future<void> createOrder(String flowId, {double? orderValue}) async {
     final res = await http.post(
       Uri.parse('${Config.apiBase}/api/fms/flows/$flowId/orders'),
       headers: _headers,
+      body: jsonEncode({if (orderValue != null) 'orderValue': orderValue}),
     );
     if (res.statusCode != 201) throw Exception('Failed to create order');
   }
@@ -440,6 +441,18 @@ class Api {
     final res = await http.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load orders');
     return jsonDecode(res.body) as List<dynamic>;
+  }
+
+  // Cost of Delay: total ₹ lost, most expensive delayed orders, costliest
+  // stage/person. Date-filtered by order start date.
+  static Future<Map<String, dynamic>> fmsAnalyticsCostOfDelay({DateTime? from, DateTime? to}) async {
+    final uri = Uri.parse('${Config.apiBase}/api/fms/analytics/cost-of-delay').replace(queryParameters: {
+      if (from != null) 'from': from.toUtc().toIso8601String(),
+      if (to != null) 'to': to.toUtc().toIso8601String(),
+    });
+    final res = await http.get(uri, headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to load cost of delay');
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   static Future<List<dynamic>> skus({String? search, String? category, String status = 'ALL'}) async {
@@ -628,6 +641,8 @@ class Api {
     String? shiftStart,
     String? shiftEnd,
     List<String>? holidays,
+    double? delayCostPerHour,
+    bool clearDelayCostPerHour = false,
   }) async {
     final res = await http.patch(
       Uri.parse('${Config.apiBase}/api/settings'),
@@ -641,6 +656,8 @@ class Api {
         if (shiftStart != null) 'shiftStart': shiftStart,
         if (shiftEnd != null) 'shiftEnd': shiftEnd,
         if (holidays != null) 'holidays': holidays,
+        if (clearDelayCostPerHour) 'delayCostPerHour': null
+        else if (delayCostPerHour != null) 'delayCostPerHour': delayCostPerHour,
       }),
     );
     if (res.statusCode != 200) {

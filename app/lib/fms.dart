@@ -9,6 +9,7 @@ import 'export_actions.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
 import 'widgets/motion.dart';
+import 'widgets/cost_of_delay_info.dart';
 import 'offline/write_queue.dart';
 import 'flow_analytics.dart';
 
@@ -313,8 +314,18 @@ class _FmsScreenState extends State<FmsScreen> {
             .toList(),
       ),
     );
-    if (flowId == null) return;
-    await Api.createOrder(flowId);
+    if (flowId == null || !mounted) return;
+
+    // Optional — dismissing this (tap outside, or "Skip") just starts the
+    // order with no captured value; Cost of Delay falls back to the ₹/hr
+    // rate (or shows the "set a delay cost" prompt) for that order.
+    final orderValue = await showAdaptiveSheet<double?>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const _OrderValueSheet(),
+    );
+
+    await Api.createOrder(flowId, orderValue: orderValue);
     _load();
   }
 
@@ -458,6 +469,84 @@ class _FmsScreenState extends State<FmsScreen> {
       sharedAxisRoute(TemplateAssignStagesScreen(flowId: applied['flowId'] as String)),
     );
     if (done == true) _load();
+  }
+}
+
+// ---------------- ORDER VALUE (Cost of Delay) ----------------
+class _OrderValueSheet extends StatefulWidget {
+  const _OrderValueSheet();
+  @override
+  State<_OrderValueSheet> createState() => _OrderValueSheetState();
+}
+
+class _OrderValueSheetState extends State<_OrderValueSheet> {
+  final _value = TextEditingController();
+
+  @override
+  void dispose() {
+    _value.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 20,
+        right: 20,
+        top: 20,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text('Order value (optional)',
+                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              const CostOfDelayInfoButton(),
+            ],
+          ),
+          const Text(
+            'Used to estimate the ₹ cost of a delay if no per-hour rate is set in Settings.',
+            style: TextStyle(color: Colors.grey, fontSize: 12),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _value,
+            autofocus: true,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: const InputDecoration(
+              labelText: 'Order value (₹)',
+              prefixText: '₹ ',
+              hintText: 'e.g. 50000',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Skip'),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => Navigator.pop(context, double.tryParse(_value.text.trim())),
+                  child: const Text('Start order'),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
   }
 }
 

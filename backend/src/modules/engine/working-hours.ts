@@ -127,6 +127,33 @@ export function addWorkingTime(start: Date, durationMinutes: number, org: OrgHou
   return cursor;
 }
 
+// Inverse of addWorkingTime: how many WORKING minutes elapse between two
+// instants — time outside the shift, on a week-off day, or on a holiday
+// doesn't count. Mirrors addWorkingTime's day-walking loop exactly (same
+// nextWorkingMoment/startOfNextWorkingDay helpers) so the two stay in sync.
+export function workingMinutesBetween(start: Date, end: Date, org: OrgHours): number {
+  if (end.getTime() <= start.getTime()) return 0;
+
+  const [endH, endM] = org.shiftEnd.split(':').map(Number);
+
+  let cursor = nextWorkingMoment(start, org);
+  if (cursor.getTime() >= end.getTime()) return 0;
+
+  let totalMinutes = 0;
+  while (cursor.getTime() < end.getTime()) {
+    const local = getLocalParts(cursor, org.timezone);
+    const dayEnd = zonedTimeToUtc(local.year, local.month, local.day, endH, endM, org.timezone);
+    const segmentEnd = dayEnd.getTime() < end.getTime() ? dayEnd : end;
+
+    totalMinutes += (segmentEnd.getTime() - cursor.getTime()) / 60_000;
+
+    if (end.getTime() <= dayEnd.getTime()) break;
+    cursor = startOfNextWorkingDay(local.year, local.month, local.day, org);
+  }
+
+  return totalMinutes;
+}
+
 async function loadOrgHours(orgId: string): Promise<OrgHours | null> {
   return prisma.organization.findUnique({
     where: { id: orgId },

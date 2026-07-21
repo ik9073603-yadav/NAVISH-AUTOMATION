@@ -4,6 +4,7 @@ import 'package:animations/animations.dart';
 import 'api.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
+import 'widgets/cost_of_delay_info.dart';
 
 class OrderHistoryScreen extends StatefulWidget {
   final String orderId;
@@ -125,11 +126,29 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       width: double.infinity,
       color: color.withValues(alpha: 0.1),
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 18),
-          const SizedBox(width: 8),
-          Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+          Row(
+            children: [
+              Icon(icon, color: color, size: 18),
+              const SizedBox(width: 8),
+              Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+            ],
+          ),
+          if (sla == 'DELAYED') ...[
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                const SizedBox(width: 26),
+                Text(
+                  'Total lost to delay: ${formatRupeesOrPrompt(_history?['orderDelayCost'] as num?)}',
+                  style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+                ),
+                const CostOfDelayInfoButton(iconSize: 16),
+              ],
+            ),
+          ],
         ],
       ),
     );
@@ -187,6 +206,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                       plannedLabel: _plannedMinsLabel(s['plannedMins'] as int?),
                       delayMins: delayMins,
                       delayed: delayed,
+                      delayCost: s['delayCost'] as num?,
                       completedByName: s['completedByName'] as String?,
                       data: (s['data'] as Map?)?.cast<String, dynamic>() ?? {},
                     ),
@@ -209,6 +229,7 @@ class _StageCard extends StatelessWidget {
   final String? plannedLabel;
   final int? delayMins;
   final bool delayed;
+  final num? delayCost;
   final String? completedByName;
   final Map<String, dynamic> data;
 
@@ -220,6 +241,7 @@ class _StageCard extends StatelessWidget {
     required this.plannedLabel,
     required this.delayMins,
     required this.delayed,
+    required this.delayCost,
     required this.completedByName,
     required this.data,
   });
@@ -247,7 +269,9 @@ class _StageCard extends StatelessWidget {
               Text('Done by: $completedByName', style: const TextStyle(fontSize: 12, color: Colors.grey)),
             if (delayMins != null)
               Text(
-                delayed ? 'Delayed by $delayMins min' : 'On time (${-delayMins!} min to spare)',
+                delayed
+                    ? 'Delayed by $delayMins min · ${formatRupeesOrPrompt(delayCost)}'
+                    : 'On time (${-delayMins!} min to spare)',
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,

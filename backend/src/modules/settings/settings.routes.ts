@@ -15,6 +15,7 @@ settingsRouter.get('/', requireRole('OWNER'), async (req, res, next) => {
       select: {
         id: true, name: true, timezone: true, industry: true, logoUrl: true,
         workingDays: true, shiftStart: true, shiftEnd: true, holidays: true,
+        delayCostPerHour: true,
       },
     });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
@@ -34,6 +35,9 @@ const updateSchema = z.object({
   shiftStart: z.string().regex(timeRegex, 'Expected HH:mm').optional(),
   shiftEnd: z.string().regex(timeRegex, 'Expected HH:mm').optional(),
   holidays: z.array(z.string().regex(dateRegex, 'Expected YYYY-MM-DD')).optional(),
+  // Cost of Delay ₹/hr rate. Null explicitly clears it (falls back to the
+  // order-value formula, or the honest "set a delay cost" prompt).
+  delayCostPerHour: z.number().positive().nullable().optional(),
 });
 
 settingsRouter.patch('/', requireRole('OWNER'), async (req, res, next) => {
@@ -47,6 +51,7 @@ settingsRouter.patch('/', requireRole('OWNER'), async (req, res, next) => {
       select: {
         id: true, name: true, timezone: true, industry: true, logoUrl: true,
         workingDays: true, shiftStart: true, shiftEnd: true, holidays: true,
+        delayCostPerHour: true,
       },
     });
 

@@ -9,6 +9,7 @@ import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
 import 'widgets/motion.dart';
+import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
 
 const _commonTimezones = [
@@ -57,6 +58,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   TimeOfDay _shiftStart = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _shiftEnd = const TimeOfDay(hour: 18, minute: 0);
   List<String> _holidays = [];
+  final _delayCostPerHour = TextEditingController();
 
   @override
   void initState() {
@@ -69,6 +71,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void dispose() {
     _companyName.dispose();
     _industry.dispose();
+    _delayCostPerHour.dispose();
     super.dispose();
   }
 
@@ -95,6 +98,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _shiftStart = _parseTime(s['shiftStart'] as String? ?? '09:00');
         _shiftEnd = _parseTime(s['shiftEnd'] as String? ?? '18:00');
         _holidays = ((s['holidays'] as List?) ?? []).map((e) => e as String).toList()..sort();
+        final rate = s['delayCostPerHour'];
+        _delayCostPerHour.text = rate == null ? '' : '$rate';
       });
     } catch (e) {
       if (mounted) {
@@ -142,6 +147,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      final rateText = _delayCostPerHour.text.trim();
+      final rate = rateText.isEmpty ? null : double.tryParse(rateText);
       await Api.updateSettings(
         name: _companyName.text.trim(),
         industry: _industry.text.trim(),
@@ -150,6 +157,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         shiftStart: _fmtTime(_shiftStart),
         shiftEnd: _fmtTime(_shiftEnd),
         holidays: _holidays,
+        delayCostPerHour: rate,
+        clearDelayCostPerHour: rateText.isEmpty,
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -285,6 +294,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
                 ),
               ],
+            ),
+            const SizedBox(height: 28),
+            Row(
+              children: [
+                _sectionLabel(l10n.delayCostPerHourLabel),
+                const CostOfDelayInfoButton(),
+              ],
+            ),
+            Text(l10n.delayCostPerHourHint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _delayCostPerHour,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                prefixText: '₹ ',
+                hintText: 'e.g. 500',
+                border: OutlineInputBorder(),
+              ),
             ),
             const SizedBox(height: 28),
             Row(
