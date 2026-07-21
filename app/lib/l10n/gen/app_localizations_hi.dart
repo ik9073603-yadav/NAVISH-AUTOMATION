@@ -481,6 +481,106 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
+  String get companyHealthScore => 'कंपनी हेल्थ स्कोर';
+
+  @override
+  String get healthBandHealthy => 'स्वस्थ';
+
+  @override
+  String get healthBandNeedsAttention => 'ध्यान चाहिए';
+
+  @override
+  String get healthBandAtRisk => 'जोखिम में';
+
+  @override
+  String healthTrendUpBy(Object delta) {
+    return '+$delta पिछली अवधि से';
+  }
+
+  @override
+  String healthTrendDownBy(Object delta) {
+    return '$delta पिछली अवधि से';
+  }
+
+  @override
+  String get healthTrendFlat => 'पिछली अवधि से कोई बदलाव नहीं';
+
+  @override
+  String get healthNoTrendYet => 'अभी पर्याप्त इतिहास नहीं है';
+
+  @override
+  String get healthBreakdownTitle => 'हेल्थ स्कोर का विवरण';
+
+  @override
+  String get healthBiggestDrags => 'सबसे बड़ी कमियां';
+
+  @override
+  String get healthNoDrags => 'आपका स्कोर किसी चीज़ से नीचे नहीं जा रहा 🎉';
+
+  @override
+  String healthWeightLabel(Object pct) {
+    return 'स्कोर का $pct%';
+  }
+
+  @override
+  String get healthExcludedNoData => 'बाहर रखा गया — अभी डेटा नहीं है';
+
+  @override
+  String healthWindowLabel(Object days) {
+    return 'पिछले $days दिन';
+  }
+
+  @override
+  String get healthHowCalculatedTitle => 'यह स्कोर कैसे कैलकुलेट होता है?';
+
+  @override
+  String get healthHowCalculatedBody =>
+      'नीचे हर कंपोनेंट को 0-100 पर स्कोर किया जाता है और उसके वेट के हिसाब से जोड़ा जाता है। जिस कंपोनेंट का अभी डेटा नहीं है (जैसे कोई चेकलिस्ट नहीं है), उसे बाहर रखा जाता है और बाकी वेट बढ़ाकर उसकी जगह भरी जाती है — उसे कभी झूठा 0 स्कोर नहीं दिया जाता। \"सबसे बड़ी कमियां\" पर टैप करके सीधे वहां जाएं जहां ध्यान चाहिए।';
+
+  @override
+  String get healthComponentOnTime => 'समय पर पूरा होना';
+
+  @override
+  String get healthComponentStuckLoad => 'अटके/देरी वाले काम';
+
+  @override
+  String get healthComponentChecklist => 'चेकलिस्ट पालन';
+
+  @override
+  String get healthComponentInventory => 'स्टॉक की सेहत';
+
+  @override
+  String get healthComponentEscalations => 'एस्केलेशन';
+
+  @override
+  String healthReasonOnTime(Object pct, Object late, Object total) {
+    return '$pct% समय पर — $total में से $late देर से पूरे हुए';
+  }
+
+  @override
+  String get healthReasonStuckLoadZero => 'अभी कुछ भी अटका या देरी में नहीं है';
+
+  @override
+  String healthReasonStuckLoad(Object count) {
+    return '$count काम अभी अटके या देरी में हैं';
+  }
+
+  @override
+  String healthReasonChecklist(Object pct, Object done, Object total) {
+    return '$pct% पालन — $total में से $done पूरे हुए';
+  }
+
+  @override
+  String healthReasonInventory(Object alertCount, Object deadPct) {
+    return '$alertCount लो/ओवर-स्टॉक आइटम, स्टॉक वैल्यू का $deadPct% डेड है';
+  }
+
+  @override
+  String healthReasonEscalations(Object escalated, Object total) {
+    return '$total टास्क में से $escalated एस्केलेट हुए';
+  }
+
+  @override
   String get activeFilter => 'एक्टिव';
 
   @override

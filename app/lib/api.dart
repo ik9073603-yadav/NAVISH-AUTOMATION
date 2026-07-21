@@ -621,6 +621,19 @@ class Api {
     });
   }
 
+  // Company Health Score — one 0-100 number + transparent component
+  // breakdown (see health-score.service.ts on the backend for the formula).
+  static Future<Map<String, dynamic>> healthScore({int days = 7}) async {
+    return _cachedGet('healthScore:$days', () async {
+      final res = await http.get(
+        Uri.parse('${Config.apiBase}/api/health-score').replace(queryParameters: {'days': '$days'}),
+        headers: _headers,
+      );
+      if (res.statusCode != 200) throw Exception('Failed to load health score');
+      return jsonDecode(res.body) as Map<String, dynamic>;
+    });
+  }
+
   static Future<Map<String, dynamic>> getSettings() async {
     final res = await http.get(
       Uri.parse('${Config.apiBase}/api/settings'),

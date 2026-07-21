@@ -63,6 +63,7 @@ model Organization {
   checklistRules    ChecklistRule[]
   flows             Flow[]
   skus              Sku[]
+  healthSnapshots   HealthSnapshot[]
 
   @@map("organizations")
 }
@@ -465,4 +466,21 @@ model StockMovement {
 
   @@index([orgId, skuId, createdAt])
   @@map("stock_movements")
+}
+
+// One row per org per calendar day (UTC date key) — written once daily by
+// the scheduler (see health-score.service.ts writeDailyHealthSnapshots) so
+// the trend arrow and history don't require recomputing the past.
+model HealthSnapshot {
+  id        String   @id @default(uuid())
+  orgId     String
+  date      String                       // "YYYY-MM-DD"
+  score     Int
+  createdAt DateTime @default(now())
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@unique([orgId, date])
+  @@index([orgId, date])
+  @@map("health_snapshots")
 }

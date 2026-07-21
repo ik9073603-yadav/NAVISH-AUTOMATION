@@ -17,6 +17,7 @@ import { analyticsRouter } from './modules/analytics/analytics.routes';
 import { exportRouter } from './modules/export/export.routes';
 import { templatesRouter } from './modules/templates/templates.routes';
 import { legalRouter } from './modules/legal/legal.routes';
+import { healthRouter } from './modules/health/health.routes';
 
 const app = express();
 app.use(express.json());
@@ -40,6 +41,7 @@ app.use('/api/admin', adminRouter);
 app.use('/api/analytics', analyticsRouter);
 app.use('/api/export', exportRouter);
 app.use('/api/templates', templatesRouter);
+app.use('/api/health-score', healthRouter);
 app.use('/legal', legalRouter);
 
 

@@ -22,6 +22,7 @@ const ORG_SCOPED_MODELS: Array<{ name: string; count: (orgId: string) => Promise
   { name: 'orderStage', count: (orgId) => prisma.orderStage.count({ where: { orgId } }) },
   { name: 'sku', count: (orgId) => prisma.sku.count({ where: { orgId } }) },
   { name: 'stockMovement', count: (orgId) => prisma.stockMovement.count({ where: { orgId } }) },
+  { name: 'healthSnapshot', count: (orgId) => prisma.healthSnapshot.count({ where: { orgId } }) },
 ];
 
 export class OrgNotFoundError extends Error {}

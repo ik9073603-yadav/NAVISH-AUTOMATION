@@ -481,6 +481,106 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get companyHealthScore => 'Company Health Score';
+
+  @override
+  String get healthBandHealthy => 'Healthy';
+
+  @override
+  String get healthBandNeedsAttention => 'Needs attention';
+
+  @override
+  String get healthBandAtRisk => 'At risk';
+
+  @override
+  String healthTrendUpBy(Object delta) {
+    return '+$delta vs last period';
+  }
+
+  @override
+  String healthTrendDownBy(Object delta) {
+    return '$delta vs last period';
+  }
+
+  @override
+  String get healthTrendFlat => 'No change vs last period';
+
+  @override
+  String get healthNoTrendYet => 'Not enough history yet';
+
+  @override
+  String get healthBreakdownTitle => 'Health Score breakdown';
+
+  @override
+  String get healthBiggestDrags => 'Biggest drags';
+
+  @override
+  String get healthNoDrags => 'Nothing dragging your score down 🎉';
+
+  @override
+  String healthWeightLabel(Object pct) {
+    return '$pct% of score';
+  }
+
+  @override
+  String get healthExcludedNoData => 'Excluded — no data yet';
+
+  @override
+  String healthWindowLabel(Object days) {
+    return 'Last $days days';
+  }
+
+  @override
+  String get healthHowCalculatedTitle => 'How is this score calculated?';
+
+  @override
+  String get healthHowCalculatedBody =>
+      'Each component below is scored 0-100 and combined using its weight. A component with no data yet (e.g. no checklists) is left out and the other weights are scaled up to fill the gap — it\'s never scored a fake 0. Tap \"Biggest drags\" to jump straight to what needs attention.';
+
+  @override
+  String get healthComponentOnTime => 'On-time performance';
+
+  @override
+  String get healthComponentStuckLoad => 'Stuck / overdue load';
+
+  @override
+  String get healthComponentChecklist => 'Checklist compliance';
+
+  @override
+  String get healthComponentInventory => 'Inventory health';
+
+  @override
+  String get healthComponentEscalations => 'Escalations';
+
+  @override
+  String healthReasonOnTime(Object pct, Object late, Object total) {
+    return '$pct% on-time — $late of $total finished late';
+  }
+
+  @override
+  String get healthReasonStuckLoadZero => 'Nothing stuck or overdue right now';
+
+  @override
+  String healthReasonStuckLoad(Object count) {
+    return '$count item(s) stuck or overdue right now';
+  }
+
+  @override
+  String healthReasonChecklist(Object pct, Object done, Object total) {
+    return '$pct% compliance — $done of $total completed';
+  }
+
+  @override
+  String healthReasonInventory(Object alertCount, Object deadPct) {
+    return '$alertCount low/over-stock item(s), $deadPct% of stock value is dead';
+  }
+
+  @override
+  String healthReasonEscalations(Object escalated, Object total) {
+    return '$escalated escalation(s) out of $total task(s)';
+  }
+
+  @override
   String get activeFilter => 'Active';
 
   @override

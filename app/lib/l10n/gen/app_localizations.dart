@@ -998,6 +998,168 @@ abstract class AppLocalizations {
   /// **'No tasks yet · {role}'**
   String noTasksYetRole(Object role);
 
+  /// No description provided for @companyHealthScore.
+  ///
+  /// In en, this message translates to:
+  /// **'Company Health Score'**
+  String get companyHealthScore;
+
+  /// No description provided for @healthBandHealthy.
+  ///
+  /// In en, this message translates to:
+  /// **'Healthy'**
+  String get healthBandHealthy;
+
+  /// No description provided for @healthBandNeedsAttention.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get healthBandNeedsAttention;
+
+  /// No description provided for @healthBandAtRisk.
+  ///
+  /// In en, this message translates to:
+  /// **'At risk'**
+  String get healthBandAtRisk;
+
+  /// No description provided for @healthTrendUpBy.
+  ///
+  /// In en, this message translates to:
+  /// **'+{delta} vs last period'**
+  String healthTrendUpBy(Object delta);
+
+  /// No description provided for @healthTrendDownBy.
+  ///
+  /// In en, this message translates to:
+  /// **'{delta} vs last period'**
+  String healthTrendDownBy(Object delta);
+
+  /// No description provided for @healthTrendFlat.
+  ///
+  /// In en, this message translates to:
+  /// **'No change vs last period'**
+  String get healthTrendFlat;
+
+  /// No description provided for @healthNoTrendYet.
+  ///
+  /// In en, this message translates to:
+  /// **'Not enough history yet'**
+  String get healthNoTrendYet;
+
+  /// No description provided for @healthBreakdownTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Health Score breakdown'**
+  String get healthBreakdownTitle;
+
+  /// No description provided for @healthBiggestDrags.
+  ///
+  /// In en, this message translates to:
+  /// **'Biggest drags'**
+  String get healthBiggestDrags;
+
+  /// No description provided for @healthNoDrags.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing dragging your score down 🎉'**
+  String get healthNoDrags;
+
+  /// No description provided for @healthWeightLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% of score'**
+  String healthWeightLabel(Object pct);
+
+  /// No description provided for @healthExcludedNoData.
+  ///
+  /// In en, this message translates to:
+  /// **'Excluded — no data yet'**
+  String get healthExcludedNoData;
+
+  /// No description provided for @healthWindowLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Last {days} days'**
+  String healthWindowLabel(Object days);
+
+  /// No description provided for @healthHowCalculatedTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'How is this score calculated?'**
+  String get healthHowCalculatedTitle;
+
+  /// No description provided for @healthHowCalculatedBody.
+  ///
+  /// In en, this message translates to:
+  /// **'Each component below is scored 0-100 and combined using its weight. A component with no data yet (e.g. no checklists) is left out and the other weights are scaled up to fill the gap — it\'s never scored a fake 0. Tap \"Biggest drags\" to jump straight to what needs attention.'**
+  String get healthHowCalculatedBody;
+
+  /// No description provided for @healthComponentOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'On-time performance'**
+  String get healthComponentOnTime;
+
+  /// No description provided for @healthComponentStuckLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'Stuck / overdue load'**
+  String get healthComponentStuckLoad;
+
+  /// No description provided for @healthComponentChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'Checklist compliance'**
+  String get healthComponentChecklist;
+
+  /// No description provided for @healthComponentInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory health'**
+  String get healthComponentInventory;
+
+  /// No description provided for @healthComponentEscalations.
+  ///
+  /// In en, this message translates to:
+  /// **'Escalations'**
+  String get healthComponentEscalations;
+
+  /// No description provided for @healthReasonOnTime.
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% on-time — {late} of {total} finished late'**
+  String healthReasonOnTime(Object pct, Object late, Object total);
+
+  /// No description provided for @healthReasonStuckLoadZero.
+  ///
+  /// In en, this message translates to:
+  /// **'Nothing stuck or overdue right now'**
+  String get healthReasonStuckLoadZero;
+
+  /// No description provided for @healthReasonStuckLoad.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} item(s) stuck or overdue right now'**
+  String healthReasonStuckLoad(Object count);
+
+  /// No description provided for @healthReasonChecklist.
+  ///
+  /// In en, this message translates to:
+  /// **'{pct}% compliance — {done} of {total} completed'**
+  String healthReasonChecklist(Object pct, Object done, Object total);
+
+  /// No description provided for @healthReasonInventory.
+  ///
+  /// In en, this message translates to:
+  /// **'{alertCount} low/over-stock item(s), {deadPct}% of stock value is dead'**
+  String healthReasonInventory(Object alertCount, Object deadPct);
+
+  /// No description provided for @healthReasonEscalations.
+  ///
+  /// In en, this message translates to:
+  /// **'{escalated} escalation(s) out of {total} task(s)'**
+  String healthReasonEscalations(Object escalated, Object total);
+
   /// No description provided for @activeFilter.
   ///
   /// In en, this message translates to:

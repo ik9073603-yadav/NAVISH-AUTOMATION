@@ -12,6 +12,7 @@ import 'filters.dart';
 import 'inventory.dart';
 import 'push.dart';
 import 'stuck.dart';
+import 'health_score.dart';
 import 'settings.dart';
 import 'profile.dart';
 import 'analytics.dart';
@@ -269,6 +270,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<dynamic> _tasks = [];
   List<dynamic> _notifs = [];
   int _stuckCount = 0;
+  Map<String, dynamic>? _healthScore;
   bool _loading = true;
   int _tab = 0;
   String _taskStatus = 'ACTIVE';
@@ -327,7 +329,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final stuckCount = isOwnerOrManager
           ? await Api.stuckList().then((l) => l.length).catchError((_) => 0)
           : 0;
-      setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; });
+      // Health Score endpoint is OWNER/MANAGER-only server-side too — best
+      // effort, same spirit as stuckCount above: the gauge just hides itself.
+      Map<String, dynamic>? healthScore;
+      if (isOwnerOrManager) {
+        try {
+          healthScore = await Api.healthScore();
+        } catch (_) {
+          healthScore = null;
+        }
+      }
+      setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; _healthScore = healthScore; });
       unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();
     } catch (e) {
@@ -366,9 +378,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Stuck tab rows deep-link into a sibling owner tab.
+  // Stuck tab rows (and Health Score "biggest drags") deep-link into a
+  // sibling owner tab.
   int _tabForModule(String module) {
     switch (module) {
+      case 'STUCK': return 1;
       case 'CHECKLISTS': return 3;
       case 'FMS': return 4;
       case 'INVENTORY': return 5;
@@ -725,6 +739,25 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             1,
           ),
           const SizedBox(height: 20),
+          if (_isOwner) ...[
+            entrance(
+              HealthGauge(
+                score: _healthScore?['overall'] as int?,
+                band: _healthScore?['band'] as String?,
+                delta: (_healthScore?['trend'] as Map?)?['delta'] as int?,
+                onTap: _healthScore == null
+                    ? null
+                    : () => Navigator.push(
+                          context,
+                          sharedAxisRoute(HealthScoreScreen(
+                            onNavigateToModule: (m) => setState(() => _tab = _tabForModule(m)),
+                          )),
+                        ),
+              ),
+              2,
+            ),
+            const SizedBox(height: 16),
+          ],
           entrance(
             Row(
               children: [
@@ -751,7 +784,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                 ),
               ],
             ),
-            2,
+            3,
           ),
           const SizedBox(height: 24),
           GridView.count(
@@ -788,7 +821,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  3 + i,
+                  4 + i,
                 ),
             ],
           ),
