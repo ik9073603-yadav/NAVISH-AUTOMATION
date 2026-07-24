@@ -317,28 +317,44 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     _load();
   }
 
+  Future<Map<String, dynamic>?> _tryHealthScore() async {
+    try {
+      return await Api.healthScore();
+    } catch (_) {
+      return null;
+    }
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final user = await Api.me();
-      final tasks = await Api.myTasks(status: _taskStatus, from: _datePreset.from);
-      final notifs = await Api.notifications();
+      // me()/myTasks()/notifications() don't depend on each other — fire all
+      // three at once instead of a 3-deep sequential waterfall. stuck/health
+      // are OWNER/MANAGER-only and need the role from me() first, but once
+      // that's known they run in parallel with everything else too.
+      final userFuture = Api.me();
+      final tasksFuture = Api.myTasks(status: _taskStatus, from: _datePreset.from);
+      final notifsFuture = Api.notifications();
+
+      final user = await userFuture;
       // Stuck endpoint is OWNER/MANAGER-only server-side — matches _isOwner.
       // Best-effort: the at-a-glance strip just shows 0 if this fails.
       final isOwnerOrManager = user['role'] == 'OWNER' || user['role'] == 'MANAGER';
-      final stuckCount = isOwnerOrManager
-          ? await Api.stuckList().then((l) => l.length).catchError((_) => 0)
-          : 0;
+      final stuckFuture = isOwnerOrManager
+          ? Api.stuckList().then((l) => l.length).catchError((_) => 0)
+          : Future.value(0);
       // Health Score endpoint is OWNER/MANAGER-only server-side too — best
       // effort, same spirit as stuckCount above: the gauge just hides itself.
-      Map<String, dynamic>? healthScore;
-      if (isOwnerOrManager) {
-        try {
-          healthScore = await Api.healthScore();
-        } catch (_) {
-          healthScore = null;
-        }
-      }
+      final Future<Map<String, dynamic>?> healthFuture = isOwnerOrManager
+          ? _tryHealthScore()
+          : Future.value(null);
+
+      final results = await Future.wait([tasksFuture, notifsFuture, stuckFuture, healthFuture]);
+      final tasks = results[0] as List<dynamic>;
+      final notifs = results[1] as List<dynamic>;
+      final stuckCount = results[2] as int;
+      final healthScore = results[3] as Map<String, dynamic>?;
+
       setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; _healthScore = healthScore; });
       unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();

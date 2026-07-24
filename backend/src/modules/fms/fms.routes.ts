@@ -258,7 +258,9 @@ fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-// Bottleneck view (Feature 97)
+// Bottleneck view (Feature 97). Two grouped aggregate queries (one count,
+// one DB-side AVG) covering every stage at once, instead of a count + a
+// full row fetch per stage.
 fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const { orgId } = req.user!;
@@ -268,25 +270,23 @@ fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req, res, 
       include: { flow: { select: { name: true } } },
     });
 
-    const result = await Promise.all(stages.map(async (s) => {
-      const stuck = await prisma.orderStage.count({
-        where: { orgId, stageId: s.id, completedAt: null },
-      });
-      const completed = await prisma.orderStage.findMany({
-        where: { orgId, stageId: s.id, completedAt: { not: null }, delayMins: { not: null } },
-        select: { delayMins: true },
-      });
-      const avgDelay = completed.length > 0
-        ? Math.round(completed.reduce((a, c) => a + (c.delayMins ?? 0), 0) / completed.length)
-        : 0;
+    const [stuckRows, avgDelayRows] = await Promise.all([
+      prisma.orderStage.groupBy({
+        by: ['stageId'], where: { orgId, completedAt: null }, _count: { _all: true },
+      }),
+      prisma.orderStage.groupBy({
+        by: ['stageId'], where: { orgId, completedAt: { not: null }, delayMins: { not: null } }, _avg: { delayMins: true },
+      }),
+    ]);
+    const stuckByStage = new Map(stuckRows.map(r => [r.stageId, r._count._all]));
+    const avgDelayByStage = new Map(avgDelayRows.map(r => [r.stageId, r._avg.delayMins ?? 0]));
 
-      return {
-        stageName: s.name,
-        flowName: s.flow.name,
-        ordersStuck: stuck,
-        avgDelayMins: avgDelay,
-        plannedMins: s.plannedMins,
-      };
+    const result = stages.map((s) => ({
+      stageName: s.name,
+      flowName: s.flow.name,
+      ordersStuck: stuckByStage.get(s.id) ?? 0,
+      avgDelayMins: Math.round(avgDelayByStage.get(s.id) ?? 0),
+      plannedMins: s.plannedMins,
     }));
 
     res.json(result.sort((a, b) => b.ordersStuck - a.ordersStuck));

@@ -67,7 +67,10 @@ inventoryRouter.get('/skus', async (req, res, next) => {
     }
     if (category) where.category = category;
 
-    const skus = await prisma.sku.findMany({ where, orderBy: { name: 'asc' } });
+    // Safety cap, not real pagination — status (LIQUID/DEAD/SLOW/LOW) is
+    // derived client-side below since it depends on business logic the DB
+    // can't filter on, so this must stay generous enough for a real catalog.
+    const skus = await prisma.sku.findMany({ where, orderBy: { name: 'asc' }, take: 500 });
 
     let mapped = skus.map(s => ({ ...s, ...skuView(s) }));
 
@@ -121,7 +124,7 @@ inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req, 
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId } = req.user!;
-    const sku = await prisma.sku.findFirst({ where: { id: req.params.id, orgId } });
+    const sku = await prisma.sku.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!sku) return res.status(404).json({ error: 'SKU not found' });
 
     const updated = await prisma.sku.update({ where: { id: sku.id }, data: parsed.data });

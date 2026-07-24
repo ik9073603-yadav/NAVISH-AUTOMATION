@@ -33,8 +33,9 @@ class _StuckScreenState extends State<StuckScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final items = await Api.stuckList();
-      final users = await Api.users();
+      final results = await Future.wait([Api.stuckList(), Api.users()]);
+      final items = results[0];
+      final users = results[1];
       final phoneById = <String, String?>{
         for (final u in users) u['id'] as String: u['phone'] as String?,
       };

@@ -79,8 +79,8 @@ checklistRouter.get('/:id/compliance', requireRole('OWNER', 'MANAGER'), async (r
   try {
     const orgId = req.user!.orgId;
     const [total, done] = await Promise.all([
-      prisma.task.count({ where: { orgId, ruleId: req.params.id } }),
-      prisma.task.count({ where: { orgId, ruleId: req.params.id, status: 'DONE' } }),
+      prisma.task.count({ where: { orgId, ruleId: req.params.id as string } }),
+      prisma.task.count({ where: { orgId, ruleId: req.params.id as string, status: 'DONE' } }),
     ]);
     res.json({ total, done, compliancePct: total > 0 ? Math.round((done / total) * 100) : 0 });
   } catch (err) { next(err); }
@@ -103,7 +103,7 @@ checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res, 
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId } = req.user!;
-    const rule = await prisma.checklistRule.findFirst({ where: { id: req.params.id, orgId } });
+    const rule = await prisma.checklistRule.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!rule) return res.status(404).json({ error: 'Not found' });
 
     if (parsed.data.assigneeId) {
@@ -129,7 +129,7 @@ checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res, 
 checklistRouter.post('/:id/toggle', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const rule = await prisma.checklistRule.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId },
+      where: { id: req.params.id as string, orgId: req.user!.orgId },
     });
     if (!rule) return res.status(404).json({ error: 'Not found' });
 

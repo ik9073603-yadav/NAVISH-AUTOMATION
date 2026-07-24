@@ -31,14 +31,12 @@ class _OwnerScreenState extends State<OwnerScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final tasks = await Api.allTasks(
-        status: _taskStatus,
-        from: _datePreset.from,
-        assigneeId: _assigneeId,
-      );
-      final stats = await Api.stats();
-      final users = await Api.users();
-      setState(() { _tasks = tasks; _stats = stats; _users = users; });
+      final results = await Future.wait([
+        Api.allTasks(status: _taskStatus, from: _datePreset.from, assigneeId: _assigneeId),
+        Api.stats(),
+        Api.users(),
+      ]);
+      setState(() { _tasks = results[0]; _stats = results[1]; _users = results[2]; });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));

@@ -78,7 +78,7 @@ userRouter.patch('/:id/inventory-permissions', requireRole('OWNER', 'MANAGER'), 
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId, userId: actorId } = req.user!;
-    const target = await prisma.user.findFirst({ where: { id: req.params.id, orgId } });
+    const target = await prisma.user.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!target) return res.status(404).json({ error: 'Person not found in your company' });
 
     const updated = await prisma.user.update({

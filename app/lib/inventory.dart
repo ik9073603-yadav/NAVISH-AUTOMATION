@@ -36,10 +36,10 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final skus = await Api.skus(search: _search.text.trim(), status: _statusFilter);
-      Map<String, dynamic>? summary;
-      if (_canManage) summary = await Api.inventorySummary();
-      setState(() { _skus = skus; _summary = summary; });
+      final skusFuture = Api.skus(search: _search.text.trim(), status: _statusFilter);
+      final summaryFuture = _canManage ? Api.inventorySummary() : Future.value(null);
+      final results = await Future.wait([skusFuture, summaryFuture]);
+      setState(() { _skus = results[0] as List<dynamic>; _summary = results[1] as Map<String, dynamic>?; });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));

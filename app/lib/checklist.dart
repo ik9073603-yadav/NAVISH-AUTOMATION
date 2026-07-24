@@ -28,13 +28,11 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final rules = await Api.checklists(
-        status: _status,
-        from: _datePreset.from,
-        assigneeId: _assigneeId,
-      );
-      final users = await Api.users();
-      setState(() { _rules = rules; _users = users; });
+      final results = await Future.wait([
+        Api.checklists(status: _status, from: _datePreset.from, assigneeId: _assigneeId),
+        Api.users(),
+      ]);
+      setState(() { _rules = results[0]; _users = results[1]; });
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));

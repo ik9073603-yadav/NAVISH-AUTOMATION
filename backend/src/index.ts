@@ -22,6 +22,20 @@ import { healthRouter } from './modules/health/health.routes';
 const app = express();
 app.use(express.json());
 app.use(cors());
+
+// TEMP PERF DIAGNOSTIC — logs end-to-end ms per request. Remove after the
+// diagnostic pass.
+if (process.env.PERF_LOG === '1') {
+  app.use((req, res, next) => {
+    const start = process.hrtime.bigint();
+    res.on('finish', () => {
+      const ms = Number(process.hrtime.bigint() - start) / 1e6;
+      console.log(`[req] ${req.method} ${req.originalUrl} -> ${res.statusCode} ${ms.toFixed(1)}ms`);
+    });
+    next();
+  });
+}
+
 app.use('/api/users', userRouter);
 app.use('/api/checklists', checklistRouter);
 app.use('/api/fms', fmsRouter);
@@ -61,7 +75,9 @@ app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   res.status(status).json(body);
 });
 
-app.listen(env.PORT, () => {
+// 0.0.0.0 (not the default loopback-only bind) so hosts like Render, which
+// route traffic to the container from outside localhost, can reach it.
+app.listen(env.PORT, '0.0.0.0', () => {
   console.log(`Navish backend running on http://localhost:${env.PORT}`);
   startScheduler();   // ← yeh add karo
 });

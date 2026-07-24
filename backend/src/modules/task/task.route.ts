@@ -59,7 +59,7 @@ taskRouter.get('/my', async (req, res, next) => {
     const createdAt = dateRangeFilter(from, to);
     if (createdAt) where.createdAt = createdAt;
 
-    const tasks = await prisma.task.findMany({ where, orderBy: { dueAt: 'asc' } });
+    const tasks = await prisma.task.findMany({ where, orderBy: { dueAt: 'asc' }, take: 200 });
     res.json(tasks);
   } catch (err) { next(err); }
 });
@@ -199,7 +199,9 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-// Employee performance (Feature 69)
+// Employee performance (Feature 69). Four grouped aggregate queries (one per
+// metric, each covering every assignee at once) instead of 4 queries per
+// user — same numbers, O(1) round trips instead of O(N).
 taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const orgId = req.user!.orgId;
@@ -208,15 +210,24 @@ taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req, res, next)
       select: { id: true, name: true },
     });
 
-    const stats = await Promise.all(users.map(async (u) => {
-      const [total, done, escalated] = await Promise.all([
-        prisma.task.count({ where: { orgId, assigneeId: u.id } }),
-        prisma.task.count({ where: { orgId, assigneeId: u.id, status: 'DONE' } }),
-        prisma.task.count({ where: { orgId, assigneeId: u.id, escalatedAt: { not: null } } }),
-      ]);
-      const onTime = await prisma.task.count({
-        where: { orgId, assigneeId: u.id, status: 'DONE', escalatedAt: null },
-      });
+    const [totalRows, doneRows, escalatedRows, onTimeRows] = await Promise.all([
+      prisma.task.groupBy({ by: ['assigneeId'], where: { orgId }, _count: { _all: true } }),
+      prisma.task.groupBy({ by: ['assigneeId'], where: { orgId, status: 'DONE' }, _count: { _all: true } }),
+      prisma.task.groupBy({ by: ['assigneeId'], where: { orgId, escalatedAt: { not: null } }, _count: { _all: true } }),
+      prisma.task.groupBy({ by: ['assigneeId'], where: { orgId, status: 'DONE', escalatedAt: null }, _count: { _all: true } }),
+    ]);
+    const toMap = (rows: { assigneeId: string; _count: { _all: number } }[]) =>
+      new Map(rows.map(r => [r.assigneeId, r._count._all]));
+    const totalByUser = toMap(totalRows);
+    const doneByUser = toMap(doneRows);
+    const escalatedByUser = toMap(escalatedRows);
+    const onTimeByUser = toMap(onTimeRows);
+
+    const stats = users.map((u) => {
+      const total = totalByUser.get(u.id) ?? 0;
+      const done = doneByUser.get(u.id) ?? 0;
+      const escalated = escalatedByUser.get(u.id) ?? 0;
+      const onTime = onTimeByUser.get(u.id) ?? 0;
       return {
         userId: u.id,
         name: u.name,
@@ -226,7 +237,7 @@ taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req, res, next)
         escalated,
         onTimePct: done > 0 ? Math.round((onTime / done) * 100) : 0,
       };
-    }));
+    });
 
     res.json(stats.filter(s => s.total > 0));
   } catch (err) { next(err); }

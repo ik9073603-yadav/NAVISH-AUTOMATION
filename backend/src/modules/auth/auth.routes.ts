@@ -222,7 +222,7 @@ authRouter.get('/reset-requests', requireAuth, requireRole('OWNER', 'MANAGER'), 
 authRouter.post('/reset-requests/:id/approve', requireAuth, requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const request = await prisma.resetRequest.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, status: 'PENDING' },
+      where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
     });
     if (!request) return res.status(404).json({ error: 'Reset request not found' });
 
@@ -263,7 +263,7 @@ authRouter.post('/reset-requests/:id/approve', requireAuth, requireRole('OWNER',
 authRouter.post('/reset-requests/:id/deny', requireAuth, requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
   try {
     const request = await prisma.resetRequest.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, status: 'PENDING' },
+      where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
     });
     if (!request) return res.status(404).json({ error: 'Reset request not found' });
 
@@ -353,7 +353,7 @@ authRouter.get('/deletion-requests', requireAuth, requireRole('OWNER'), async (r
 authRouter.post('/deletion-requests/:id/complete', requireAuth, requireRole('OWNER'), async (req, res, next) => {
   try {
     const request = await prisma.deletionRequest.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, status: 'PENDING' },
+      where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
     });
     if (!request) return res.status(404).json({ error: 'Deletion request not found' });
 
@@ -380,7 +380,7 @@ authRouter.post('/deletion-requests/:id/complete', requireAuth, requireRole('OWN
 authRouter.post('/deletion-requests/:id/deny', requireAuth, requireRole('OWNER'), async (req, res, next) => {
   try {
     const request = await prisma.deletionRequest.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId, status: 'PENDING' },
+      where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
     });
     if (!request) return res.status(404).json({ error: 'Deletion request not found' });
 

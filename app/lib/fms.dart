@@ -52,19 +52,17 @@ class _FmsScreenState extends State<FmsScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
-      final o = await Api.orders(
-        status: _orderStatus,
-        from: _datePreset.from,
-        assigneeId: _assigneeId,
-      );
-      final f = await Api.flows();
-      final b = await Api.bottlenecks();
-      final u = await Api.users();
+      final results = await Future.wait([
+        Api.orders(status: _orderStatus, from: _datePreset.from, assigneeId: _assigneeId),
+        Api.flows(),
+        Api.bottlenecks(),
+        Api.users(),
+      ]);
       setState(() {
-        _orders = o;
-        _flows = f;
-        _bottlenecks = b;
-        _users = u;
+        _orders = results[0];
+        _flows = results[1];
+        _bottlenecks = results[2];
+        _users = results[3];
       });
     } catch (e) {
       if (mounted) {
