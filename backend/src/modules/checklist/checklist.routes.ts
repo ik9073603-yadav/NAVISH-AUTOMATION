@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -19,7 +19,7 @@ const schema = z.object({
   priority: z.enum(['HIGH', 'NORMAL', 'LOW']).optional(),
 });
 
-checklistRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+checklistRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = schema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -49,7 +49,7 @@ checklistRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next
   } catch (err) { next(err); }
 });
 
-checklistRouter.get('/', async (req, res, next) => {
+checklistRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, from, to, assigneeId } = parseListQuery(req);
     const where: any = { orgId: req.user!.orgId };
@@ -75,7 +75,7 @@ checklistRouter.get('/', async (req, res, next) => {
 });
 
 // Compliance % (Feature 81)
-checklistRouter.get('/:id/compliance', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+checklistRouter.get('/:id/compliance', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = req.user!.orgId;
     const [total, done] = await Promise.all([
@@ -97,7 +97,7 @@ const updateSchema = z.object({
 
 // Used to finish setting up a template-applied rule — assign the real person
 // and (optionally) activate it. Also usable as a general small-edit endpoint.
-checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -126,7 +126,7 @@ checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req, res, 
   } catch (err) { next(err); }
 });
 
-checklistRouter.post('/:id/toggle', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+checklistRouter.post('/:id/toggle', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const rule = await prisma.checklistRule.findFirst({
       where: { id: req.params.id as string, orgId: req.user!.orgId },

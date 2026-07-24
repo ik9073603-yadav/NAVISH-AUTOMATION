@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 
 export const legalRouter = Router();
 
@@ -123,10 +123,10 @@ required under the DPDP Act.</p>
 version number.</p>
 `;
 
-legalRouter.get('/terms', (_req, res) => {
+legalRouter.get('/terms', (_req: Request, res: Response) => {
   res.type('html').send(page('Terms & Conditions', termsBody));
 });
 
-legalRouter.get('/privacy', (_req, res) => {
+legalRouter.get('/privacy', (_req: Request, res: Response) => {
   res.type('html').send(page('Privacy Policy', privacyBody));
 });

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireSuperAdmin } from '../../middleware/auth';
 import { deleteOrganizationCascade, OrgNameMismatchError, OrgNotFoundError } from '../../lib/org-deletion';
@@ -20,7 +20,7 @@ async function orgIdsActiveSince(since: Date): Promise<Set<string>> {
   return new Set(rows.map(r => r.orgId));
 }
 
-adminRouter.get('/overview', async (_req, res, next) => {
+adminRouter.get('/overview', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const since = new Date(Date.now() - SEVEN_DAYS_MS);
 
@@ -40,7 +40,7 @@ adminRouter.get('/overview', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-adminRouter.get('/orgs', async (_req, res, next) => {
+adminRouter.get('/orgs', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const since = new Date(Date.now() - SEVEN_DAYS_MS);
 
@@ -76,9 +76,11 @@ adminRouter.get('/orgs', async (_req, res, next) => {
 
 // Health/usage counts only — deliberately no task titles, no user names/emails.
 // Even as superadmin, we don't read into a tenant's private data.
-adminRouter.get('/orgs/:id', async (req, res, next) => {
+adminRouter.get('/orgs/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+    // Express types route params as string | string[] (for wildcard/repeated
+    // segments); a plain :id segment is always a single string at runtime.
+    const org = await prisma.organization.findUnique({ where: { id: req.params.id as string } });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
 
     const since = new Date(Date.now() - SEVEN_DAYS_MS);
@@ -115,9 +117,9 @@ adminRouter.get('/orgs/:id', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-adminRouter.post('/orgs/:id/toggle', async (req, res, next) => {
+adminRouter.post('/orgs/:id/toggle', async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const org = await prisma.organization.findUnique({ where: { id: req.params.id } });
+    const org = await prisma.organization.findUnique({ where: { id: req.params.id as string } });
     if (!org) return res.status(404).json({ error: 'Organization not found' });
 
     const updated = await prisma.organization.update({
@@ -143,14 +145,14 @@ adminRouter.post('/orgs/:id/toggle', async (req, res, next) => {
 // so the caller must echo the org's exact current name back as confirmName.
 // The org row (and everything FK-cascaded from it) is gone after this call;
 // no soft-delete, no undo.
-adminRouter.delete('/orgs/:id', async (req, res, next) => {
+adminRouter.delete('/orgs/:id', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { confirmName } = req.body ?? {};
     if (typeof confirmName !== 'string' || confirmName.length === 0) {
       return res.status(400).json({ error: 'confirmName is required' });
     }
 
-    const deleted = await deleteOrganizationCascade(req.params.id, confirmName);
+    const deleted = await deleteOrganizationCascade(req.params.id as string, confirmName);
     res.json({ deleted: true, id: deleted.id, name: deleted.name });
   } catch (err) {
     if (err instanceof OrgNotFoundError) return res.status(404).json({ error: err.message });
@@ -162,7 +164,7 @@ adminRouter.delete('/orgs/:id', async (req, res, next) => {
 // Cross-org fallback for account-deletion requests (Feature 176) — the org
 // owner is the normal actioner (see /api/auth/deletion-requests); this exists
 // for cases where a superadmin needs to step in.
-adminRouter.get('/deletion-requests', async (_req, res, next) => {
+adminRouter.get('/deletion-requests', async (_req: Request, res: Response, next: NextFunction) => {
   try {
     const requests = await prisma.deletionRequest.findMany({
       where: { status: 'PENDING' },
@@ -191,10 +193,10 @@ adminRouter.get('/deletion-requests', async (_req, res, next) => {
   } catch (err) { next(err); }
 });
 
-adminRouter.post('/deletion-requests/:id/complete', async (req, res, next) => {
+adminRouter.post('/deletion-requests/:id/complete', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.deletionRequest.findFirst({
-      where: { id: req.params.id, status: 'PENDING' },
+      where: { id: req.params.id as string, status: 'PENDING' },
     });
     if (!request) return res.status(404).json({ error: 'Deletion request not found' });
 

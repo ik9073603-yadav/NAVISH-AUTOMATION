@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -8,7 +8,7 @@ export const settingsRouter = Router();
 settingsRouter.use(requireAuth);
 
 // Working-hours + org profile settings that gate the automation engine.
-settingsRouter.get('/', requireRole('OWNER'), async (req, res, next) => {
+settingsRouter.get('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const org = await prisma.organization.findUnique({
       where: { id: req.user!.orgId },
@@ -40,7 +40,7 @@ const updateSchema = z.object({
   delayCostPerHour: z.number().positive().nullable().optional(),
 });
 
-settingsRouter.patch('/', requireRole('OWNER'), async (req, res, next) => {
+settingsRouter.patch('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = updateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -68,7 +68,7 @@ const deleteOrgSchema = z.object({ confirmName: z.string().min(1) });
 // Feature 13 — company delete + data retention (DPDP erasure). Owner-initiated,
 // self-service equivalent of the superadmin path in admin.routes.ts. Irreversible:
 // deletes the caller's own org and everything FK-cascaded from it, no undo.
-settingsRouter.delete('/', requireRole('OWNER'), async (req, res, next) => {
+settingsRouter.delete('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = deleteOrgSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });

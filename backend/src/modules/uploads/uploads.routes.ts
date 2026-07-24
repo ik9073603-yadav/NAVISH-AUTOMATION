@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
 import path from 'path';
@@ -19,12 +19,12 @@ const upload = multer({
   },
 });
 
-uploadsRouter.post('/', (req, res, next) => {
-  upload.single('file')(req, res, (err) => {
-    if (err) return res.status(400).json({ error: err.message });
+uploadsRouter.post('/', (req: Request, res: Response, next: NextFunction) => {
+  upload.single('file')(req, res, (err: unknown) => {
+    if (err) return res.status(400).json({ error: (err as Error).message });
     next();
   });
-}, async (req, res, next) => {
+}, async (req: Request, res: Response, next: NextFunction) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 

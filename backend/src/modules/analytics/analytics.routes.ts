@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { cached } from '../../lib/cache';
@@ -11,7 +11,7 @@ analyticsRouter.use(requireAuth, requireRole('OWNER', 'MANAGER'));
 // numbers for long, long enough to absorb repeated tab-switches/reopens.
 const CACHE_TTL_MS = 60_000;
 
-function parseRange(req: any): { from: Date; to: Date } {
+function parseRange(req: Request): { from: Date; to: Date } {
   const now = new Date();
   const from = req.query.from ? new Date(req.query.from as string) : new Date(now.getTime() - 30 * 86_400_000);
   const to = req.query.to ? new Date(req.query.to as string) : now;
@@ -23,7 +23,7 @@ function dayKey(d: Date): string {
 }
 
 // Employee performance: on-time %, completed, late, escalated, current load.
-analyticsRouter.get('/employees', async (req, res, next) => {
+analyticsRouter.get('/employees', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { from, to } = parseRange(req);
@@ -85,7 +85,7 @@ analyticsRouter.get('/employees', async (req, res, next) => {
 });
 
 // Delegation completion rate over time — one point per day in range.
-analyticsRouter.get('/delegation', async (req, res, next) => {
+analyticsRouter.get('/delegation', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { from, to } = parseRange(req);
@@ -120,7 +120,7 @@ analyticsRouter.get('/delegation', async (req, res, next) => {
 });
 
 // Checklist compliance % per checklist rule.
-analyticsRouter.get('/checklists', async (req, res, next) => {
+analyticsRouter.get('/checklists', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { from, to } = parseRange(req);
@@ -159,7 +159,7 @@ analyticsRouter.get('/checklists', async (req, res, next) => {
 });
 
 // FMS: avg time per stage, throughput, bottlenecks (bounded to range).
-analyticsRouter.get('/fms', async (req, res, next) => {
+analyticsRouter.get('/fms', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { from, to } = parseRange(req);
@@ -220,7 +220,7 @@ analyticsRouter.get('/fms', async (req, res, next) => {
 });
 
 // Inventory: dead-stock value, low-stock count, total stock value, movement trend.
-analyticsRouter.get('/inventory', async (req, res, next) => {
+analyticsRouter.get('/inventory', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { from, to } = parseRange(req);

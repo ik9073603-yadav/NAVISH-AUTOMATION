@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
@@ -8,7 +8,7 @@ export const userRouter = Router();
 userRouter.use(requireAuth);
 
 // Company ke saare log (task assign karne ke liye)
-userRouter.get('/', async (req, res, next) => {
+userRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const users = await prisma.user.findMany({
       where: { orgId: req.user!.orgId, status: 'ACTIVE' },
@@ -32,7 +32,7 @@ const addSchema = z.object({
 });
 
 // Employee/Manager add karo (Owner only)
-userRouter.post('/', requireRole('OWNER'), async (req, res, next) => {
+userRouter.post('/', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = addSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -72,7 +72,7 @@ const inventoryPermissionsSchema = z.object({
 // Grants/revokes an employee's Stock IN / Stock OUT capability. OWNER and
 // MANAGER always have both regardless of these flags (enforced in code, not
 // stored) — this only matters for EMPLOYEE, but is harmless to set on anyone.
-userRouter.patch('/:id/inventory-permissions', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+userRouter.patch('/:id/inventory-permissions', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = inventoryPermissionsSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });

@@ -26,7 +26,7 @@ app.use(cors());
 // TEMP PERF DIAGNOSTIC — logs end-to-end ms per request. Remove after the
 // diagnostic pass.
 if (process.env.PERF_LOG === '1') {
-  app.use((req, res, next) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     const start = process.hrtime.bigint();
     res.on('finish', () => {
       const ms = Number(process.hrtime.bigint() - start) / 1e6;
@@ -40,7 +40,7 @@ app.use('/api/users', userRouter);
 app.use('/api/checklists', checklistRouter);
 app.use('/api/fms', fmsRouter);
 
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', service: 'navish-backend', time: new Date().toISOString() });
 });
 
@@ -59,7 +59,7 @@ app.use('/api/health-score', healthRouter);
 app.use('/legal', legalRouter);
 
 
-app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
+app.use((_req: Request, res: Response) => res.status(404).json({ error: 'Route not found' }));
 
 app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
   console.error(err?.stack ?? err);

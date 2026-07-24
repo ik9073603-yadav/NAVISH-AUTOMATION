@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { TEMPLATES } from './template-data';
@@ -7,7 +7,7 @@ export const templatesRouter = Router();
 templatesRouter.use(requireAuth);
 
 // Library is static and org-agnostic — safe to show summaries to anyone in the org.
-templatesRouter.get('/', (_req, res) => {
+templatesRouter.get('/', (_req: Request, res: Response) => {
   res.json(TEMPLATES.map(t => {
     if (t.type === 'FMS') {
       return {
@@ -24,10 +24,12 @@ templatesRouter.get('/', (_req, res) => {
 
 // Clones a template into the caller's org. Never guesses a responsible
 // person / checklist assignee — that's for the owner to fill in after.
-templatesRouter.post('/:id/apply', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+templatesRouter.post('/:id/apply', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId, userId } = req.user!;
-    const template = TEMPLATES.find(t => t.id === req.params.id);
+    // Express types route params as string | string[]; a plain :id segment
+    // is always a single string at runtime.
+    const template = TEMPLATES.find(t => t.id === (req.params.id as string));
     if (!template) return res.status(404).json({ error: 'Template not found' });
 
     if (template.type === 'FMS') {

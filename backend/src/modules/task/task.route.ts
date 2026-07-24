@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -17,7 +17,7 @@ const createSchema = z.object({
 });
 
 // Task assign karo (Owner/Manager only)
-taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = createSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -50,7 +50,7 @@ taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req, res, next) => 
 });
 
 // Mere tasks
-taskRouter.get('/my', async (req, res, next) => {
+taskRouter.get('/my', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, from, to } = parseListQuery(req);
     const where: any = { orgId: req.user!.orgId, assigneeId: req.user!.userId };
@@ -65,10 +65,12 @@ taskRouter.get('/my', async (req, res, next) => {
 });
 
 // DONE — chasing turant band
-taskRouter.post('/:id/done', async (req, res, next) => {
+taskRouter.post('/:id/done', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId },
+      // Express types params as string | string[] (for wildcard/repeated
+      // segments); a plain :id segment is always a single string at runtime.
+      where: { id: req.params.id as string, orgId: req.user!.orgId },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
@@ -93,13 +95,13 @@ taskRouter.post('/:id/done', async (req, res, next) => {
 });
 
 // STUCK — reason ke saath
-taskRouter.post('/:id/stuck', async (req, res, next) => {
+taskRouter.post('/:id/stuck', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const reason = z.object({ reason: z.string().min(2) }).safeParse(req.body);
     if (!reason.success) return res.status(400).json({ error: 'Reason required' });
 
     const task = await prisma.task.findFirst({
-      where: { id: req.params.id, orgId: req.user!.orgId },
+      where: { id: req.params.id as string, orgId: req.user!.orgId },
     });
     if (!task) return res.status(404).json({ error: 'Task not found' });
 
@@ -118,7 +120,7 @@ taskRouter.post('/:id/stuck', async (req, res, next) => {
 });
 
 // Notifications dekho
-taskRouter.get('/notifications', async (req, res, next) => {
+taskRouter.get('/notifications', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const items = await prisma.notification.findMany({
       where: { orgId: req.user!.orgId, userId: req.user!.userId },
@@ -130,7 +132,7 @@ taskRouter.get('/notifications', async (req, res, next) => {
 });
 
 // Owner/Manager: company ke saare tasks
-taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { status, from, to, assigneeId } = parseListQuery(req);
     const where: any = { orgId: req.user!.orgId };
@@ -158,7 +160,7 @@ taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req, res, next) =
 });
 
 // Bulk assign — ek command, kai log (Feature 124)
-taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const schema = z.object({
       title: z.string().min(2),
@@ -202,7 +204,7 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req, res, next)
 // Employee performance (Feature 69). Four grouped aggregate queries (one per
 // metric, each covering every assignee at once) instead of 4 queries per
 // user — same numbers, O(1) round trips instead of O(N).
-taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+taskRouter.get('/stats', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const orgId = req.user!.orgId;
     const users = await prisma.user.findMany({

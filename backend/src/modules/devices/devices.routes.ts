@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth } from '../../middleware/auth';
@@ -12,7 +12,7 @@ const tokenSchema = z.object({
 });
 
 // Register/refresh this device's push token for the logged-in user.
-devicesRouter.post('/', async (req, res, next) => {
+devicesRouter.post('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = tokenSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -35,7 +35,7 @@ devicesRouter.post('/', async (req, res, next) => {
 });
 
 // Called on logout — a shared device shouldn't keep chasing the previous user.
-devicesRouter.delete('/', async (req, res, next) => {
+devicesRouter.delete('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = z.object({ token: z.string().min(1) }).safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });

@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
@@ -33,7 +33,7 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-authRouter.post('/signup', async (req, res, next) => {
+authRouter.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = signupSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -45,7 +45,7 @@ authRouter.post('/signup', async (req, res, next) => {
   }
 });
 
-authRouter.post('/login', async (req, res, next) => {
+authRouter.post('/login', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = loginSchema.safeParse(req.body);
     if (!parsed.success) {
@@ -58,7 +58,7 @@ authRouter.post('/login', async (req, res, next) => {
 });
 
 // Proves the token works and shows what the server thinks you are.
-authRouter.get('/me', requireAuth, async (req, res, next) => {
+authRouter.get('/me', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findFirst({
       where: { id: req.user!.userId, orgId: req.user!.orgId },
@@ -88,7 +88,7 @@ const updateMeSchema = z.object({
 
 // Self-service profile edits: phone, name, nickname, designation, language,
 // profile photo. Anything omitted from the body is left untouched.
-authRouter.patch('/me', requireAuth, async (req, res, next) => {
+authRouter.patch('/me', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = updateMeSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -115,7 +115,7 @@ const changePasswordSchema = z.object({
 
 // You know your password, you just want a new one — distinct from the
 // logged-out reset-request/approve flow below.
-authRouter.post('/change-password', requireAuth, async (req, res, next) => {
+authRouter.post('/change-password', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = changePasswordSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -149,7 +149,7 @@ const requestResetSchema = z.object({ email: z.string().email() });
 
 // Public — the whole point is the caller isn't logged in. Never reveals
 // whether the email exists (same non-committal response either way).
-authRouter.post('/request-reset', async (req, res, next) => {
+authRouter.post('/request-reset', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = requestResetSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -193,7 +193,7 @@ authRouter.post('/request-reset', async (req, res, next) => {
 });
 
 // Owner/Manager: pending reset requests for their org.
-authRouter.get('/reset-requests', requireAuth, requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+authRouter.get('/reset-requests', requireAuth, requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const requests = await prisma.resetRequest.findMany({
       where: { orgId: req.user!.orgId, status: 'PENDING' },
@@ -219,7 +219,7 @@ authRouter.get('/reset-requests', requireAuth, requireRole('OWNER', 'MANAGER'), 
 // Approve: generates a temp password, sets it on the employee's account, and
 // returns it in the response so the approver can relay it (Call/WhatsApp).
 // We do not persist the plaintext password anywhere.
-authRouter.post('/reset-requests/:id/approve', requireAuth, requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+authRouter.post('/reset-requests/:id/approve', requireAuth, requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.resetRequest.findFirst({
       where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
@@ -260,7 +260,7 @@ authRouter.post('/reset-requests/:id/approve', requireAuth, requireRole('OWNER',
   }
 });
 
-authRouter.post('/reset-requests/:id/deny', requireAuth, requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+authRouter.post('/reset-requests/:id/deny', requireAuth, requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.resetRequest.findFirst({
       where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
@@ -288,7 +288,7 @@ authRouter.post('/reset-requests/:id/deny', requireAuth, requireRole('OWNER', 'M
 // automated data-erasure pipeline.
 
 // Self-service — any authenticated account can ask for its own account to be deleted.
-authRouter.post('/request-deletion', requireAuth, async (req, res, next) => {
+authRouter.post('/request-deletion', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId, userId } = req.user!;
 
@@ -326,7 +326,7 @@ authRouter.post('/request-deletion', requireAuth, async (req, res, next) => {
 });
 
 // Owner: pending deletion requests for their org.
-authRouter.get('/deletion-requests', requireAuth, requireRole('OWNER'), async (req, res, next) => {
+authRouter.get('/deletion-requests', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const requests = await prisma.deletionRequest.findMany({
       where: { orgId: req.user!.orgId, status: 'PENDING' },
@@ -350,7 +350,7 @@ authRouter.get('/deletion-requests', requireAuth, requireRole('OWNER'), async (r
 });
 
 // Approve: deactivates the account (soft — not a hard data wipe) and resolves the request.
-authRouter.post('/deletion-requests/:id/complete', requireAuth, requireRole('OWNER'), async (req, res, next) => {
+authRouter.post('/deletion-requests/:id/complete', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.deletionRequest.findFirst({
       where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },
@@ -377,7 +377,7 @@ authRouter.post('/deletion-requests/:id/complete', requireAuth, requireRole('OWN
   }
 });
 
-authRouter.post('/deletion-requests/:id/deny', requireAuth, requireRole('OWNER'), async (req, res, next) => {
+authRouter.post('/deletion-requests/:id/deny', requireAuth, requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const request = await prisma.deletionRequest.findFirst({
       where: { id: req.params.id as string, orgId: req.user!.orgId, status: 'PENDING' },

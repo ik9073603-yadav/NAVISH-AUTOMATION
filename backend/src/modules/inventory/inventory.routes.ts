@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -51,7 +51,7 @@ function skuView(s: {
 }
 
 // List SKUs — search/category/status(LIQUID|DEAD|SLOW|LOW|ALL). Active-by-default.
-inventoryRouter.get('/skus', async (req, res, next) => {
+inventoryRouter.get('/skus', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const search = (req.query.search as string | undefined)?.trim();
@@ -84,7 +84,7 @@ inventoryRouter.get('/skus', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = skuCreateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -118,7 +118,7 @@ inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req, res, 
   }
 });
 
-inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = skuUpdateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -143,7 +143,7 @@ inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req, 
 // employee needs canStockIn/canStockOut granted (see PATCH /users/:id/inventory-permissions).
 // Never trust the UI to have hidden the button — flags are re-read from the
 // DB here, not from the JWT, so a permission change takes effect immediately.
-inventoryRouter.post('/skus/:id/movement', async (req, res, next) => {
+inventoryRouter.post('/skus/:id/movement', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = movementSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -164,10 +164,10 @@ inventoryRouter.post('/skus/:id/movement', async (req, res, next) => {
     }
 
     const movement = await recordMovement(
-      orgId, req.params.id, parsed.data.type, parsed.data.quantity, parsed.data.reason, userId,
+      orgId, req.params.id as string, parsed.data.type, parsed.data.quantity, parsed.data.reason, userId,
     );
 
-    await checkStockAlertForSku(orgId, req.params.id);
+    await checkStockAlertForSku(orgId, req.params.id as string);
 
     res.status(201).json(movement);
   } catch (err: any) {
@@ -177,10 +177,10 @@ inventoryRouter.post('/skus/:id/movement', async (req, res, next) => {
   }
 });
 
-inventoryRouter.get('/skus/:id/history', async (req, res, next) => {
+inventoryRouter.get('/skus/:id/history', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
-    const sku = await prisma.sku.findFirst({ where: { id: req.params.id, orgId } });
+    const sku = await prisma.sku.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!sku) return res.status(404).json({ error: 'SKU not found' });
 
     const movements = await prisma.stockMovement.findMany({
@@ -200,7 +200,7 @@ inventoryRouter.get('/skus/:id/history', async (req, res, next) => {
   } catch (err) { next(err); }
 });
 
-inventoryRouter.get('/summary', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+inventoryRouter.get('/summary', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const skus = await prisma.sku.findMany({ where: { orgId, active: true } });

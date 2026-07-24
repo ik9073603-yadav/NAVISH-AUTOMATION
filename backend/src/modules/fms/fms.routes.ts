@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -29,7 +29,7 @@ const flowSchema = z.object({
   })).min(1),
 });
 
-fmsRouter.post('/flows', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.post('/flows', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = flowSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -69,7 +69,7 @@ fmsRouter.post('/flows', requireRole('OWNER', 'MANAGER'), async (req, res, next)
   } catch (err) { next(err); }
 });
 
-fmsRouter.get('/flows', async (req, res, next) => {
+fmsRouter.get('/flows', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const flows = await prisma.flow.findMany({
       where: { orgId: req.user!.orgId },
@@ -92,7 +92,7 @@ const stageUpdateSchema = z.object({
 
 // Used to finish setting up a template-applied flow — assign the real
 // responsible person per stage (and optionally tweak the planned time).
-fmsRouter.patch('/stages/:id', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.patch('/stages/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = stageUpdateSchema.safeParse(req.body);
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
@@ -120,14 +120,16 @@ const orderCreateSchema = z.object({
   orderValue: z.number().positive().optional(),
 });
 
-fmsRouter.post('/flows/:flowId/orders', async (req, res, next) => {
+fmsRouter.post('/flows/:flowId/orders', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = orderCreateSchema.safeParse(req.body ?? {});
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId } = req.user!;
 
-    const flow = await prisma.flow.findFirst({ where: { id: req.params.flowId, orgId } });
+    // Express types route params as string | string[]; a plain :flowId
+    // segment is always a single string at runtime.
+    const flow = await prisma.flow.findFirst({ where: { id: req.params.flowId as string, orgId } });
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
 
     const count = flow.orderCount + 1;
@@ -146,7 +148,7 @@ fmsRouter.post('/flows/:flowId/orders', async (req, res, next) => {
 });
 
 // Live status board (Feature 92)
-fmsRouter.get('/orders', async (req, res, next) => {
+fmsRouter.get('/orders', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const { status, from, to, assigneeId } = parseListQuery(req);
@@ -200,12 +202,12 @@ fmsRouter.get('/orders', async (req, res, next) => {
 });
 
 // Stage complete karo + custom fields bharo
-fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
+fmsRouter.post('/orderstages/:id/complete', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId, userId, role } = req.user!;
 
     const os = await prisma.orderStage.findFirst({
-      where: { id: req.params.id, orgId, completedAt: null },
+      where: { id: req.params.id as string, orgId, completedAt: null },
     });
     if (!os) return res.status(404).json({ error: 'Stage not found or already done' });
 
@@ -261,7 +263,7 @@ fmsRouter.post('/orderstages/:id/complete', async (req, res, next) => {
 // Bottleneck view (Feature 97). Two grouped aggregate queries (one count,
 // one DB-side AVG) covering every stage at once, instead of a count + a
 // full row fetch per stage.
-fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
 
@@ -294,11 +296,11 @@ fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req, res, 
 });
 
 // Order ka poora safar (Feature 99)
-fmsRouter.get('/orders/:id/history', async (req, res, next) => {
+fmsRouter.get('/orders/:id/history', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const order = await prisma.order.findFirst({
-      where: { id: req.params.id, orgId },
+      where: { id: req.params.id as string, orgId },
       include: { flow: { include: { stages: true } }, stages: { orderBy: { sequence: 'asc' } } },
     });
     if (!order) return res.status(404).json({ error: 'Not found' });
@@ -369,7 +371,7 @@ const ANALYTICS_CACHE_TTL_MS = 60_000;
 
 // Four clickable KPI counts + a small summary. All-time (the drill-down
 // lists carry the date-range filter, not the headline counts).
-fmsRouter.get('/analytics/summary', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.get('/analytics/summary', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const key = `fms:analytics:summary:${orgId}`;
@@ -410,7 +412,7 @@ const KPI_CATEGORIES = ['PENDING', 'COMPLETED', 'DELAYED', 'ONTIME'] as const;
 
 // Drill-down list behind a KPI card. Same common columns regardless of
 // category: order number, start date, current status, best-effort item label.
-fmsRouter.get('/analytics/orders', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.get('/analytics/orders', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const category = ((req.query.category as string) || '').toUpperCase();
@@ -482,7 +484,7 @@ fmsRouter.get('/analytics/orders', requireRole('OWNER', 'MANAGER'), async (req, 
 // (order.startedAt, same convention as /analytics/orders) total ₹ lost,
 // the most expensive delayed orders, and the costliest stage/person.
 // Org-scoped, same 60s cache pattern as the other Flow analytics endpoints.
-fmsRouter.get('/analytics/cost-of-delay', requireRole('OWNER', 'MANAGER'), async (req, res, next) => {
+fmsRouter.get('/analytics/cost-of-delay', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const from = req.query.from ? new Date(req.query.from as string) : undefined;

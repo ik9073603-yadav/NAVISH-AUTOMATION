@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { ZipArchive } from 'archiver';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -8,14 +8,14 @@ import { rowsToCsv, rowsToXlsxBuffer } from '../../lib/exportUtils';
 export const exportRouter = Router();
 exportRouter.use(requireAuth, requireRole('OWNER', 'MANAGER'));
 
-function parseRange(req: any): { from?: Date; to?: Date } {
+function parseRange(req: Request): { from?: Date; to?: Date } {
   return {
     from: req.query.from ? new Date(req.query.from as string) : undefined,
     to: req.query.to ? new Date(req.query.to as string) : undefined,
   };
 }
 
-async function sendTable(res: any, format: string, filenameBase: string, sheetName: string, headers: string[], rows: unknown[][]) {
+async function sendTable(res: Response, format: string, filenameBase: string, sheetName: string, headers: string[], rows: unknown[][]) {
   if (format === 'xlsx') {
     const buffer = await rowsToXlsxBuffer(sheetName, headers, rows);
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
@@ -30,14 +30,16 @@ async function sendTable(res: any, format: string, filenameBase: string, sheetNa
 }
 
 // FMS orders for one flow, in a date range.
-exportRouter.get('/fms/:flowId', async (req, res, next) => {
+exportRouter.get('/fms/:flowId', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const format = (req.query.format as string) === 'xlsx' ? 'xlsx' : 'csv';
     const { from, to } = parseRange(req);
 
     const flow = await prisma.flow.findFirst({
-      where: { id: req.params.flowId, orgId },
+      // Express types route params as string | string[]; a plain :flowId
+      // segment is always a single string at runtime.
+      where: { id: req.params.flowId as string, orgId },
       include: { stages: { orderBy: { sequence: 'asc' } } },
     });
     if (!flow) return res.status(404).json({ error: 'Flow not found' });
@@ -72,7 +74,7 @@ exportRouter.get('/fms/:flowId', async (req, res, next) => {
 });
 
 // Inventory stock movements in a date range (optionally one SKU).
-exportRouter.get('/inventory/movements', async (req, res, next) => {
+exportRouter.get('/inventory/movements', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const format = (req.query.format as string) === 'xlsx' ? 'xlsx' : 'csv';
@@ -108,7 +110,7 @@ exportRouter.get('/inventory/movements', async (req, res, next) => {
 });
 
 // Task / analytics report in a date range (optionally one source).
-exportRouter.get('/tasks', async (req, res, next) => {
+exportRouter.get('/tasks', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const format = (req.query.format as string) === 'xlsx' ? 'xlsx' : 'csv';
@@ -146,7 +148,7 @@ exportRouter.get('/tasks', async (req, res, next) => {
 
 // Full company backup (Feature 12) — a zip of JSON files, one per entity.
 // OWNER only, always the caller's own org (orgId from JWT).
-exportRouter.get('/backup', requireRole('OWNER'), async (req, res, next) => {
+exportRouter.get('/backup', requireRole('OWNER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
 

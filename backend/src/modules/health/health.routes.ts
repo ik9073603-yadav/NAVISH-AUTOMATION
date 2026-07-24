@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { cached } from '../../lib/cache';
@@ -17,7 +17,7 @@ const DEFAULT_WINDOW_DAYS = 7;
 // strictly before today (see writeDailyHealthSnapshots, run by the
 // scheduler), so this stays cheap even though the score itself is
 // recomputed live.
-healthRouter.get('/', async (req, res, next) => {
+healthRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
     const days = Math.max(1, Math.min(90, Number(req.query.days) || DEFAULT_WINDOW_DAYS));
