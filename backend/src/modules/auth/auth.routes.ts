@@ -6,6 +6,7 @@ import * as authService from './auth.service';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { prisma } from '../../lib/prisma';
 import { notify } from '../engine/engine.service';
+import { emailSchema } from '../../lib/validation';
 
 export const authRouter = Router();
 
@@ -22,14 +23,14 @@ function generateTempPassword(length = 10): string {
 const signupSchema = z.object({
   companyName: z.string().min(2),
   ownerName: z.string().min(2),
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(8),
   phone: z.string().optional(),
   acceptedTerms: z.literal(true, { message: 'You must accept the Terms & Conditions and Privacy Policy' }),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(1),
 });
 
@@ -52,6 +53,73 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
       return res.status(400).json({ error: 'Validation failed' });
     }
     res.json(await authService.login(parsed.data));
+  } catch (err: any) {
+    // Stable machine-readable code the client keys off to route to the
+    // OTP-entry screen — sent directly (not via the generic error handler,
+    // which only echoes `code` outside production).
+    if (err?.emailNotVerified) {
+      return res.status(403).json({ error: 'EMAIL_NOT_VERIFIED', message: err.message, email: err.email });
+    }
+    next(err);
+  }
+});
+
+// ---------------- Email OTP verification (signup + first-login) ----------------
+
+const verifyOtpSchema = z.object({ email: emailSchema, code: z.string().length(6) });
+
+authRouter.post('/verify-otp', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = verifyOtpSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    res.json(await authService.verifyOtpAndLogin(parsed.data.email, parsed.data.code));
+  } catch (err) {
+    next(err);
+  }
+});
+
+const resendOtpSchema = z.object({ email: emailSchema });
+
+authRouter.post('/resend-otp', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = resendOtpSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    await authService.resendOtp(parsed.data.email);
+    res.json({ message: 'A new code has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+// ---------------- Self-service forgot/reset password (email OTP) ----------------
+// Distinct from the owner/manager-approval flow below (request-reset /
+// reset-requests) — that one stays intact for employees who prefer it.
+
+const forgotPasswordSchema = z.object({ email: emailSchema });
+
+authRouter.post('/forgot-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = forgotPasswordSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    await authService.forgotPassword(parsed.data.email);
+    res.json({ message: 'If an account exists for that email, a code has been sent.' });
+  } catch (err) {
+    next(err);
+  }
+});
+
+const resetPasswordSchema = z.object({
+  email: emailSchema,
+  code: z.string().length(6),
+  newPassword: z.string().min(8),
+});
+
+authRouter.post('/reset-password', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = resetPasswordSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+    await authService.resetPassword(parsed.data.email, parsed.data.code, parsed.data.newPassword);
+    res.json({ reset: true });
   } catch (err) {
     next(err);
   }

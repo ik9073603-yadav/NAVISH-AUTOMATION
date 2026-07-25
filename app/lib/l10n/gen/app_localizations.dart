@@ -1178,6 +1178,120 @@ abstract class AppLocalizations {
   /// **'{escalated} escalation(s) out of {total} task(s)'**
   String healthReasonEscalations(Object escalated, Object total);
 
+  /// No description provided for @otpScreenTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify your email'**
+  String get otpScreenTitle;
+
+  /// No description provided for @otpScreenSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter the 6-digit code we sent to {email}'**
+  String otpScreenSubtitle(Object email);
+
+  /// No description provided for @otpVerify.
+  ///
+  /// In en, this message translates to:
+  /// **'Verify'**
+  String get otpVerify;
+
+  /// No description provided for @otpVerifying.
+  ///
+  /// In en, this message translates to:
+  /// **'Verifying...'**
+  String get otpVerifying;
+
+  /// No description provided for @otpResendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend code'**
+  String get otpResendCode;
+
+  /// No description provided for @otpResendIn.
+  ///
+  /// In en, this message translates to:
+  /// **'Resend in {seconds}s'**
+  String otpResendIn(Object seconds);
+
+  /// No description provided for @otpCodeResent.
+  ///
+  /// In en, this message translates to:
+  /// **'A new code has been sent'**
+  String get otpCodeResent;
+
+  /// No description provided for @otpIncompleteCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter all 6 digits'**
+  String get otpIncompleteCode;
+
+  /// No description provided for @forgotPasswordTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get forgotPasswordTitle;
+
+  /// No description provided for @forgotPasswordStepEmailSubtitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter your account email and we\'ll send you a code'**
+  String get forgotPasswordStepEmailSubtitle;
+
+  /// No description provided for @sendCode.
+  ///
+  /// In en, this message translates to:
+  /// **'Send code'**
+  String get sendCode;
+
+  /// No description provided for @sending.
+  ///
+  /// In en, this message translates to:
+  /// **'Sending...'**
+  String get sending;
+
+  /// No description provided for @newPasswordLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'New password'**
+  String get newPasswordLabel;
+
+  /// No description provided for @resetPasswordButton.
+  ///
+  /// In en, this message translates to:
+  /// **'Reset password'**
+  String get resetPasswordButton;
+
+  /// No description provided for @resettingPassword.
+  ///
+  /// In en, this message translates to:
+  /// **'Resetting...'**
+  String get resettingPassword;
+
+  /// No description provided for @passwordResetSuccess.
+  ///
+  /// In en, this message translates to:
+  /// **'Password reset. Log in with your new password.'**
+  String get passwordResetSuccess;
+
+  /// No description provided for @askManagerInstead.
+  ///
+  /// In en, this message translates to:
+  /// **'Can\'t access this email? Ask your manager to reset it instead'**
+  String get askManagerInstead;
+
+  /// No description provided for @backToLogin.
+  ///
+  /// In en, this message translates to:
+  /// **'Back to login'**
+  String get backToLogin;
+
+  /// No description provided for @invalidEmailError.
+  ///
+  /// In en, this message translates to:
+  /// **'Enter a valid email address'**
+  String get invalidEmailError;
+
   /// No description provided for @activeFilter.
   ///
   /// In en, this message translates to:

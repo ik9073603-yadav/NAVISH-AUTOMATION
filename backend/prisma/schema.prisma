@@ -101,6 +101,11 @@ model User {
   // any API — only ever flipped by a direct DB script. See scripts/set-superadmin.mjs.
   isSuperAdmin Boolean       @default(false)
 
+  // Gates login until the signup/add-person OTP is confirmed (see OtpCode
+  // below). Existing pre-verification accounts are backfilled to true by
+  // the migration that introduced this column.
+  emailVerified Boolean      @default(false)
+
   // Recorded at signup — the checkbox is mandatory, this is the audit trail.
   termsAcceptedAt DateTime?
   termsVersion    String?
@@ -177,6 +182,30 @@ model ResetRequest {
 
   @@index([orgId, status])
   @@map("reset_requests")
+}
+
+enum OtpPurpose {
+  SIGNUP         // finishing a fresh company signup
+  LOGIN_VERIFY   // an unverified account (e.g. owner-added employee) confirming on first login
+  PASSWORD_RESET // self-service forgot-password
+}
+
+// Not org-scoped — keyed by email, used before a session/org context exists
+// (signup) or independent of it (forgot-password). Codes are stored hashed,
+// never plaintext. One row per send; verification looks at the newest
+// unconsumed row for the (email, purpose) pair.
+model OtpCode {
+  id        String     @id @default(uuid())
+  email     String
+  purpose   OtpPurpose
+  codeHash  String
+  expiresAt DateTime
+  consumed  Boolean    @default(false)
+  attempts  Int        @default(0)
+  createdAt DateTime   @default(now())
+
+  @@index([email, purpose])
+  @@map("otp_codes")
 }
 
 enum DeletionRequestStatus {

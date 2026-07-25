@@ -1,10 +1,34 @@
 import bcrypt from 'bcryptjs';
+import { OtpPurpose } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { signToken } from '../../middleware/auth';
 import { LEGAL_VERSION } from '../legal/legal.routes';
+import { sendMail } from '../../lib/mailer';
+import { issueOtp, verifyOtp, findPendingVerificationPurpose } from './otp.service';
 
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 40);
+}
+
+function otpEmailHtml(code: string, purpose: OtpPurpose, name?: string): { subject: string; html: string } {
+  const subject = purpose === 'PASSWORD_RESET' ? 'Reset your Navish password' : 'Verify your email — Navish';
+  const intro = purpose === 'PASSWORD_RESET'
+    ? "Use this code to reset your Navish password."
+    : "Use this code to verify your email and finish signing in to Navish.";
+  const html = `
+    <div style="font-family:sans-serif;max-width:480px;margin:auto">
+      <h2 style="color:#111">Navish</h2>
+      <p>Hi${name ? ` ${name}` : ''},</p>
+      <p>${intro}</p>
+      <p style="font-size:32px;font-weight:bold;letter-spacing:8px;text-align:center;background:#f4f4f5;padding:16px;border-radius:8px">${code}</p>
+      <p style="color:#666;font-size:13px">This code expires in 10 minutes. If you didn't request this, you can safely ignore this email.</p>
+    </div>`;
+  return { subject, html };
+}
+
+async function sendOtpEmail(email: string, code: string, purpose: OtpPurpose, name?: string) {
+  const { subject, html } = otpEmailHtml(code, purpose, name);
+  await sendMail(email, subject, html);
 }
 
 export async function signup(input: {
@@ -56,23 +80,99 @@ export async function signup(input: {
     return { org, owner };
   });
 
+  // Account exists but is unverified — no token yet. The client moves to
+  // the OTP-entry screen and calls verify-otp to actually get logged in.
+  const code = await issueOtp(email, 'SIGNUP', { enforceCooldown: false });
+  await sendOtpEmail(email, code, 'SIGNUP', result.owner.name);
+
+  return {
+    message: 'Account created — enter the code we emailed you to verify.',
+    email,
+  };
+}
+
+// Completes SIGNUP or LOGIN_VERIFY (owner-added employee's first login) —
+// verifies the code, flips emailVerified, and returns a normal login
+// response. PASSWORD_RESET codes are deliberately excluded: they must go
+// through resetPassword() instead, never grant a session on their own.
+export async function verifyOtpAndLogin(email: string, code: string) {
+  const normalized = email.toLowerCase().trim();
+  await verifyOtp(normalized, ['SIGNUP', 'LOGIN_VERIFY'], code);
+
+  const user = await prisma.user.findFirst({ where: { email: normalized }, include: { organization: true } });
+  if (!user) throw Object.assign(new Error('Account not found'), { status: 404 });
+
+  if (!user.emailVerified) {
+    await prisma.user.update({ where: { id: user.id }, data: { emailVerified: true } });
+  }
+
+  if (!user.organization.enabled && !user.isSuperAdmin) {
+    throw Object.assign(new Error('This company account has been suspended'), { status: 403 });
+  }
+
   const token = signToken({
-    userId: result.owner.id,
-    orgId: result.org.id,
-    role: 'OWNER',
-    isSuperAdmin: false,
+    userId: user.id,
+    orgId: user.orgId,
+    role: user.role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
+    isSuperAdmin: user.isSuperAdmin,
+  });
+
+  await prisma.activityLog.create({
+    data: { orgId: user.orgId, actorId: user.id, action: 'EMAIL_VERIFIED', entity: 'User', entityId: user.id },
   });
 
   return {
     token,
-    user: {
-      id: result.owner.id,
-      name: result.owner.name,
-      email: result.owner.email,
-      role: result.owner.role,
-    },
-    organization: { id: result.org.id, name: result.org.name, slug: result.org.slug },
+    user: { id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: user.isSuperAdmin },
+    organization: { id: user.organization.id, name: user.organization.name },
   };
+}
+
+// Re-sends whatever SIGNUP/LOGIN_VERIFY code is currently pending for this
+// email, at the same purpose. Cooldown is enforced inside issueOtp.
+export async function resendOtp(email: string) {
+  const normalized = email.toLowerCase().trim();
+  const purpose = await findPendingVerificationPurpose(normalized);
+  if (!purpose) {
+    throw Object.assign(new Error('No pending verification for this email'), { status: 400 });
+  }
+
+  const user = await prisma.user.findFirst({ where: { email: normalized } });
+  const code = await issueOtp(normalized, purpose);
+  await sendOtpEmail(normalized, code, purpose, user?.name);
+}
+
+// Self-service — always resolves, never reveals whether the email exists.
+export async function forgotPassword(email: string) {
+  const normalized = email.toLowerCase().trim();
+  try {
+    const user = await prisma.user.findFirst({ where: { email: normalized } });
+    if (user) {
+      const code = await issueOtp(normalized, 'PASSWORD_RESET');
+      await sendOtpEmail(normalized, code, 'PASSWORD_RESET', user.name);
+    }
+  } catch (err) {
+    // Cooldown (already sent recently) or a transient mail failure — never
+    // let this change the response the caller sees.
+    console.warn('forgotPassword: OTP issue/send failed (response unaffected):', err);
+  }
+}
+
+export async function resetPassword(email: string, code: string, newPassword: string) {
+  const normalized = email.toLowerCase().trim();
+  await verifyOtp(normalized, 'PASSWORD_RESET', code);
+
+  const user = await prisma.user.findFirst({ where: { email: normalized } });
+  if (!user) throw Object.assign(new Error('Invalid or expired code'), { status: 400 });
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { passwordHash: await bcrypt.hash(newPassword, 10) },
+  });
+
+  await prisma.activityLog.create({
+    data: { orgId: user.orgId, actorId: user.id, action: 'PASSWORD_RESET_SELF_SERVICE', entity: 'User', entityId: user.id },
+  });
 }
 
 export async function login(input: { email: string; password: string }) {
@@ -91,6 +191,25 @@ export async function login(input: { email: string; password: string }) {
 
   if (user.status !== 'ACTIVE') {
     throw Object.assign(new Error('Account is not active'), { status: 403 });
+  }
+
+  // Unverified — either mid-signup or an owner-added employee logging in
+  // for the first time. Fire off (or resend, cooldown-permitting) a
+  // LOGIN_VERIFY code and block the session; the client routes to the same
+  // OTP-entry screen used after signup. Password is already proven above,
+  // so this can't be used to spam an arbitrary inbox without knowing it.
+  if (!user.emailVerified) {
+    try {
+      const code = await issueOtp(email, 'LOGIN_VERIFY');
+      await sendOtpEmail(email, code, 'LOGIN_VERIFY', user.name);
+    } catch (err: any) {
+      if (err?.status !== 429) throw err; // 429 = code already pending, fine
+    }
+    throw Object.assign(new Error('Verify your email to continue — we sent you a code'), {
+      status: 403,
+      emailNotVerified: true,
+      email,
+    });
   }
 
   // Suspended org — blocks new logins. Superadmins bypass this so they can

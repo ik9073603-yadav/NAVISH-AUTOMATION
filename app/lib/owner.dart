@@ -3,6 +3,7 @@ import 'api.dart';
 import 'filters.dart';
 import 'contact_actions.dart';
 import 'responsive.dart';
+import 'validators.dart';
 import 'widgets/motion.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -434,6 +435,11 @@ class _AddUserSheetState extends State<_AddUserSheet> {
   bool _saving = false;
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
+    if (!isValidEmail(_email.text.trim())) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.invalidEmailError)));
+      return;
+    }
     setState(() => _saving = true);
     try {
       await Api.addUser(

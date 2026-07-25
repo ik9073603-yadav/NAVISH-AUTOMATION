@@ -592,6 +592,70 @@ class AppLocalizationsHi extends AppLocalizations {
   }
 
   @override
+  String get otpScreenTitle => 'अपनी ईमेल वेरिफाई करें';
+
+  @override
+  String otpScreenSubtitle(Object email) {
+    return '$email पर भेजा गया 6-अंकों का कोड डालें';
+  }
+
+  @override
+  String get otpVerify => 'वेरिफाई करें';
+
+  @override
+  String get otpVerifying => 'वेरिफाई हो रहा है...';
+
+  @override
+  String get otpResendCode => 'कोड दोबारा भेजें';
+
+  @override
+  String otpResendIn(Object seconds) {
+    return '$seconds सेकंड में दोबारा भेजें';
+  }
+
+  @override
+  String get otpCodeResent => 'नया कोड भेज दिया गया है';
+
+  @override
+  String get otpIncompleteCode => 'सभी 6 अंक डालें';
+
+  @override
+  String get forgotPasswordTitle => 'पासवर्ड रीसेट करें';
+
+  @override
+  String get forgotPasswordStepEmailSubtitle =>
+      'अपना अकाउंट ईमेल डालें, हम आपको एक कोड भेजेंगे';
+
+  @override
+  String get sendCode => 'कोड भेजें';
+
+  @override
+  String get sending => 'भेजा जा रहा है...';
+
+  @override
+  String get newPasswordLabel => 'नया पासवर्ड';
+
+  @override
+  String get resetPasswordButton => 'पासवर्ड रीसेट करें';
+
+  @override
+  String get resettingPassword => 'रीसेट हो रहा है...';
+
+  @override
+  String get passwordResetSuccess =>
+      'पासवर्ड रीसेट हो गया। नए पासवर्ड से लॉग इन करें।';
+
+  @override
+  String get askManagerInstead =>
+      'इस ईमेल तक पहुंच नहीं है? इसके बजाय अपने मैनेजर से रीसेट करवाएं';
+
+  @override
+  String get backToLogin => 'लॉगिन पर वापस जाएं';
+
+  @override
+  String get invalidEmailError => 'एक सही ईमेल एड्रेस डालें';
+
+  @override
   String get activeFilter => 'एक्टिव';
 
   @override

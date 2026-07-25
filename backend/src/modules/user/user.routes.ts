@@ -3,6 +3,7 @@ import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
+import { emailSchema } from '../../lib/validation';
 
 export const userRouter = Router();
 userRouter.use(requireAuth);
@@ -24,7 +25,7 @@ userRouter.get('/', async (req: Request, res: Response, next: NextFunction) => {
 
 const addSchema = z.object({
   name: z.string().min(2),
-  email: z.string().email(),
+  email: emailSchema,
   password: z.string().min(8),
   phone: z.string().optional(),
   role: z.enum(['MANAGER', 'EMPLOYEE']),

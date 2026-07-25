@@ -19,6 +19,9 @@ import 'profile.dart';
 import 'analytics.dart';
 import 'admin.dart';
 import 'signup.dart';
+import 'otp_verify.dart';
+import 'forgot_password.dart';
+import 'validators.dart';
 import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
@@ -83,12 +86,21 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   Future<void> _login() async {
+    final l10n = AppLocalizations.of(context);
+    final email = _email.text.trim();
+    if (!isValidEmail(email)) {
+      setState(() => _error = l10n.invalidEmailError);
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     try {
-      await Api.login(_email.text.trim(), _password.text);
+      await Api.login(email, _password.text);
       await PushService.registerToken();
       if (!mounted) return;
       Navigator.pushReplacement(context, sharedAxisRoute(const HomeScreen()));
+    } on EmailNotVerifiedException catch (e) {
+      if (!mounted) return;
+      Navigator.push(context, sharedAxisRoute(OtpVerifyScreen(email: e.email)));
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
@@ -97,39 +109,10 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _forgotPassword() async {
-    final l10n = AppLocalizations.of(context);
-    final controller = TextEditingController(text: _email.text.trim());
-    final email = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: Text(l10n.forgotPasswordDialogTitle),
-        content: TextField(
-          controller: controller,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: l10n.yourEmailLabel, border: const OutlineInputBorder()),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(l10n.cancel),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
-            child: Text(l10n.requestReset),
-          ),
-        ],
-      ),
-    );
-    if (email == null || email.isEmpty) return;
-    try {
-      final message = await Api.requestPasswordReset(email);
-      if (!mounted) return;
+    final message = await Navigator.push<String>(
+      context, sharedAxisRoute(const ForgotPasswordScreen()));
+    if (message != null && mounted) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
     }
   }
 

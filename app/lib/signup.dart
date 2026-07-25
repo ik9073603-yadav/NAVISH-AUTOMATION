@@ -3,9 +3,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'config.dart';
-import 'push.dart';
-import 'main.dart';
+import 'otp_verify.dart';
 import 'theme/app_theme.dart';
+import 'validators.dart';
 import 'widgets/motion.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -33,11 +33,16 @@ class _SignupScreenState extends State<SignupScreen> {
 
   Future<void> _submit() async {
     final l10n = AppLocalizations.of(context);
+    final email = _email.text.trim();
     if (_companyName.text.trim().length < 2 ||
         _ownerName.text.trim().length < 2 ||
-        _email.text.trim().isEmpty ||
+        email.isEmpty ||
         _password.text.length < 8) {
       setState(() => _error = l10n.fillRequiredFieldsError);
+      return;
+    }
+    if (!isValidEmail(email)) {
+      setState(() => _error = l10n.invalidEmailError);
       return;
     }
     if (!_accepted) {
@@ -50,14 +55,13 @@ class _SignupScreenState extends State<SignupScreen> {
       await Api.signup(
         companyName: _companyName.text.trim(),
         ownerName: _ownerName.text.trim(),
-        email: _email.text.trim(),
+        email: email,
         password: _password.text,
         phone: _phone.text.trim().isEmpty ? null : _phone.text.trim(),
         acceptedTerms: _accepted,
       );
-      await PushService.registerToken();
       if (!mounted) return;
-      Navigator.pushReplacement(context, sharedAxisRoute(const HomeScreen()));
+      Navigator.pushReplacement(context, sharedAxisRoute(OtpVerifyScreen(email: email)));
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {

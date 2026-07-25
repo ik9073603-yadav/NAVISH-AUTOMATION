@@ -6,6 +6,18 @@ import 'config.dart';
 import 'offline/offline_store.dart';
 import 'offline/write_queue.dart';
 
+// Thrown by Api.login when the account exists and the password is correct,
+// but the email hasn't been OTP-verified yet (mid-signup, or an owner-added
+// employee's first login). Callers should route to the OTP-entry screen
+// instead of showing this as a plain error.
+class EmailNotVerifiedException implements Exception {
+  final String email;
+  final String message;
+  EmailNotVerifiedException(this.email, this.message);
+  @override
+  String toString() => message;
+}
+
 class Api {
   static String? _token;
 
@@ -91,9 +103,63 @@ class Api {
       body: jsonEncode({'email': email, 'password': password}),
     );
     final data = jsonDecode(res.body);
+    if (res.statusCode == 403 && data['error'] == 'EMAIL_NOT_VERIFIED') {
+      throw EmailNotVerifiedException(
+        (data['email'] as String?) ?? email,
+        (data['message'] as String?) ?? 'Verify your email to continue',
+      );
+    }
     if (res.statusCode != 200) throw Exception(data['error'] ?? 'Login failed');
     await _saveToken(data['token']);
     return data;
+  }
+
+  // ---------------- Email OTP verification (signup + first-login) ----------------
+
+  static Future<Map<String, dynamic>> verifyOtp(String email, String code) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/auth/verify-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Invalid or expired code');
+    await _saveToken(data['token']);
+    return data;
+  }
+
+  static Future<String> resendOtp(String email) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/auth/resend-otp'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to resend code');
+    return (data['message'] as String?) ?? 'A new code has been sent.';
+  }
+
+  // ---------------- Self-service forgot/reset password (email OTP) ----------------
+
+  static Future<String> forgotPasswordOtp(String email) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/auth/forgot-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to send code');
+    return (data['message'] as String?) ?? 'If an account exists for that email, a code has been sent.';
+  }
+
+  static Future<void> resetPasswordOtp(String email, String code, String newPassword) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/auth/reset-password'),
+      headers: {'Content-Type': 'application/json'},
+      body: jsonEncode({'email': email, 'code': code, 'newPassword': newPassword}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to reset password');
   }
 
   static Future<Map<String, dynamic>> me() async {
@@ -861,7 +927,7 @@ class Api {
     );
     final data = jsonDecode(res.body);
     if (res.statusCode != 201) throw Exception(data['error'] ?? 'Signup failed');
-    await _saveToken(data['token']);
+    // No token yet — the account is unverified until verifyOtp() succeeds.
     return data;
   }
 

@@ -592,6 +592,70 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get otpScreenTitle => 'Verify your email';
+
+  @override
+  String otpScreenSubtitle(Object email) {
+    return 'Enter the 6-digit code we sent to $email';
+  }
+
+  @override
+  String get otpVerify => 'Verify';
+
+  @override
+  String get otpVerifying => 'Verifying...';
+
+  @override
+  String get otpResendCode => 'Resend code';
+
+  @override
+  String otpResendIn(Object seconds) {
+    return 'Resend in ${seconds}s';
+  }
+
+  @override
+  String get otpCodeResent => 'A new code has been sent';
+
+  @override
+  String get otpIncompleteCode => 'Enter all 6 digits';
+
+  @override
+  String get forgotPasswordTitle => 'Reset password';
+
+  @override
+  String get forgotPasswordStepEmailSubtitle =>
+      'Enter your account email and we\'ll send you a code';
+
+  @override
+  String get sendCode => 'Send code';
+
+  @override
+  String get sending => 'Sending...';
+
+  @override
+  String get newPasswordLabel => 'New password';
+
+  @override
+  String get resetPasswordButton => 'Reset password';
+
+  @override
+  String get resettingPassword => 'Resetting...';
+
+  @override
+  String get passwordResetSuccess =>
+      'Password reset. Log in with your new password.';
+
+  @override
+  String get askManagerInstead =>
+      'Can\'t access this email? Ask your manager to reset it instead';
+
+  @override
+  String get backToLogin => 'Back to login';
+
+  @override
+  String get invalidEmailError => 'Enter a valid email address';
+
+  @override
   String get activeFilter => 'Active';
 
   @override
