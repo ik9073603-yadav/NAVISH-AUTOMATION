@@ -278,6 +278,12 @@ abstract class AppLocalizations {
   /// **'You must accept the Terms & Conditions and Privacy Policy'**
   String get acceptTermsError;
 
+  /// No description provided for @yourSystemsHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Your Systems'**
+  String get yourSystemsHeading;
+
   /// No description provided for @navHome.
   ///
   /// In en, this message translates to:
@@ -445,6 +451,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Everything is running.'**
   String get nothingStuckSubtitle;
+
+  /// No description provided for @stuckCountForPerson.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} stuck'**
+  String stuckCountForPerson(Object count);
 
   /// No description provided for @moduleTasks.
   ///

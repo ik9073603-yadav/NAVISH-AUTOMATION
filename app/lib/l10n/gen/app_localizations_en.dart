@@ -101,6 +101,9 @@ class AppLocalizationsEn extends AppLocalizations {
       'You must accept the Terms & Conditions and Privacy Policy';
 
   @override
+  String get yourSystemsHeading => 'Your Systems';
+
+  @override
   String get navHome => 'Home';
 
   @override
@@ -189,6 +192,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get nothingStuckSubtitle => 'Everything is running.';
+
+  @override
+  String stuckCountForPerson(Object count) {
+    return '$count stuck';
+  }
 
   @override
   String get moduleTasks => 'Tasks';

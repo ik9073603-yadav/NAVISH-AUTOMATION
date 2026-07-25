@@ -274,7 +274,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
     final ok = await showAdaptiveSheet<bool>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => const _AssignSheet(),
+      builder: (_) => const AssignTaskSheet(),
     );
     if (ok == true) _load();
   }
@@ -290,13 +290,15 @@ class _OwnerScreenState extends State<OwnerScreen> {
 }
 
 // ---------- ASSIGN TASK ----------
-class _AssignSheet extends StatefulWidget {
-  const _AssignSheet();
+// Public: also opened directly from the Home hub's floating + button
+// (main.dart), not just from OwnerScreen's own FAB.
+class AssignTaskSheet extends StatefulWidget {
+  const AssignTaskSheet({super.key});
   @override
-  State<_AssignSheet> createState() => _AssignSheetState();
+  State<AssignTaskSheet> createState() => _AssignTaskSheetState();
 }
 
-class _AssignSheetState extends State<_AssignSheet> {
+class _AssignTaskSheetState extends State<AssignTaskSheet> {
   final _title = TextEditingController();
   final _desc = TextEditingController();
   List<dynamic> _users = [];

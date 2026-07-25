@@ -34,6 +34,7 @@
   "fillRequiredFieldsError": "Fill in all required fields (password: 8+ characters)",
   "acceptTermsError": "You must accept the Terms & Conditions and Privacy Policy",
 
+  "yourSystemsHeading": "Your Systems",
   "navHome": "Home",
   "navStuck": "Stuck",
   "navTasks": "Tasks",
@@ -68,6 +69,8 @@
 
   "nothingStuckTitle": "Nothing is stuck.",
   "nothingStuckSubtitle": "Everything is running.",
+  "stuckCountForPerson": "{count} stuck",
+  "@stuckCountForPerson": { "placeholders": { "count": {} } },
 
   "moduleTasks": "Tasks",
   "moduleChecklists": "Checklists",

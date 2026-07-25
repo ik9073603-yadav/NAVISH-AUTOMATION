@@ -34,6 +34,7 @@
   "fillRequiredFieldsError": "सभी ज़रूरी फ़ील्ड भरें (पासवर्ड: 8+ अक्षर)",
   "acceptTermsError": "आपको नियम व शर्तें और प्राइवेसी पॉलिसी स्वीकार करनी होंगी",
 
+  "yourSystemsHeading": "आपके सिस्टम",
   "navHome": "होम",
   "navStuck": "अटका हुआ",
   "navTasks": "टास्क",
@@ -65,6 +66,7 @@
 
   "nothingStuckTitle": "कुछ भी अटका नहीं है।",
   "nothingStuckSubtitle": "सब कुछ सही चल रहा है।",
+  "stuckCountForPerson": "{count} अटके हुए",
 
   "moduleTasks": "टास्क",
   "moduleChecklists": "चेकलिस्ट",

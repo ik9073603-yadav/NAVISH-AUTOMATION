@@ -3,10 +3,14 @@ import 'api.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 
-// Cross-org platform view. Only ever pushed onto the nav for accounts where
-// isSuperAdmin is true (checked in main.dart) — regular users never see this.
+// The entire experience for an isSuperAdmin account (main.dart routes
+// straight here, bypassing the normal company Home/modules UI — a platform
+// operator doesn't belong to any company). onLogout is provided when this
+// is the root view, so there's a way out; null when (historically) pushed
+// on top of something else that already has its own logout path.
 class AdminScreen extends StatefulWidget {
-  const AdminScreen({super.key});
+  const AdminScreen({super.key, this.onLogout});
+  final Future<void> Function()? onLogout;
   @override
   State<AdminScreen> createState() => _AdminScreenState();
 }
@@ -69,7 +73,17 @@ class _AdminScreenState extends State<AdminScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Navish Admin')),
+      appBar: AppBar(
+        title: const Text('Navish Admin'),
+        actions: [
+          if (widget.onLogout != null)
+            IconButton(
+              icon: const Icon(Icons.logout),
+              tooltip: 'Log out',
+              onPressed: widget.onLogout,
+            ),
+        ],
+      ),
       body: _loading
           ? const ShimmerSkeletonList()
           : _error != null

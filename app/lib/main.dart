@@ -455,56 +455,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Navigator.push(context, sharedAxisRoute(const ResetRequestsScreen()));
   }
 
-  void _openAdmin() {
-    Navigator.push(context, sharedAxisRoute(const AdminScreen()));
-  }
-
   void _openNotifications() {
     Navigator.push(
       context,
       sharedAxisRoute(_NotificationsScreen(notifs: _notifs)),
     ).then((_) => _load());
-  }
-
-  // Compact phones can't fit Profile/Settings/Admin as their own bottom
-  // destinations alongside every module — they collapse into this sheet.
-  void _showMoreSheet() {
-    final l10n = AppLocalizations.of(context);
-    showAdaptiveSheet(
-      context: context,
-      builder: (_) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const SizedBox(height: 8),
-            ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: Text(l10n.navProfile),
-              onTap: () { Navigator.pop(context); _openProfile(); },
-            ),
-            if (_isOwnerRole)
-              ListTile(
-                leading: const Icon(Icons.settings_outlined),
-                title: Text(l10n.navCompanySettings),
-                onTap: () { Navigator.pop(context); _openSettings(); },
-              ),
-            if (_isOwner && !_isOwnerRole)
-              ListTile(
-                leading: const Icon(Icons.lock_reset),
-                title: Text(l10n.navPasswordResetRequests),
-                onTap: () { Navigator.pop(context); _openResetRequests(); },
-              ),
-            if (_isSuperAdmin)
-              ListTile(
-                leading: const Icon(Icons.admin_panel_settings),
-                title: Text(l10n.navNavishAdmin),
-                onTap: () { Navigator.pop(context); _openAdmin(); },
-              ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
-    );
   }
 
   IconData _moduleIcon(String label) {
@@ -573,122 +528,74 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       );
     }
 
-    final size = screenSizeOf(context);
+    // A platform operator (Navish) isn't a member of any company — they get
+    // the oversight view only, full stop. Never the Tasks/Flows/etc modules.
+    if (_isSuperAdmin) {
+      return _withBackHandling(AdminScreen(onLogout: _logout));
+    }
+
     final labels = _moduleLabels;
     final l10n = AppLocalizations.of(context);
-    final body = Column(
-      children: [
-        _offlineBanner(),
-        Expanded(
-          child: MaxWidthCenter(
-            child: FadeThroughSwitcher(tabKey: _tab, child: _bodyForTab(labels)),
+    final onHome = _tab == 0;
+
+    final appBar = AppBar(
+      title: Text(onHome
+          ? (_user?['nickname'] as String? ?? _user?['name'] ?? l10n.appTitle)
+          : _moduleDisplayLabel(l10n, labels[_tab])),
+      actions: [
+        if (_isOwnerRole)
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: l10n.navCompanySettings,
+            onPressed: _openSettings,
           ),
+        if (_isOwner && !_isOwnerRole)
+          IconButton(
+            icon: const Icon(Icons.lock_reset),
+            tooltip: l10n.navPasswordResetRequests,
+            onPressed: _openResetRequests,
+          ),
+        IconButton(
+          icon: const Icon(Icons.person_outline),
+          tooltip: l10n.navProfile,
+          onPressed: _openProfile,
         ),
+        _notificationBell(l10n),
       ],
     );
 
-    final appBar = AppBar(
-      title: GestureDetector(
-        onTap: _openProfile,
-        child: Text(_user?['nickname'] as String? ?? _user?['name'] ?? l10n.appTitle),
-      ),
-      actions: [_notificationBell(l10n)],
-    );
-
-    if (size == ScreenSize.compact) {
-      return _withBackHandling(Scaffold(
-        appBar: appBar,
-        body: body,
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _tab,
-          labelBehavior: NavigationDestinationLabelBehavior.onlyShowSelected,
-          onDestinationSelected: (i) {
-            if (i == labels.length) {
-              _showMoreSheet();
-            } else {
-              setState(() => _tab = i);
-            }
-          },
-          destinations: [
-            for (final l in labels)
-              NavigationDestination(icon: Icon(_moduleIcon(l)), label: _moduleDisplayLabel(l10n, l)),
-            NavigationDestination(icon: const Icon(Icons.more_horiz), label: l10n.navMore),
-          ],
-        ),
-      ));
-    }
-
-    // Medium/expanded: a side rail replaces the bottom bar, and there's room
-    // to show Profile/Settings/Admin directly instead of behind a menu.
     return _withBackHandling(Scaffold(
       appBar: appBar,
-      body: Row(
+      body: Column(
         children: [
-          // A short window (many modules + a maximized owner/superadmin
-          // trailing icon set) can exceed the viewport height — scroll
-          // instead of overflowing, same as the rail would on a real device.
-          LayoutBuilder(
-            builder: (context, constraints) => SingleChildScrollView(
-              child: ConstrainedBox(
-                constraints: BoxConstraints(minHeight: constraints.maxHeight),
-                child: IntrinsicHeight(
-                  child: NavigationRail(
-                    selectedIndex: _tab,
-                    onDestinationSelected: (i) => setState(() => _tab = i),
-                    labelType: size == ScreenSize.expanded
-                        ? NavigationRailLabelType.none
-                        : NavigationRailLabelType.all,
-                    extended: size == ScreenSize.expanded,
-                    destinations: [
-                      for (final l in labels)
-                        NavigationRailDestination(icon: Icon(_moduleIcon(l)), label: Text(_moduleDisplayLabel(l10n, l))),
-                    ],
-                    trailing: Expanded(
-                      child: Align(
-                        alignment: Alignment.bottomCenter,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 12),
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                icon: const Icon(Icons.person_outline),
-                                tooltip: l10n.navProfile,
-                                onPressed: _openProfile,
-                              ),
-                              if (_isOwnerRole)
-                                IconButton(
-                                  icon: const Icon(Icons.settings_outlined),
-                                  tooltip: l10n.navCompanySettings,
-                                  onPressed: _openSettings,
-                                ),
-                              if (_isOwner && !_isOwnerRole)
-                                IconButton(
-                                  icon: const Icon(Icons.lock_reset),
-                                  tooltip: l10n.navPasswordResetRequests,
-                                  onPressed: _openResetRequests,
-                                ),
-                              if (_isSuperAdmin)
-                                IconButton(
-                                  icon: const Icon(Icons.admin_panel_settings),
-                                  tooltip: l10n.navNavishAdmin,
-                                  onPressed: _openAdmin,
-                                ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
+          _offlineBanner(),
+          Expanded(
+            child: MaxWidthCenter(
+              child: FadeThroughSwitcher(tabKey: _tab, child: _bodyForTab(labels)),
             ),
           ),
-          const VerticalDivider(width: 1),
-          Expanded(child: body),
         ],
       ),
+      // OwnerScreen (the Tasks module, for owner/manager) already carries its
+      // own "Assign task" FAB — this one only covers Home, the one place
+      // that didn't have a quick-assign entry point at all.
+      floatingActionButton: (onHome && _isOwner)
+          ? FloatingActionButton.extended(
+              onPressed: _openAssignFromHome,
+              icon: const Icon(Icons.add),
+              label: Text(l10n.assignTaskAction),
+            )
+          : null,
     ));
+  }
+
+  Future<void> _openAssignFromHome() async {
+    final ok = await showAdaptiveSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => const AssignTaskSheet(),
+    );
+    if (ok == true) _load();
   }
 
   Widget _notificationBell(AppLocalizations l10n) {
@@ -835,7 +742,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             3,
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 28),
+          entrance(
+            Text(l10n.yourSystemsHeading, style: theme.textTheme.titleMedium),
+            4,
+          ),
+          const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: crossAxisCount,
             shrinkWrap: true,
@@ -870,7 +782,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       ),
                     ),
                   ),
-                  4 + i,
+                  5 + i,
                 ),
             ],
           ),
