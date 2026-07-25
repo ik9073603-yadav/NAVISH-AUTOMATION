@@ -1,22 +1,22 @@
-// Resend (resend.com) — plain HTTPS API, not SMTP. Switched from Gmail SMTP
-// after confirming (from real production traffic on Render) that outbound
-// SMTP connections to Gmail time out at the TCP handshake stage — code
-// ETIMEDOUT, command CONN — a network-level block on Render's side, not a
-// credentials problem. An HTTPS API call sidesteps that entirely.
-const RESEND_API_KEY = process.env.RESEND_API_KEY;
+// Brevo (brevo.com) — plain HTTPS transactional email API, not SMTP.
+// Gmail SMTP failed on Render (ETIMEDOUT / command CONN — the TCP handshake
+// never completes, a network-level egress block), and the same is true of
+// most SMTP-based providers on Render. Brevo's API runs over HTTPS (443),
+// which Render allows. Uses fetch directly rather than the @getbrevo/brevo
+// SDK to avoid another dependencies-vs-devDependencies footgun for zero gain.
+const BREVO_API_KEY = process.env.BREVO_API_KEY;
+const MAIL_FROM = process.env.MAIL_FROM || 'no-reply@navish.app';
+const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || 'Navish';
 
-// Resend's built-in sandbox sender — works with zero setup but can only
-// deliver to the email address the Resend account itself was created with.
-// Once a domain is verified in Resend, set RESEND_FROM_EMAIL to an address
-// at that domain (e.g. otp@yourdomain.com) so mail can reach arbitrary
-// recipients — required before this can serve real customer signups.
-const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
+// A send must never hang the caller (that's exactly the failure mode this
+// replaced) — bounded by AbortSignal.timeout below.
+const SEND_TIMEOUT_MS = 15_000;
 
-if (RESEND_API_KEY) {
-  console.log(`📧 Resend configured (from ${RESEND_FROM_EMAIL}) — email sending enabled`);
+if (BREVO_API_KEY) {
+  console.log(`📧 Brevo configured (from "${MAIL_FROM_NAME}" <${MAIL_FROM}>) — email sending enabled`);
 } else {
   console.warn(
-    '⚠️  RESEND_API_KEY not set — email sending disabled (no-op). ' +
+    '⚠️  BREVO_API_KEY not set — email sending disabled (no-op). ' +
     'OTP/reset emails will not be delivered until it is set.',
   );
 }
@@ -24,22 +24,37 @@ if (RESEND_API_KEY) {
 // No-op (logs a warning, does not throw) when the API key is missing, so
 // local dev without credentials keeps working.
 export async function sendMail(to: string, subject: string, html: string): Promise<void> {
-  if (!RESEND_API_KEY) {
-    console.warn(`⚠️  sendMail no-op (no RESEND_API_KEY): would have sent "${subject}" to ${to}`);
+  if (!BREVO_API_KEY) {
+    console.warn(`⚠️  sendMail no-op (no BREVO_API_KEY): would have sent "${subject}" to ${to}`);
     return;
   }
 
-  const res = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${RESEND_API_KEY}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ from: RESEND_FROM_EMAIL, to, subject, html }),
-  });
+  let res: Response;
+  try {
+    res = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
+      headers: {
+        'api-key': BREVO_API_KEY,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify({
+        sender: { name: MAIL_FROM_NAME, email: MAIL_FROM },
+        to: [{ email: to }],
+        subject,
+        htmlContent: html,
+      }),
+      signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
+    });
+  } catch (err: any) {
+    if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+      throw new Error(`Brevo API request timed out after ${SEND_TIMEOUT_MS}ms`);
+    }
+    throw new Error(`Brevo API request failed: ${err?.message ?? err}`);
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => '');
-    throw new Error(`Resend API error ${res.status}: ${body}`);
+    throw new Error(`Brevo API error ${res.status}: ${body}`);
   }
 }
