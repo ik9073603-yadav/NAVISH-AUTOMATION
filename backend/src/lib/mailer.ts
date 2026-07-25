@@ -1,33 +1,45 @@
-import nodemailer, { Transporter } from 'nodemailer';
+// Resend (resend.com) — plain HTTPS API, not SMTP. Switched from Gmail SMTP
+// after confirming (from real production traffic on Render) that outbound
+// SMTP connections to Gmail time out at the TCP handshake stage — code
+// ETIMEDOUT, command CONN — a network-level block on Render's side, not a
+// credentials problem. An HTTPS API call sidesteps that entirely.
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
 
-// Gmail SMTP via an App Password. "from" is the Gmail address itself for
-// now — swap for a custom-domain address later by pointing FROM at it once
-// domain auth (SPF/DKIM) is set up; Gmail SMTP would still work as a relay
-// or get replaced with a dedicated provider then.
-const GMAIL_USER = process.env.GMAIL_USER;
-const GMAIL_APP_PASSWORD = process.env.GMAIL_APP_PASSWORD;
+// Resend's built-in sandbox sender — works with zero setup but can only
+// deliver to the email address the Resend account itself was created with.
+// Once a domain is verified in Resend, set RESEND_FROM_EMAIL to an address
+// at that domain (e.g. otp@yourdomain.com) so mail can reach arbitrary
+// recipients — required before this can serve real customer signups.
+const RESEND_FROM_EMAIL = process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev';
 
-let transporter: Transporter | null = null;
-
-if (GMAIL_USER && GMAIL_APP_PASSWORD) {
-  transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-  });
-  console.log(`📧 Gmail SMTP configured (${GMAIL_USER}) — email sending enabled`);
+if (RESEND_API_KEY) {
+  console.log(`📧 Resend configured (from ${RESEND_FROM_EMAIL}) — email sending enabled`);
 } else {
   console.warn(
-    '⚠️  GMAIL_USER / GMAIL_APP_PASSWORD not set — email sending disabled (no-op). ' +
-    'OTP/reset emails will not be delivered until these are set.',
+    '⚠️  RESEND_API_KEY not set — email sending disabled (no-op). ' +
+    'OTP/reset emails will not be delivered until it is set.',
   );
 }
 
-// No-op (logs a warning, does not throw) when SMTP creds are missing, so
+// No-op (logs a warning, does not throw) when the API key is missing, so
 // local dev without credentials keeps working.
 export async function sendMail(to: string, subject: string, html: string): Promise<void> {
-  if (!transporter) {
-    console.warn(`⚠️  sendMail no-op (no SMTP creds): would have sent "${subject}" to ${to}`);
+  if (!RESEND_API_KEY) {
+    console.warn(`⚠️  sendMail no-op (no RESEND_API_KEY): would have sent "${subject}" to ${to}`);
     return;
   }
-  await transporter.sendMail({ from: GMAIL_USER, to, subject, html });
+
+  const res = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${RESEND_API_KEY}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ from: RESEND_FROM_EMAIL, to, subject, html }),
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    throw new Error(`Resend API error ${res.status}: ${body}`);
+  }
 }
