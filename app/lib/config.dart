@@ -7,6 +7,10 @@ import 'package:flutter/foundation.dart';
 // at runtime, so a physical device MUST pass this explicitly.
 const String _apiBaseOverride = String.fromEnvironment('API_BASE');
 
+// The deployed backend — the release default so a built APK works out of
+// the box for anyone it's shared with, with no local server required.
+const String _productionApiBase = 'https://navish-automation.onrender.com';
+
 class Config {
   // Web (Chrome) uses localhost. Android emulator can't reach the host machine
   // via localhost — 10.0.2.2 is the emulator's alias for the host's loopback.
@@ -14,6 +18,11 @@ class Config {
   // --dart-define=API_BASE=... (see above) since it can't be inferred.
   static String get apiBase {
     if (_apiBaseOverride.isNotEmpty) return _apiBaseOverride;
+    // Release builds (flutter build apk --release) default to the deployed
+    // backend. Debug/profile builds (flutter run) keep hitting your local
+    // dev server, same as always — override with --dart-define=API_BASE=...
+    // for a physical device on your LAN or any other target.
+    if (kReleaseMode) return _productionApiBase;
     if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
       return 'http://10.0.2.2:4000';
     }

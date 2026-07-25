@@ -427,7 +427,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _phone = TextEditingController();
-  final _password = TextEditingController(text: 'password123');
+  final _password = TextEditingController();
   String _role = 'EMPLOYEE';
   bool _saving = false;
 

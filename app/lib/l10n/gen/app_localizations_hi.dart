@@ -33,6 +33,9 @@ class AppLocalizationsHi extends AppLocalizations {
   String get everyone => 'सभी';
 
   @override
+  String get pressBackAgainToExit => 'बाहर जाने के लिए दोबारा बैक दबाएं';
+
+  @override
   String get loginTagline => 'आपका पूरा कामकाज, अपने आप चलता रहे';
 
   @override

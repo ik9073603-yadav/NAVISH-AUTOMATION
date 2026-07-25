@@ -33,6 +33,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get everyone => 'Everyone';
 
   @override
+  String get pressBackAgainToExit => 'Press back again to exit';
+
+  @override
   String get loginTagline => 'Your operations, on autopilot';
 
   @override

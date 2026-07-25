@@ -14,13 +14,11 @@ const page = (title: string, bodyHtml: string) => `<!doctype html>
   body { font-family: -apple-system, Segoe UI, Roboto, Arial, sans-serif; max-width: 760px; margin: 0 auto; padding: 24px 20px 60px; line-height: 1.55; color: #1a1a1a; }
   h1 { font-size: 1.6rem; margin-bottom: 4px; }
   h2 { font-size: 1.15rem; margin-top: 2em; }
-  .draft-banner { background: #fff3cd; border: 1px solid #ffe08a; color: #7a5b00; padding: 12px 16px; border-radius: 8px; font-weight: 600; margin: 16px 0 28px; }
   .meta { color: #666; font-size: 0.9rem; margin-bottom: 24px; }
   a { color: #0f5132; }
 </style>
 </head>
 <body>
-<div class="draft-banner">⚠️ DRAFT — must be reviewed by a lawyer before public launch. This is placeholder scaffolding text, not legal advice.</div>
 ${bodyHtml}
 <p class="meta">Version ${LEGAL_VERSION} · Navish</p>
 </body>

@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart' show SystemNavigator;
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api.dart';
@@ -76,8 +77,8 @@ class LoginScreen extends StatefulWidget {
 }
 
 class _LoginScreenState extends State<LoginScreen> {
-  final _email = TextEditingController(text: 'suraj@navish.com');
-  final _password = TextEditingController(text: 'password123');
+  final _email = TextEditingController();
+  final _password = TextEditingController();
   bool _loading = false;
   String? _error;
 
@@ -273,6 +274,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _healthScore;
   bool _loading = true;
   int _tab = 0;
+  DateTime? _lastBackPressAt;
   String _taskStatus = 'ACTIVE';
   DateRangePreset _datePreset = DateRangePreset.all;
   bool get _isOwner => _user?['role'] == 'OWNER' || _user?['role'] == 'MANAGER';
@@ -534,10 +536,41 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // Back on any non-Home tab returns to Home instead of exiting; back on
+  // Home follows standard Android behaviour (confirm-to-exit via a second
+  // press within 2s) instead of closing immediately.
+  Widget _withBackHandling(Widget child) {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_tab != 0) {
+          setState(() => _tab = 0);
+          return;
+        }
+        final now = DateTime.now();
+        final recent = _lastBackPressAt != null &&
+            now.difference(_lastBackPressAt!) < const Duration(seconds: 2);
+        if (recent) {
+          SystemNavigator.pop();
+          return;
+        }
+        _lastBackPressAt = now;
+        final l10n = AppLocalizations.of(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(l10n.pressBackAgainToExit), duration: const Duration(seconds: 2)),
+        );
+      },
+      child: child,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading && _user == null) {
-      return const Scaffold(body: Center(child: CircularProgressIndicator()));
+      return _withBackHandling(
+        const Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
     }
 
     final size = screenSizeOf(context);
@@ -563,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
 
     if (size == ScreenSize.compact) {
-      return Scaffold(
+      return _withBackHandling(Scaffold(
         appBar: appBar,
         body: body,
         bottomNavigationBar: NavigationBar(
@@ -582,12 +615,12 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             NavigationDestination(icon: const Icon(Icons.more_horiz), label: l10n.navMore),
           ],
         ),
-      );
+      ));
     }
 
     // Medium/expanded: a side rail replaces the bottom bar, and there's room
     // to show Profile/Settings/Admin directly instead of behind a menu.
-    return Scaffold(
+    return _withBackHandling(Scaffold(
       appBar: appBar,
       body: Row(
         children: [
@@ -655,7 +688,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           Expanded(child: body),
         ],
       ),
-    );
+    ));
   }
 
   Widget _notificationBell(AppLocalizations l10n) {

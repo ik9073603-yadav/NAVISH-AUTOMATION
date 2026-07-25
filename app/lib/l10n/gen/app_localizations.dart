@@ -146,6 +146,12 @@ abstract class AppLocalizations {
   /// **'Everyone'**
   String get everyone;
 
+  /// No description provided for @pressBackAgainToExit.
+  ///
+  /// In en, this message translates to:
+  /// **'Press back again to exit'**
+  String get pressBackAgainToExit;
+
   /// No description provided for @loginTagline.
   ///
   /// In en, this message translates to:
