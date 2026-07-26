@@ -581,16 +581,20 @@ class _StageFormSheetState extends State<_StageFormSheet> {
       _data.putIfAbsent(label, () => <String>[]) as List<String>;
 
   Future<void> _addPhotos(String label) async {
-    final picker = ImagePicker();
-    final files = await picker.pickMultiImage();
-    if (files.isEmpty) return;
-
-    setState(() => _uploadingField = label);
+    // The picker call itself must be inside the try/catch — a denied
+    // gallery permission (or any other platform-channel failure) throws
+    // here, and an uncaught exception in an un-awaited async callback fails
+    // completely silently: no error, no state change, nothing the user can see.
     try {
+      final picker = ImagePicker();
+      final files = await picker.pickMultiImage();
+      if (files.isEmpty) return;
+
+      setState(() => _uploadingField = label);
       final urls = _photoList(label);
       for (final f in files) {
         final Uint8List bytes = await f.readAsBytes();
-        final url = await Api.uploadImage(bytes, f.name);
+        final url = await Api.uploadImage(bytes, f.name, mimeType: f.mimeType);
         urls.add(url);
       }
     } catch (e) {

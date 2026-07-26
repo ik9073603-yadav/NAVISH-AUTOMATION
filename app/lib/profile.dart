@@ -70,14 +70,18 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-    if (file == null) return;
-
-    setState(() => _uploadingPhoto = true);
+    // The picker call itself must be inside the try/catch — a denied gallery
+    // permission (or any other platform-channel failure) throws here, and an
+    // uncaught exception in an un-awaited async callback fails completely
+    // silently: no error, no state change, nothing the user can see.
     try {
+      final picker = ImagePicker();
+      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
+      if (file == null) return;
+
+      setState(() => _uploadingPhoto = true);
       final Uint8List bytes = await file.readAsBytes();
-      final url = await Api.uploadImage(bytes, file.name);
+      final url = await Api.uploadImage(bytes, file.name, mimeType: file.mimeType);
       final updated = await Api.updateMe(photoUrl: url);
       if (mounted) setState(() => _user = {..._user!, ...updated});
     } catch (e) {

@@ -1,10 +1,28 @@
 import 'dart:convert';
 import 'dart:typed_data';
 import 'package:http/http.dart' as http;
+import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'config.dart';
 import 'offline/offline_store.dart';
 import 'offline/write_queue.dart';
+
+// http.MultipartFile.fromBytes defaults to application/octet-stream when no
+// contentType is given — the backend's multer fileFilter rejects anything
+// whose Content-Type doesn't start with "image/", so every upload failed
+// with 400 regardless of platform. Falls back to guessing from the
+// extension for the rare case a picker doesn't supply a mimeType.
+String _guessImageMimeType(String filename) {
+  final ext = filename.toLowerCase().split('.').last;
+  switch (ext) {
+    case 'png': return 'image/png';
+    case 'webp': return 'image/webp';
+    case 'gif': return 'image/gif';
+    case 'heic': return 'image/heic';
+    case 'heif': return 'image/heif';
+    default: return 'image/jpeg';
+  }
+}
 
 // Thrown by Api.login when the account exists and the password is correct,
 // but the email hasn't been OTP-verified yet (mid-signup, or an owner-added
@@ -444,13 +462,18 @@ class Api {
     );
   }
 
-  static Future<String> uploadImage(Uint8List bytes, String filename) async {
+  static Future<String> uploadImage(Uint8List bytes, String filename, {String? mimeType}) async {
     final req = http.MultipartRequest(
       'POST',
       Uri.parse('${Config.apiBase}/api/uploads'),
     );
     if (_token != null) req.headers['Authorization'] = 'Bearer $_token';
-    req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    req.files.add(http.MultipartFile.fromBytes(
+      'file',
+      bytes,
+      filename: filename,
+      contentType: MediaType.parse(mimeType ?? _guessImageMimeType(filename)),
+    ));
 
     final streamed = await req.send();
     final res = await http.Response.fromStream(streamed);

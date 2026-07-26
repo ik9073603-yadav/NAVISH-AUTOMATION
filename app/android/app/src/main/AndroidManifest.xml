@@ -1,4 +1,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Profile/company-logo photo picker (image_picker, gallery source only).
+         Android 13+ (API 33+) uses the system Photo Picker and needs neither
+         permission, but these cover the legacy path on older OS versions —
+         READ_MEDIA_IMAGES for 13+, READ_EXTERNAL_STORAGE capped at 32 so it's
+         inert (and non-prompting) on newer devices. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32"/>
     <application
         android:label="app"
         android:name="${applicationName}"
