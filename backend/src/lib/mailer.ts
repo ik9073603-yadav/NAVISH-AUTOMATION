@@ -13,7 +13,12 @@ const MAIL_FROM_NAME = process.env.MAIL_FROM_NAME || 'Navish';
 const SEND_TIMEOUT_MS = 15_000;
 
 if (BREVO_API_KEY) {
-  console.log(`📧 Brevo configured (from "${MAIL_FROM_NAME}" <${MAIL_FROM}>) — email sending enabled`);
+  // First 8 chars + length only — enough to confirm the right key loaded
+  // (and that it isn't empty/truncated) without ever exposing the secret.
+  console.log(
+    `📧 Brevo configured (from "${MAIL_FROM_NAME}" <${MAIL_FROM}>) — email sending enabled ` +
+    `[BREVO_API_KEY: ${BREVO_API_KEY.slice(0, 8)}... length=${BREVO_API_KEY.length}]`,
+  );
 } else {
   console.warn(
     '⚠️  BREVO_API_KEY not set — email sending disabled (no-op). ' +
@@ -53,8 +58,11 @@ export async function sendMail(to: string, subject: string, html: string): Promi
     throw new Error(`Brevo API request failed: ${err?.message ?? err}`);
   }
 
+  const responseText = await res.text().catch(() => '');
+
   if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`Brevo API error ${res.status}: ${body}`);
+    throw new Error(`Brevo API error ${res.status}: ${responseText}`);
   }
+
+  console.log(`📧 Brevo accepted send to ${to} (status ${res.status}): ${responseText}`);
 }
