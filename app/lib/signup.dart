@@ -156,9 +156,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   onPressed: (_loading || !_accepted) ? null : _submit,
                   style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
                   child: _loading
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20, width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                       : Text(l10n.createAccount),
                 ), 6),
               ],

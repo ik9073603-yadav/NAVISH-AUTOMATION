@@ -119,7 +119,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
                 _statTile(
                   '$deadCount',
                   'Dead (₹${(s['deadStockValue'] as num).toStringAsFixed(0)})',
-                  color: deadCount > 0 ? Colors.grey.shade700 : null,
+                  color: deadCount > 0 ? Theme.of(context).colorScheme.onSurfaceVariant : null,
                 ),
               ],
             ),
@@ -133,7 +133,9 @@ class _InventoryScreenState extends State<InventoryScreen> {
     return Column(
       children: [
         Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center),
       ],
     );
   }
@@ -175,7 +177,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final badgeColor = switch (liquidClass) {
       'LIQUID' => semantic.success,
       'SLOW' => semantic.warning,
-      _ => Colors.grey,
+      _ => Theme.of(context).colorScheme.onSurfaceVariant,
     };
 
     return Card(
@@ -361,8 +363,8 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
               ],
             ),
             const SizedBox(height: 4),
-            const Text('Leave min/max blank for no alert on that SKU.',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
+            Text('Leave min/max blank for no alert on that SKU.',
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 12),
             TextField(
               controller: _unitCost,
@@ -555,7 +557,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                 ],
               ),
               Text('${widget.sku['code']} · $currentStock ${widget.sku['unit']}',
-                  style: const TextStyle(color: Colors.grey)),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 16),
               if (widget.allowIn || widget.allowOut)
                 Row(
@@ -567,7 +569,8 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                           icon: const Icon(Icons.arrow_downward),
                           label: const Text('Stock IN'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.green,
+                            backgroundColor: AppColors.of(context).success,
+                            foregroundColor: AppColors.of(context).onSuccess,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
@@ -580,7 +583,8 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                           icon: const Icon(Icons.arrow_upward),
                           label: const Text('Stock OUT'),
                           style: FilledButton.styleFrom(
-                            backgroundColor: Colors.red,
+                            backgroundColor: AppColors.of(context).danger,
+                            foregroundColor: AppColors.of(context).onDanger,
                             padding: const EdgeInsets.symmetric(vertical: 14),
                           ),
                         ),
@@ -615,7 +619,10 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
       itemBuilder: (_, i) {
         final m = movements[i] as Map;
         final type = m['type'] as String;
-        final color = type == 'IN' ? Colors.green : (type == 'OUT' ? Colors.red : Colors.blueGrey);
+        final semantic = AppColors.of(context);
+        final color = type == 'IN'
+            ? semantic.success
+            : (type == 'OUT' ? semantic.danger : Theme.of(context).colorScheme.onSurfaceVariant);
         final sign = type == 'OUT' ? '-' : '+';
         return ListTile(
           dense: true,

@@ -8,6 +8,7 @@ import 'contact_actions.dart';
 import 'export_actions.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
+import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'offline/write_queue.dart';
@@ -210,8 +211,8 @@ class _FmsScreenState extends State<FmsScreen> {
                       ? Icons.check_circle
                       : (delayed ? Icons.warning : Icons.local_shipping),
                   color: done
-                      ? Colors.green
-                      : (delayed ? Colors.red : Colors.blue),
+                      ? AppColors.of(context).success
+                      : (delayed ? AppColors.of(context).danger : AppColors.of(context).info),
                 ),
                 title: Text(o['orderNumber'],
                     style: const TextStyle(fontWeight: FontWeight.bold)),
@@ -226,7 +227,9 @@ class _FmsScreenState extends State<FmsScreen> {
                         _sitting(o['sittingMins'] as int),
                         style: TextStyle(
                           fontSize: 12,
-                          color: delayed ? Colors.red : Colors.grey,
+                          color: delayed
+                              ? AppColors.of(context).danger
+                              : Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
                       ),
                   ],
@@ -275,14 +278,19 @@ class _FmsScreenState extends State<FmsScreen> {
           return StaggeredListItem(
             index: i,
             child: Card(
-              color: stuck > 0 ? Colors.red.shade50 : null,
+              color: stuck > 0 ? AppColors.of(context).danger.withValues(alpha: 0.08) : null,
               child: ListTile(
                 leading: CircleAvatar(
                   backgroundColor: stuck > 2
-                      ? Colors.red
-                      : (stuck > 0 ? Colors.orange : Colors.green),
+                      ? AppColors.of(context).danger
+                      : (stuck > 0 ? AppColors.of(context).warning : AppColors.of(context).success),
                   child: Text('$stuck',
-                      style: const TextStyle(color: Colors.white)),
+                      style: TextStyle(
+                          color: stuck > 2
+                              ? AppColors.of(context).onDanger
+                              : (stuck > 0
+                                  ? AppColors.of(context).onWarning
+                                  : AppColors.of(context).onSuccess))),
                 ),
                 title: Text(b['stageName'],
                     style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -508,9 +516,9 @@ class _OrderValueSheetState extends State<_OrderValueSheet> {
               const CostOfDelayInfoButton(),
             ],
           ),
-          const Text(
+          Text(
             'Used to estimate the ₹ cost of a delay if no per-hour rate is set in Settings.',
-            style: TextStyle(color: Colors.grey, fontSize: 12),
+            style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -613,8 +621,8 @@ class _StageFormSheetState extends State<_StageFormSheet> {
                     fontSize: 18, fontWeight: FontWeight.bold)),
             const SizedBox(height: 16),
             if (widget.fields.isEmpty)
-              const Text('No fields to fill. Just confirm.',
-                  style: TextStyle(color: Colors.grey)),
+              Text('No fields to fill. Just confirm.',
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             ...widget.fields.map((f) {
               final label = f['label'] as String;
               final type = f['type'] as String;
@@ -661,10 +669,10 @@ class _StageFormSheetState extends State<_StageFormSheet> {
                                   right: -8,
                                   child: GestureDetector(
                                     onTap: () => setState(() => urls.remove(url)),
-                                    child: const CircleAvatar(
+                                    child: CircleAvatar(
                                       radius: 10,
-                                      backgroundColor: Colors.red,
-                                      child: Icon(Icons.close, size: 14, color: Colors.white),
+                                      backgroundColor: AppColors.of(context).danger,
+                                      child: Icon(Icons.close, size: 14, color: AppColors.of(context).onDanger),
                                     ),
                                   ),
                                 ),
@@ -820,8 +828,8 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
           children: [
             const Text('Build a flow',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-            const Text('Your own process. Any number of stages.',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('Your own process. Any number of stages.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
             const SizedBox(height: 16),
             TextField(
               controller: _name,
@@ -982,7 +990,7 @@ class _StageCard extends StatelessWidget {
                 draft.hasPlannedTime
                     ? 'Late = chase + escalate'
                     : 'Unplanned — no deadline, no chasing',
-                style: const TextStyle(fontSize: 11, color: Colors.grey),
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
               ),
               value: draft.hasPlannedTime,
               onChanged: (v) {
@@ -1032,8 +1040,8 @@ class _StageCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text('${draft.fields.length} custom field(s)',
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.grey)),
+                      style: TextStyle(
+                          fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 ),
                 TextButton.icon(
                   icon: const Icon(Icons.add, size: 16),

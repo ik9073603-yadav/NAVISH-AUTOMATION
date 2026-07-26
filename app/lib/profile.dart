@@ -172,9 +172,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     FilledButton(
                       onPressed: (_dirty && !_saving) ? _saveBasicInfo : null,
                       child: _saving
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 18, width: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                           : Text(l10n.saveChanges),
                     ),
                     const SizedBox(height: 28),
@@ -281,10 +281,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     radius: 16,
                     backgroundColor: Theme.of(context).colorScheme.primary,
                     child: _uploadingPhoto
-                        ? const SizedBox(
+                        ? SizedBox(
                             height: 14, width: 14,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Icon(Icons.camera_alt, size: 16, color: Colors.white),
+                            child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
+                        : Icon(Icons.camera_alt, size: 16, color: Theme.of(context).colorScheme.onPrimary),
                   ),
                 ),
               ),

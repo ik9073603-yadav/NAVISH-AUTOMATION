@@ -179,14 +179,16 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                   children: [
                     Icon(
                       completed ? Icons.check_circle : Icons.radio_button_unchecked,
-                      color: completed ? Colors.green : Colors.grey,
+                      color: completed
+                          ? AppColors.of(context).success
+                          : Theme.of(context).colorScheme.onSurfaceVariant,
                       size: 22,
                     ),
                     if (!isLast)
                       Expanded(
                         child: Container(
                           width: 2,
-                          color: Colors.grey.shade300,
+                          color: Theme.of(context).colorScheme.outlineVariant,
                           margin: const EdgeInsets.symmetric(vertical: 4),
                         ),
                       ),
@@ -260,13 +262,13 @@ class _StageCard extends StatelessWidget {
             Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
             const SizedBox(height: 6),
             Text('Planned: ${plannedLabel ?? "no deadline (unplanned)"}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text('Entered: $entered', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-            Text('Completed: $completedText', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text('Entered: $entered', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text('Completed: $completedText', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             if (duration != null)
-              Text('Time taken: $duration', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text('Time taken: $duration', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             if (completedByName != null)
-              Text('Done by: $completedByName', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+              Text('Done by: $completedByName', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             if (delayMins != null)
               Text(
                 delayed
@@ -275,7 +277,7 @@ class _StageCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color: delayed ? Colors.red : Colors.green,
+                  color: delayed ? AppColors.of(context).danger : AppColors.of(context).success,
                 ),
               ),
             if (fieldEntries.isNotEmpty) ...[
@@ -303,7 +305,7 @@ class _StageCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 4),
             Wrap(
               spacing: 8,
@@ -333,7 +335,7 @@ class _StageCard extends StatelessWidget {
         text: TextSpan(
           style: DefaultTextStyle.of(context).style.copyWith(fontSize: 13),
           children: [
-            TextSpan(text: '$label: ', style: const TextStyle(color: Colors.grey)),
+            TextSpan(text: '$label: ', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             TextSpan(text: '$value'),
           ],
         ),

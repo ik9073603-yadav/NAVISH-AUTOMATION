@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'theme/app_theme.dart';
 
 // Owner: approve or deny pending account-deletion requests (Feature 176).
 // Approving deactivates the account — a soft action, not a hard data wipe.
@@ -51,7 +52,10 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(context).danger,
+              foregroundColor: AppColors.of(context).onDanger,
+            ),
             child: const Text('Deactivate'),
           ),
         ],
@@ -101,12 +105,12 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.check_circle, color: Colors.green),
+                                icon: Icon(Icons.check_circle, color: AppColors.of(context).success),
                                 tooltip: 'Approve (deactivate)',
                                 onPressed: () => _complete(r),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.cancel, color: Colors.red),
+                                icon: Icon(Icons.cancel, color: AppColors.of(context).danger),
                                 tooltip: 'Deny',
                                 onPressed: () => _deny(r),
                               ),

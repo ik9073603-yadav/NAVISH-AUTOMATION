@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'api.dart';
 import 'config.dart';
+import 'theme/app_theme.dart';
 
 // Profile → Legal. Opens the backend-hosted Terms/Privacy pages and lets the
 // user file an account-deletion request (Feature 176).
@@ -25,7 +26,10 @@ class LegalScreen extends StatelessWidget {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppColors.of(context).danger,
+              foregroundColor: AppColors.of(context).onDanger,
+            ),
             child: const Text('Request deletion'),
           ),
         ],
@@ -67,8 +71,8 @@ class LegalScreen extends StatelessWidget {
           ),
           const Divider(),
           ListTile(
-            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
-            title: const Text('Delete my account', style: TextStyle(color: Colors.red)),
+            leading: Icon(Icons.delete_forever_outlined, color: AppColors.of(context).danger),
+            title: Text('Delete my account', style: TextStyle(color: AppColors.of(context).danger)),
             subtitle: const Text('Files a request; your owner/admin actions it'),
             onTap: () => _requestDeletion(context),
           ),

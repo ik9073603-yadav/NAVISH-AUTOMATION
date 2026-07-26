@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'theme/app_theme.dart';
 
 // Normalises a raw phone number to E.164, assuming +91 (India) when no
 // country code is present. Strips spaces/dashes/parens. Returns null for
@@ -54,11 +55,14 @@ class ContactButtons extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton(
-          icon: Icon(Icons.call, color: Colors.green, size: iconSize),
+          icon: Icon(Icons.call, color: AppColors.of(context).success, size: iconSize),
           tooltip: 'Call',
           onPressed: () => callPhone(normalized),
         ),
         IconButton(
+          // WhatsApp's own brand green — a third-party mark, deliberately
+          // left as-is so the icon stays instantly recognizable, unlike the
+          // app's own (now retired) green theme.
           icon: Icon(Icons.chat, color: const Color(0xFF25D366), size: iconSize),
           tooltip: 'WhatsApp',
           onPressed: () => whatsappMessage(normalized, message),

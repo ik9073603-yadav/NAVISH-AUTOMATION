@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'contact_actions.dart';
+import 'theme/app_theme.dart';
 
 // Owner/Manager: approve or deny employees' forgot-password requests.
 class ResetRequestsScreen extends StatefulWidget {
@@ -121,12 +122,12 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: const Icon(Icons.check_circle, color: Colors.green),
+                                icon: Icon(Icons.check_circle, color: AppColors.of(context).success),
                                 tooltip: 'Approve',
                                 onPressed: () => _approve(r),
                               ),
                               IconButton(
-                                icon: const Icon(Icons.cancel, color: Colors.red),
+                                icon: Icon(Icons.cancel, color: AppColors.of(context).danger),
                                 tooltip: 'Deny',
                                 onPressed: () => _deny(r),
                               ),

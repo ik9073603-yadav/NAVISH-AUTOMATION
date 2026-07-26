@@ -130,9 +130,9 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                const Text(
+                Text(
                   "Pick who's responsible for each stage. Leave blank if anyone can pick it up.",
-                  style: TextStyle(color: Colors.grey),
+                  style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 16),
                 ...(_flow!['stages'] as List).map((s) {
@@ -146,7 +146,7 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
                           Text(s['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
                           Text(
                             s['plannedMins'] != null ? 'Planned: ${s['plannedMins']} min' : 'Unplanned — no deadline',
-                            style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                            style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                           ),
                           const SizedBox(height: 8),
                           DropdownButtonFormField<String?>(
@@ -243,7 +243,8 @@ class _TemplateAssignChecklistScreenState extends State<TemplateAssignChecklistS
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                Text(_rule!['description'] as String? ?? '', style: TextStyle(color: Colors.grey.shade700)),
+                Text(_rule!['description'] as String? ?? '',
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String?>(
                   initialValue: _assigneeId,

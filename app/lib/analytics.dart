@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
 import 'export_actions.dart';
+import 'theme/app_theme.dart';
 
 enum _RangePreset { today, week, month, custom }
 
@@ -134,7 +135,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             const SizedBox(height: 12),
             if (_loading) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
             if (_error != null)
-              Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: const TextStyle(color: Colors.red))),
+              Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger))),
             if (!_loading && _error == null) ...[
               _sectionCard('Employee performance', _employeeSection()),
               _sectionCard('Delegation completion rate', _delegationSection()),
@@ -174,7 +175,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             padding: const EdgeInsets.only(top: 6),
             child: Text(
               '${_customFrom.toLocal().toString().split(' ')[0]} → ${_customTo.toLocal().toString().split(' ')[0]}',
-              style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
             ),
           ),
       ],
@@ -221,7 +222,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             barGroups: [
               for (int i = 0; i < _employees.length; i++)
                 BarChartGroupData(x: i, barRods: [
-                  BarChartRodData(toY: (_employees[i]['onTimePct'] as int).toDouble(), color: Colors.green, width: 18),
+                  BarChartRodData(toY: (_employees[i]['onTimePct'] as int).toDouble(), color: AppColors.of(context).success, width: 18),
                 ]),
             ],
             titlesData: FlTitlesData(
@@ -269,7 +270,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                     FlSpot(i.toDouble(), (_delegation[i]['completionPct'] as int).toDouble()),
                 ],
                 isCurved: true,
-                color: Colors.teal,
+                color: Theme.of(context).colorScheme.tertiary,
                 dotData: const FlDotData(show: true),
               ),
             ],
@@ -306,8 +307,12 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: LinearProgressIndicator(
                     value: pct / 100,
                     minHeight: 10,
-                    color: pct >= 80 ? Colors.green : pct >= 50 ? Colors.orange : Colors.red,
-                    backgroundColor: Colors.grey.shade300,
+                    color: pct >= 80
+                        ? AppColors.of(context).success
+                        : pct >= 50
+                            ? AppColors.of(context).warning
+                            : AppColors.of(context).danger,
+                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
                   ),
                 ),
               ),
@@ -341,7 +346,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       flex: 2,
                       child: Text(
                         s['avgDelayMins'] > 0 ? '+${s['avgDelayMins']}m late' : 'on time',
-                        style: TextStyle(color: s['avgDelayMins'] > 0 ? Colors.red : Colors.green),
+                        style: TextStyle(
+                            color: s['avgDelayMins'] > 0
+                                ? AppColors.of(context).danger
+                                : AppColors.of(context).success),
                       ),
                     ),
                     Expanded(flex: 2, child: Text('${s['ordersStuckNow']} stuck now')),
@@ -371,11 +379,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               lineBarsData: [
                 LineChartBarData(
                   spots: [for (int i = 0; i < trend.length; i++) FlSpot(i.toDouble(), (trend[i]['inQty'] as num).toDouble())],
-                  isCurved: true, color: Colors.green, dotData: const FlDotData(show: false),
+                  isCurved: true, color: AppColors.of(context).success, dotData: const FlDotData(show: false),
                 ),
                 LineChartBarData(
                   spots: [for (int i = 0; i < trend.length; i++) FlSpot(i.toDouble(), (trend[i]['outQty'] as num).toDouble())],
-                  isCurved: true, color: Colors.red, dotData: const FlDotData(show: false),
+                  isCurved: true, color: AppColors.of(context).danger, dotData: const FlDotData(show: false),
                 ),
               ],
               titlesData: const FlTitlesData(
@@ -389,9 +397,10 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             )),
           ),
         if (trend.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.only(top: 4),
-            child: Text('green = IN, red = OUT', style: TextStyle(fontSize: 11, color: Colors.grey)),
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('green = IN, red = OUT',
+                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ),
       ],
     );

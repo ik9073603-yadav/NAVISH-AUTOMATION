@@ -302,7 +302,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const CostOfDelayInfoButton(),
               ],
             ),
-            Text(l10n.delayCostPerHourHint, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            Text(l10n.delayCostPerHourHint, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 8),
             TextField(
               controller: _delayCostPerHour,
@@ -328,7 +328,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_holidays.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(l10n.noHolidaysAdded, style: const TextStyle(color: Colors.grey)),
+                child: Text(l10n.noHolidaysAdded,
+                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               )
             else
               Wrap(
@@ -346,9 +347,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onPressed: _saving ? null : _save,
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
               child: _saving
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 20, width: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                   : Text(l10n.saveSettings),
             ),
             const SizedBox(height: 32),
@@ -394,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _sectionLabel(l10n.dataSection),
             Text(
               l10n.dataExportDescription,
-              style: const TextStyle(fontSize: 12, color: Colors.grey),
+              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
             OutlinedButton.icon(
@@ -434,10 +435,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
               radius: 15,
               backgroundColor: Theme.of(context).colorScheme.primary,
               child: _uploadingLogo
-                  ? const SizedBox(
+                  ? SizedBox(
                       height: 12, width: 12,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                  : const Icon(Icons.camera_alt, size: 14, color: Colors.white),
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
+                  : Icon(Icons.camera_alt, size: 14, color: Theme.of(context).colorScheme.onPrimary),
             ),
           ),
         ),

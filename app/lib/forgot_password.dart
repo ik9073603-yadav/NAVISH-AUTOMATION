@@ -179,9 +179,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onPressed: _loading ? null : _sendCode,
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
           child: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   height: 20, width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
               : Text(l10n.sendCode),
         ),
         const SizedBox(height: 8),
@@ -229,9 +229,9 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
           onPressed: _loading ? null : _resetPassword,
           style: FilledButton.styleFrom(minimumSize: const Size(double.infinity, 50)),
           child: _loading
-              ? const SizedBox(
+              ? SizedBox(
                   height: 20, width: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                  child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
               : Text(l10n.resetPasswordButton),
         ),
       ],

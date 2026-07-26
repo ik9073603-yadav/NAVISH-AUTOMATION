@@ -165,9 +165,9 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
                   style: FilledButton.styleFrom(
                       minimumSize: const Size(double.infinity, 50)),
                   child: _verifying
-                      ? const SizedBox(
+                      ? SizedBox(
                           height: 20, width: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                       : Text(l10n.otpVerify),
                 ),
                 const SizedBox(height: 12),

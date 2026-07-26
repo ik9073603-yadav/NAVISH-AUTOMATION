@@ -148,16 +148,21 @@ class _LoginScreenState extends State<LoginScreen> {
                         height: 64,
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(AppRadius.md),
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [theme.colorScheme.primary, theme.colorScheme.tertiary],
-                          ),
+                          color: theme.colorScheme.primary,
+                          boxShadow: [
+                            BoxShadow(
+                              color: theme.colorScheme.primary.withValues(alpha: 0.35),
+                              blurRadius: 24,
+                              offset: const Offset(0, 8),
+                            ),
+                          ],
                         ),
                         alignment: Alignment.center,
-                        child: const Text('N',
+                        child: Text('N',
                             style: TextStyle(
-                                color: Colors.white, fontSize: 30, fontWeight: FontWeight.w800)),
+                                color: theme.colorScheme.onPrimary,
+                                fontSize: 30,
+                                fontWeight: FontWeight.w800)),
                       ),
                     ),
                     0,
@@ -208,9 +213,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 16)),
                       child: _loading
-                          ? const SizedBox(
+                          ? SizedBox(
                               height: 20, width: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                              child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                           : Text(l10n.logIn),
                     ),
                     5,
@@ -863,7 +868,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     if (t['dueAt'] != null)
                       Text(l10n.dueLabel('${DateTime.parse(t['dueAt']).toLocal()}'),
                           style: TextStyle(
-                              color: overdue ? AppColors.of(context).danger : Colors.grey,
+                              color: overdue
+                                  ? AppColors.of(context).danger
+                                  : Theme.of(context).colorScheme.onSurfaceVariant,
                               fontSize: 12)),
                     Text(l10n.chasedTimes(t['chaseCount'], t['priority']),
                         style: const TextStyle(fontSize: 12)),
@@ -898,29 +905,35 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           builder: (_, syncing, ____) {
             if (online && pending == 0 && !syncing) return const SizedBox.shrink();
 
+            final scheme = Theme.of(context).colorScheme;
+            final semantic = AppColors.of(context);
             final String text;
-            final Color color;
+            final Color background;
+            final Color foreground;
             if (syncing) {
               text = 'Syncing $pending change${pending == 1 ? '' : 's'}...';
-              color = Colors.blue.shade700;
+              background = scheme.secondaryContainer;
+              foreground = scheme.onSecondaryContainer;
             } else if (!online) {
               text = pending > 0
                   ? 'Offline — $pending change${pending == 1 ? '' : 's'} will sync'
                   : 'Offline — will sync';
-              color = Colors.orange.shade800;
+              background = semantic.warningContainer;
+              foreground = semantic.onWarningContainer;
             } else {
               text = '$pending change${pending == 1 ? '' : 's'} pending sync';
-              color = Colors.orange.shade800;
+              background = semantic.warningContainer;
+              foreground = semantic.onWarningContainer;
             }
 
             return Container(
               width: double.infinity,
-              color: color,
+              color: background,
               padding: const EdgeInsets.symmetric(vertical: 6),
               child: Text(
                 text,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
+                style: TextStyle(color: foreground, fontSize: 12, fontWeight: FontWeight.w600),
               ),
             );
           },

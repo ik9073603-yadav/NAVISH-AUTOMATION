@@ -158,6 +158,11 @@ class _PersonSummaryRow extends StatelessWidget {
     return group.worstSeverity == 'HIGH' ? semantic.danger : semantic.warning;
   }
 
+  Color _onSeverityColor(BuildContext context) {
+    final semantic = AppColors.of(context);
+    return group.worstSeverity == 'HIGH' ? semantic.onDanger : semantic.onWarning;
+  }
+
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
@@ -170,7 +175,7 @@ class _PersonSummaryRow extends StatelessWidget {
         onTap: onTap,
         leading: CircleAvatar(
           backgroundColor: color,
-          child: Text(initial, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          child: Text(initial, style: TextStyle(color: _onSeverityColor(context), fontWeight: FontWeight.bold)),
         ),
         title: Text(group.who, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text(l10n.stuckCountForPerson(group.count)),
@@ -253,13 +258,16 @@ class _PersonStuckScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
                 child: Row(
                   children: [
-                    Icon(_moduleIcon(module), size: 18, color: Colors.grey.shade700),
+                    Icon(_moduleIcon(module), size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 6),
                     Text(_moduleLabel(l10n, module),
                         style: TextStyle(
-                            fontWeight: FontWeight.bold, color: Colors.grey.shade700)),
+                            fontWeight: FontWeight.bold,
+                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
                     const SizedBox(width: 6),
-                    Text('(${items.length})', style: TextStyle(color: Colors.grey.shade500)),
+                    Text('(${items.length})',
+                        style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
                   ],
                 ),
               ),
@@ -295,6 +303,15 @@ class _StuckRow extends StatelessWidget {
     }
   }
 
+  Color _onSeverityColor(BuildContext context) {
+    final semantic = AppColors.of(context);
+    switch (item['severity']) {
+      case 'HIGH': return semantic.onDanger;
+      case 'MEDIUM': return semantic.onWarning;
+      default: return semantic.onWarning;
+    }
+  }
+
   String _duration(int mins) {
     if (mins < 60) return '$mins min';
     if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
@@ -314,7 +331,7 @@ class _StuckRow extends StatelessWidget {
         leading: CircleAvatar(
           backgroundColor: color,
           child: Text(item['severity'].toString().substring(0, 1),
-              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+              style: TextStyle(color: _onSeverityColor(context), fontSize: 12, fontWeight: FontWeight.bold)),
         ),
         title: Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
         subtitle: Text('$who · stuck for ${_duration(stuckForMins)}'),

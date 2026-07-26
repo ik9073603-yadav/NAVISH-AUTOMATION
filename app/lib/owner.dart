@@ -4,6 +4,7 @@ import 'filters.dart';
 import 'contact_actions.dart';
 import 'responsive.dart';
 import 'validators.dart';
+import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -130,7 +131,9 @@ class _OwnerScreenState extends State<OwnerScreen> {
               child: ListTile(
                 leading: Icon(
                   done ? Icons.check_circle : (escalated ? Icons.warning : Icons.schedule),
-                  color: done ? Colors.green : (escalated ? Colors.red : Colors.orange),
+                  color: done
+                      ? AppColors.of(context).success
+                      : (escalated ? AppColors.of(context).danger : AppColors.of(context).warning),
                 ),
                 title: Text(t['title']),
                 subtitle: Text(
@@ -195,7 +198,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
                       IconButton(
                         icon: Icon(
                           hasInventoryAccess ? Icons.inventory : Icons.inventory_2_outlined,
-                          color: hasInventoryAccess ? Colors.green : null,
+                          color: hasInventoryAccess ? AppColors.of(context).success : null,
                         ),
                         tooltip: l10n.inventoryPermissionsTooltip,
                         onPressed: () => _editInventoryPermissions(u),
@@ -208,10 +211,18 @@ class _OwnerScreenState extends State<OwnerScreen> {
                     if (s != null)
                       CircleAvatar(
                         backgroundColor: s['onTimePct'] >= 80
-                            ? Colors.green
-                            : (s['onTimePct'] >= 50 ? Colors.orange : Colors.red),
+                            ? AppColors.of(context).success
+                            : (s['onTimePct'] >= 50
+                                ? AppColors.of(context).warning
+                                : AppColors.of(context).danger),
                         child: Text('${s['onTimePct']}',
-                            style: const TextStyle(color: Colors.white, fontSize: 12)),
+                            style: TextStyle(
+                                color: s['onTimePct'] >= 80
+                                    ? AppColors.of(context).onSuccess
+                                    : (s['onTimePct'] >= 50
+                                        ? AppColors.of(context).onWarning
+                                        : AppColors.of(context).onDanger),
+                                fontSize: 12)),
                       ),
                   ],
                 ),

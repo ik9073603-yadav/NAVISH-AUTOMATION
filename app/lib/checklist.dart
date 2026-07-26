@@ -3,6 +3,7 @@ import 'api.dart';
 import 'filters.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
+import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 
 class ChecklistScreen extends StatefulWidget {
@@ -156,11 +157,13 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                     child: Card(
                       child: ListTile(
                         leading: Icon(Icons.event_repeat,
-                            color: active ? Colors.green : Colors.grey),
+                            color: active
+                                ? AppColors.of(context).success
+                                : Theme.of(context).colorScheme.onSurfaceVariant),
                         title: Text(r['title'],
                             style: TextStyle(
                                 fontWeight: FontWeight.w600,
-                                color: active ? null : Colors.grey)),
+                                color: active ? null : Theme.of(context).colorScheme.onSurfaceVariant)),
                         subtitle: Text('${r['assigneeName']} · ${_schedule(r)}'),
                         trailing: Switch(
                           value: active,
@@ -242,8 +245,8 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
             const Text('New recurring checklist',
                 style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
             const SizedBox(height: 4),
-            const Text('Fires automatically. Nobody has to remember.',
-                style: TextStyle(color: Colors.grey, fontSize: 12)),
+            Text('Fires automatically. Nobody has to remember.',
+                style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
             const SizedBox(height: 16),
             TextField(
               controller: _title,

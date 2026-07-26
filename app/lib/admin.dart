@@ -55,7 +55,12 @@ class _AdminScreenState extends State<AdminScreen> {
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            style: enabling ? null : FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: enabling
+                ? null
+                : FilledButton.styleFrom(
+                    backgroundColor: AppColors.of(context).danger,
+                    foregroundColor: AppColors.of(context).onDanger,
+                  ),
             child: Text(enabling ? 'Reactivate' : 'Suspend'),
           ),
         ],
@@ -132,7 +137,7 @@ class _AdminScreenState extends State<AdminScreen> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(label, style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+          Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
         ],
       ),
     );
@@ -148,12 +153,11 @@ class _AdminScreenState extends State<AdminScreen> {
           '${org['accountCount']} accounts · ${org['taskCount']} tasks · '
           '${activeRecently ? "active recently" : "quiet 7d+"}'
           '${enabled ? "" : " · SUSPENDED"}',
-          style: TextStyle(color: enabled ? null : Colors.red),
+          style: TextStyle(color: enabled ? null : AppColors.of(context).danger),
         ),
         trailing: Switch(
           value: enabled,
           onChanged: (_) => _toggle(org),
-          activeTrackColor: Colors.green.shade200,
         ),
       ),
     );

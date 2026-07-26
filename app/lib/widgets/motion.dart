@@ -250,9 +250,7 @@ class BreathingCheck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = Theme.of(context).brightness == Brightness.dark
-        ? const Color(0xFF6FDB9C)
-        : const Color(0xFF1E7D4D);
+    final color = AppColors.of(context).success;
     final still = reducedMotion(context);
 
     final glow = Container(
@@ -328,7 +326,7 @@ Future<void> playDoneConfirmation(BuildContext context, {required VoidCallback o
             color: Theme.of(context).colorScheme.primary,
             shape: BoxShape.circle,
           ),
-          child: const Icon(Icons.check_rounded, color: Colors.white, size: 40),
+          child: Icon(Icons.check_rounded, color: Theme.of(context).colorScheme.onPrimary, size: 40),
         )
             .animate()
             .scale(
@@ -397,7 +395,7 @@ Future<void> playCelebration(BuildContext context, {required VoidCallback onFini
               Container(
                 padding: const EdgeInsets.all(22),
                 decoration: BoxDecoration(color: scheme.primary, shape: BoxShape.circle),
-                child: const Icon(Icons.flag_rounded, color: Colors.white, size: 42),
+                child: Icon(Icons.flag_rounded, color: scheme.onPrimary, size: 42),
               )
                   .animate()
                   .scale(

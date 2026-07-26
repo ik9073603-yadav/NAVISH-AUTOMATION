@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
+import 'theme/app_theme.dart';
 
 // Reachable from Profile — used when you already know your current password.
 // Distinct from the forgot-password / approval flow.
@@ -73,15 +74,15 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
-              child: Text(_error!, style: const TextStyle(color: Colors.red)),
+              child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger)),
             ),
           FilledButton(
             onPressed: _saving ? null : _submit,
             style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
             child: _saving
-                ? const SizedBox(
+                ? SizedBox(
                     height: 20, width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                    child: CircularProgressIndicator(strokeWidth: 2, color: Theme.of(context).colorScheme.onPrimary))
                 : const Text('Change password'),
           ),
         ],

@@ -3,6 +3,7 @@ import 'package:intl/intl.dart';
 import 'api.dart';
 import 'filters.dart';
 import 'order_history.dart';
+import 'theme/app_theme.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -75,13 +76,13 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
             crossAxisSpacing: 12,
             childAspectRatio: 1.5,
             children: [
-              _kpiCard('Pending', s['pending'] as int, Colors.blue, Icons.hourglass_top,
+              _kpiCard('Pending', s['pending'] as int, AppColors.of(context).info, Icons.hourglass_top,
                   () => _openCategory('PENDING', 'Pending orders')),
-              _kpiCard('Completed', s['completed'] as int, Colors.green, Icons.check_circle,
+              _kpiCard('Completed', s['completed'] as int, AppColors.of(context).success, Icons.check_circle,
                   () => _openCategory('COMPLETED', 'Completed orders')),
-              _kpiCard('Delayed', s['delayed'] as int, Colors.red, Icons.warning,
+              _kpiCard('Delayed', s['delayed'] as int, AppColors.of(context).danger, Icons.warning,
                   () => _openCategory('DELAYED', 'Delayed orders')),
-              _kpiCard('On-time', s['onTime'] as int, Colors.teal, Icons.thumb_up,
+              _kpiCard('On-time', s['onTime'] as int, Theme.of(context).colorScheme.tertiary, Icons.thumb_up,
                   () => _openCategory('ONTIME', 'On-time orders')),
             ],
           ),
@@ -127,7 +128,7 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
         ),
         const SizedBox(height: 4),
         Card(
-          color: Colors.red.withValues(alpha: 0.06),
+          color: AppColors.of(context).danger.withValues(alpha: 0.06),
           child: Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -138,18 +139,20 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
                   style: TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: total == null ? Colors.grey.shade600 : Colors.red.shade700,
+                    color: total == null
+                        ? Theme.of(context).colorScheme.onSurfaceVariant
+                        : AppColors.of(context).danger,
                   ),
                 ),
                 Text(
                   total == null ? 'Set a ₹/hr rate or capture order values to see ₹ lost to delay' : 'Total ₹ lost to delay',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
                 if (missing > 0) ...[
                   const SizedBox(height: 4),
                   Text(
                     '$missing delayed order(s) not counted — no rate or order value set',
-                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800),
+                    style: TextStyle(fontSize: 11, color: AppColors.of(context).warning),
                   ),
                 ],
               ],
@@ -182,7 +185,7 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
         children: [
           Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
           Text('₹${cost.toStringAsFixed(0)}',
-              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.red.shade700)),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.of(context).danger)),
         ],
       ),
     );
@@ -199,7 +202,9 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
     return Column(
       children: [
         Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey), textAlign: TextAlign.center),
+        Text(label,
+            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center),
       ],
     );
   }
@@ -362,7 +367,9 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
                                         Text(o['detailLabel'] as String),
                                         Text(
                                           '${_fmt.format(DateTime.parse(o['startedAt'] as String).toLocal())} · ${o['status']}',
-                                          style: const TextStyle(fontSize: 12, color: Colors.grey),
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: Theme.of(context).colorScheme.onSurfaceVariant),
                                         ),
                                       ],
                                     ),
