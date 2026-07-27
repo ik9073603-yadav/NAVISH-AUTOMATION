@@ -1,6 +1,4 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'api.dart';
 import 'analytics.dart';
 import 'change_password.dart';
@@ -8,7 +6,9 @@ import 'legal.dart';
 import 'deletion_requests.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
+import 'widgets/avatar.dart';
 import 'widgets/motion.dart';
+import 'widgets/photo_picker.dart';
 import 'locale_controller.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -70,18 +70,16 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _pickPhoto() async {
-    // The picker call itself must be inside the try/catch — a denied gallery
-    // permission (or any other platform-channel failure) throws here, and an
-    // uncaught exception in an un-awaited async callback fails completely
-    // silently: no error, no state change, nothing the user can see.
+    // The pick/crop call itself must be inside the try/catch — a denied
+    // gallery permission (or any other platform-channel failure) throws
+    // here, and an uncaught exception in an un-awaited async callback fails
+    // completely silently: no error, no state change, nothing the user can see.
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      if (file == null) return;
+      final bytes = await pickAndCropSquareImage(context, toolbarTitle: 'Crop photo');
+      if (bytes == null) return;
 
       setState(() => _uploadingPhoto = true);
-      final Uint8List bytes = await file.readAsBytes();
-      final url = await Api.uploadImage(bytes, file.name, mimeType: file.mimeType);
+      final url = await Api.uploadImage(bytes, 'profile.jpg', mimeType: 'image/jpeg');
       final updated = await Api.updateMe(photoUrl: url);
       if (mounted) setState(() => _user = {..._user!, ...updated});
     } catch (e) {
@@ -265,15 +263,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
         children: [
           Stack(
             children: [
-              CircleAvatar(
+              AppAvatar(
+                imageUrl: photoUrl,
                 radius: 48,
-                backgroundImage: photoUrl != null ? NetworkImage(photoUrl) : null,
-                child: photoUrl == null
-                    ? Text(
-                        displayName.isNotEmpty ? displayName[0].toUpperCase() : '?',
-                        style: const TextStyle(fontSize: 32),
-                      )
-                    : null,
+                heroTag: 'profile-photo-${_user?['id'] ?? 'me'}',
+                fallbackText: displayName,
               ),
               Positioned(
                 right: 0,

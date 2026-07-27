@@ -9,7 +9,9 @@ plugins {
 
 android {
     namespace = "com.navish.app"
-    compileSdk = flutter.compileSdkVersion
+    // image_cropper's Android dependencies (androidx.window, core, exifinterface)
+    // require compileSdk 34+; the Flutter tool's bundled default (33) is too old.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {

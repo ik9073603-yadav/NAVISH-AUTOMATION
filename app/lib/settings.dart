@@ -1,6 +1,4 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api.dart';
 import 'export_actions.dart';
@@ -8,8 +6,10 @@ import 'push.dart';
 import 'reset_requests.dart';
 import 'responsive.dart';
 import 'theme_controller.dart';
+import 'widgets/avatar.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
+import 'widgets/photo_picker.dart';
 import 'l10n/gen/app_localizations.dart';
 
 const _commonTimezones = [
@@ -127,18 +127,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _pickLogo() async {
-    // The picker call itself must be inside the try/catch — a denied gallery
-    // permission (or any other platform-channel failure) throws here, and an
-    // uncaught exception in an un-awaited async callback fails completely
-    // silently: no error, no state change, nothing the user can see.
+    // The pick/crop call itself must be inside the try/catch — a denied
+    // gallery permission (or any other platform-channel failure) throws
+    // here, and an uncaught exception in an un-awaited async callback fails
+    // completely silently: no error, no state change, nothing the user can see.
     try {
-      final picker = ImagePicker();
-      final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 85);
-      if (file == null) return;
+      final bytes = await pickAndCropSquareImage(context, toolbarTitle: 'Crop logo');
+      if (bytes == null) return;
 
       setState(() => _uploadingLogo = true);
-      final Uint8List bytes = await file.readAsBytes();
-      final url = await Api.uploadImage(bytes, file.name, mimeType: file.mimeType);
+      final url = await Api.uploadImage(bytes, 'logo.jpg', mimeType: 'image/jpeg');
       await Api.updateSettings(logoUrl: url);
       if (mounted) setState(() => _logoUrl = url);
     } catch (e) {
@@ -424,10 +422,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _logoPicker() {
     return Stack(
       children: [
-        CircleAvatar(
+        AppAvatar(
+          imageUrl: _logoUrl,
           radius: 40,
-          backgroundImage: _logoUrl != null ? NetworkImage(_logoUrl!) : null,
-          child: _logoUrl == null ? const Icon(Icons.business, size: 32) : null,
+          heroTag: 'company-logo',
+          fallbackIcon: Icons.business,
         ),
         Positioned(
           right: 0,
