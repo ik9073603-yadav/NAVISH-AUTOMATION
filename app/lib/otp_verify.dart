@@ -88,6 +88,7 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
       Navigator.pushAndRemoveUntil(
         context, sharedAxisRoute(const HomeScreen()), (route) => false);
     } catch (e) {
+      if (!mounted) return;
       for (final c in _controllers) {
         c.clear();
       }

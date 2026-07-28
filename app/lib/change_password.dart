@@ -17,6 +17,14 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
   bool _saving = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _current.dispose();
+    _newPass.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
   Future<void> _submit() async {
     setState(() => _error = null);
 
@@ -37,7 +45,7 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
           .showSnackBar(const SnackBar(content: Text('Password changed')));
       Navigator.pop(context);
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _saving = false);
     }

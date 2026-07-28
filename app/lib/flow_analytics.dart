@@ -4,6 +4,7 @@ import 'api.dart';
 import 'filters.dart';
 import 'order_history.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -39,12 +40,13 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
         Api.fmsAnalyticsSummary(),
         Api.fmsAnalyticsCostOfDelay(),
       ]);
+      if (!mounted) return;
       setState(() {
         _summary = results[0];
         _costOfDelay = results[1];
       });
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -95,7 +97,7 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
                 children: [
                   _summaryTile('${s['totalOrders']}', 'Total orders'),
                   _summaryTile('${s['noSla']}', 'No SLA'),
-                  _summaryTile(_avgCycle(s['avgCycleTimeMins'] as int), 'Avg cycle time'),
+                  _summaryTile(formatDurationMinsOrDash(s['avgCycleTimeMins'] as int), 'Avg cycle time'),
                 ],
               ),
             ),
@@ -191,12 +193,6 @@ class _FlowAnalyticsViewState extends State<FlowAnalyticsView> {
     );
   }
 
-  String _avgCycle(int mins) {
-    if (mins <= 0) return '—';
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
-  }
 
   Widget _summaryTile(String value, String label) {
     return Column(
@@ -250,6 +246,7 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
   String? _error;
   final _search = TextEditingController();
   DateRangePreset _datePreset = DateRangePreset.all;
+  int _loadRequestId = 0;
 
   static final _fmt = DateFormat('MMM d, yyyy');
 
@@ -259,7 +256,14 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() {
       _loading = true;
       _error = null;
@@ -270,11 +274,11 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
         search: _search.text.trim().isEmpty ? null : _search.text.trim(),
         from: _datePreset.from,
       );
-      setState(() => _orders = o);
+      if (mounted && requestId == _loadRequestId) setState(() => _orders = o);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted && requestId == _loadRequestId) setState(() => _error = '$e');
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 

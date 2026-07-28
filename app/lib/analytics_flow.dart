@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
 import 'flow_analytics.dart' show FlowOrdersListScreen;
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
@@ -28,6 +29,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   Map<String, dynamic>? _costOfDelay;
   Map<String, dynamic>? _stageMetrics;
   List<dynamic> _bottlenecks = []; // current state — which stages are backed up right now
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -36,6 +38,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
     try {
@@ -45,6 +48,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
         Api.analyticsFms(from, to),
         Api.bottlenecks(),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _summary = results[0] as Map<String, dynamic>;
         _costOfDelay = results[1] as Map<String, dynamic>;
@@ -52,9 +56,9 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
         _bottlenecks = results[3] as List<dynamic>;
       });
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -127,7 +131,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
             children: [
               _summaryTile(context, '${s['totalOrders'] ?? 0}', 'Total orders'),
               _summaryTile(context, '${throughput['completedOrders'] ?? 0}', 'Completed in range'),
-              _summaryTile(context, _fmtMins(throughput['avgCycleTimeMins'] as int? ?? 0), 'Avg cycle time'),
+              _summaryTile(context, formatDurationMinsOrDash(throughput['avgCycleTimeMins'] as int? ?? 0), 'Avg cycle time'),
             ],
           ),
         ),
@@ -317,11 +321,11 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
               child: Row(
                 children: [
                   Expanded(flex: 3, child: Text('${s['flowName']} — ${s['stageName']}', style: const TextStyle(fontSize: 13))),
-                  Expanded(flex: 2, child: Text('avg ${_fmtMins(s['avgMins'] as int)}', style: const TextStyle(fontSize: 12))),
+                  Expanded(flex: 2, child: Text('avg ${formatDurationMinsOrDash(s['avgMins'] as int)}', style: const TextStyle(fontSize: 12))),
                   Expanded(
                     flex: 2,
                     child: Text(
-                      (s['avgDelayMins'] as int) > 0 ? '+${_fmtMins(s['avgDelayMins'] as int)} late' : 'on time',
+                      (s['avgDelayMins'] as int) > 0 ? '+${formatDurationMinsOrDash(s['avgDelayMins'] as int)} late' : 'on time',
                       style: TextStyle(
                           fontSize: 12,
                           color: (s['avgDelayMins'] as int) > 0 ? AppColors.of(context).danger : AppColors.of(context).success),
@@ -389,10 +393,4 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
     );
   }
 
-  String _fmtMins(int mins) {
-    if (mins <= 0) return '—';
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
-  }
 }

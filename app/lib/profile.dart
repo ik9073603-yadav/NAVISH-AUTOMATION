@@ -54,6 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     setState(() => _loading = true);
     try {
       final user = await Api.me();
+      if (!mounted) return;
       setState(() {
         _user = user;
         _name.text = user['name'] as String? ?? '';
@@ -374,6 +375,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
           if (!DateTime.parse(completedAt).isAfter(DateTime.parse(dueAt))) onTime++;
         }
       }
+      if (!mounted) return;
       setState(() {
         _activeCount = active.length;
         _doneCount = done.length;
@@ -381,7 +383,7 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
         _escalatedCount = escalated;
       });
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

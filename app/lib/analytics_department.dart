@@ -26,6 +26,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
   String? _error;
   List<dynamic> _departments = [];
   List<dynamic> _employees = [];
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -34,6 +35,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
     try {
@@ -41,14 +43,15 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
         Api.analyticsDepartments(from, to),
         Api.analyticsEmployees(from, to),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _departments = results[0];
         _employees = results[1];
       });
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 

@@ -4,6 +4,7 @@ import 'api.dart';
 import 'contact_actions.dart';
 import 'order_history.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/motion.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -56,6 +57,7 @@ class _StuckScreenState extends State<StuckScreen> {
       final phoneById = <String, String?>{
         for (final u in users) u['id'] as String: u['phone'] as String?,
       };
+      if (!mounted) return;
       setState(() {
         _items = items;
         _phoneById = phoneById;
@@ -312,12 +314,6 @@ class _StuckRow extends StatelessWidget {
     }
   }
 
-  String _duration(int mins) {
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
-  }
-
   @override
   Widget build(BuildContext context) {
     final who = item['who'] as String;
@@ -334,10 +330,10 @@ class _StuckRow extends StatelessWidget {
               style: TextStyle(color: _onSeverityColor(context), fontSize: 12, fontWeight: FontWeight.bold)),
         ),
         title: Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('$who · stuck for ${_duration(stuckForMins)}'),
+        subtitle: Text('$who · stuck for ${formatDurationMins(stuckForMins)}'),
         trailing: ContactButtons(
           phone: phone,
-          message: 'Hi $who, checking on: ${item['title']} (pending since ${_duration(stuckForMins)}).',
+          message: 'Hi $who, checking on: ${item['title']} (pending since ${formatDurationMins(stuckForMins)}).',
         ),
       ),
     );

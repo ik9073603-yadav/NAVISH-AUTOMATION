@@ -27,6 +27,16 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _loading = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _companyName.dispose();
+    _ownerName.dispose();
+    _email.dispose();
+    _password.dispose();
+    _phone.dispose();
+    super.dispose();
+  }
+
   Future<void> _open(String path) async {
     await launchUrl(Uri.parse('${Config.apiBase}$path'), mode: LaunchMode.externalApplication);
   }
@@ -63,7 +73,7 @@ class _SignupScreenState extends State<SignupScreen> {
       if (!mounted) return;
       Navigator.pushReplacement(context, sharedAxisRoute(OtpVerifyScreen(email: email)));
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

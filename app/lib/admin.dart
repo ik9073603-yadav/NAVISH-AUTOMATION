@@ -32,9 +32,10 @@ class _AdminScreenState extends State<AdminScreen> {
     try {
       final overview = await Api.adminOverview();
       final orgs = await Api.adminOrgs();
+      if (!mounted) return;
       setState(() { _overview = overview; _orgs = orgs; });
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }

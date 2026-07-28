@@ -230,9 +230,9 @@ class _HealthScoreScreenState extends State<HealthScoreScreen> {
     });
     try {
       final d = await Api.healthScore();
-      setState(() => _data = d);
+      if (mounted) setState(() => _data = d);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }

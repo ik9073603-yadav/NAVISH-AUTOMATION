@@ -93,6 +93,13 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _loading = false;
   String? _error;
 
+  @override
+  void dispose() {
+    _email.dispose();
+    _password.dispose();
+    super.dispose();
+  }
+
   Future<void> _login() async {
     final l10n = AppLocalizations.of(context);
     final email = _email.text.trim();
@@ -110,7 +117,7 @@ class _LoginScreenState extends State<LoginScreen> {
       if (!mounted) return;
       Navigator.push(context, sharedAxisRoute(OtpVerifyScreen(email: e.email)));
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -353,6 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final stuckCount = results[2] as int;
       final healthScore = results[3] as Map<String, dynamic>?;
 
+      if (!mounted) return;
       setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; _healthScore = healthScore; });
       unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();

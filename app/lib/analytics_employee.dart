@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -23,6 +24,7 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
   bool _loading = true;
   String? _error;
   List<dynamic> _employees = [];
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -31,15 +33,16 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
     try {
       final data = await Api.analyticsEmployees(from, to);
-      setState(() => _employees = data);
+      if (mounted && requestId == _loadRequestId) setState(() => _employees = data);
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -225,7 +228,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
             _row(context, 'Escalated', '${e['escalated']}'),
             _row(context, 'Current load', '${e['currentLoad']}'),
             _row(context, 'Checklist compliance', '${e['checklistCompliancePct']}% (${e['checklistDone']}/${e['checklistTotal']})'),
-            _row(context, 'Avg completion time', _fmtMins(e['avgCompletionMins'] as int)),
+            _row(context, 'Avg completion time', formatDurationMinsOrDash(e['avgCompletionMins'] as int)),
             const SizedBox(height: 8),
           ],
         ),
@@ -244,12 +247,5 @@ class _EmployeeDetailSheet extends StatelessWidget {
         ],
       ),
     );
-  }
-
-  String _fmtMins(int mins) {
-    if (mins <= 0) return '—';
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
   }
 }

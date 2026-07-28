@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'api.dart';
 import 'contact_actions.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 
 // Owner/Manager: approve or deny employees' forgot-password requests.
 class ResetRequestsScreen extends StatefulWidget {
@@ -24,7 +25,7 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
     setState(() => _loading = true);
     try {
       final requests = await Api.resetRequests();
-      setState(() => _requests = requests);
+      if (mounted) setState(() => _requests = requests);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
@@ -34,14 +35,6 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
     }
   }
 
-  String _timeAgo(String iso) {
-    final mins = DateTime.now().difference(DateTime.parse(iso).toLocal()).inMinutes;
-    if (mins < 1) return 'just now';
-    if (mins < 60) return '$mins min ago';
-    final hrs = mins ~/ 60;
-    if (hrs < 24) return '$hrs hr ago';
-    return '${hrs ~/ 24} day(s) ago';
-  }
 
   Future<void> _approve(Map<String, dynamic> req) async {
     try {
@@ -117,7 +110,7 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
                         child: ListTile(
                           title: Text(user?['name'] ?? 'Unknown user'),
                           subtitle: Text(
-                              '${user?['email'] ?? ''} · requested ${_timeAgo(r['requestedAt'] as String)}'),
+                              '${user?['email'] ?? ''} · requested ${timeAgo(r['requestedAt'] as String)}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

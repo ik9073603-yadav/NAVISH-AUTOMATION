@@ -91,7 +91,13 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
     try {
       final flows = await Api.flows();
       final users = await Api.users();
-      final flow = flows.firstWhere((f) => f['id'] == widget.flowId);
+      final flow = flows.firstWhere((f) => f['id'] == widget.flowId, orElse: () => null);
+      if (!mounted) return;
+      if (flow == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('This flow template is no longer available.')));
+        return;
+      }
       setState(() {
         _flow = flow as Map<String, dynamic>;
         _users = users;
@@ -127,7 +133,9 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
       appBar: AppBar(title: Text(_flow != null ? '${_flow!['name']} — assign people' : 'Assign people')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          : _flow == null
+              ? const Center(child: Text('This flow template is no longer available.'))
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Text(
@@ -208,7 +216,13 @@ class _TemplateAssignChecklistScreenState extends State<TemplateAssignChecklistS
     try {
       final rules = await Api.checklists(status: 'ALL');
       final users = await Api.users();
-      final rule = rules.firstWhere((r) => r['id'] == widget.ruleId);
+      final rule = rules.firstWhere((r) => r['id'] == widget.ruleId, orElse: () => null);
+      if (!mounted) return;
+      if (rule == null) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('This checklist rule is no longer available.')));
+        return;
+      }
       setState(() {
         _rule = rule as Map<String, dynamic>;
         _users = users;
@@ -240,7 +254,9 @@ class _TemplateAssignChecklistScreenState extends State<TemplateAssignChecklistS
       appBar: AppBar(title: Text(_rule != null ? '${_rule!['title']} — assign' : 'Assign checklist')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
-          : ListView(
+          : _rule == null
+              ? const Center(child: Text('This checklist rule is no longer available.'))
+              : ListView(
               padding: const EdgeInsets.all(16),
               children: [
                 Text(_rule!['description'] as String? ?? '',

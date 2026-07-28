@@ -19,6 +19,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   String _status = 'ACTIVE';
   DateRangePreset _datePreset = DateRangePreset.all;
   String? _assigneeId;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -27,19 +28,21 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
         Api.checklists(status: _status, from: _datePreset.from, assigneeId: _assigneeId),
         Api.users(),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() { _rules = results[0]; _users = results[1]; });
     } catch (e) {
-      if (mounted) {
+      if (mounted && requestId == _loadRequestId) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -200,17 +203,37 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
   @override
   void initState() {
     super.initState();
-    Api.users().then((u) => setState(() {
-          _users = u;
-          if (u.isNotEmpty) _assignee = u.first['id'];
-        }));
+    Api.users().then((u) {
+      if (!mounted) return;
+      setState(() {
+        _users = u;
+        if (u.isNotEmpty) _assignee = u.first['id'];
+      });
+    });
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    super.dispose();
   }
 
   String get _timeStr =>
       '${_time.hour.toString().padLeft(2, '0')}:${_time.minute.toString().padLeft(2, '0')}';
 
   Future<void> _save() async {
-    if (_title.text.trim().length < 2 || _assignee == null) return;
+    if (_title.text.trim().length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter what must be done (2+ characters)')),
+      );
+      return;
+    }
+    if (_assignee == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select who does it')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await Api.createChecklist(

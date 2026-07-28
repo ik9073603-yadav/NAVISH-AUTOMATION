@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'api.dart';
 import 'order_history.dart';
 import 'filters.dart';
@@ -9,6 +10,7 @@ import 'export_actions.dart';
 import 'template_setup.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'offline/write_queue.dart';
@@ -33,6 +35,7 @@ class _FmsScreenState extends State<FmsScreen> {
   String _orderStatus = 'ACTIVE';
   DateRangePreset _datePreset = DateRangePreset.all;
   String? _assigneeId;
+  int _loadRequestId = 0;
 
   // Owner never executes; only the stage's responsible person (or anyone,
   // if the stage has no assigned responsible) may complete it.
@@ -51,6 +54,7 @@ class _FmsScreenState extends State<FmsScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -59,6 +63,7 @@ class _FmsScreenState extends State<FmsScreen> {
         Api.bottlenecks(),
         Api.users(),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _orders = results[0];
         _flows = results[1];
@@ -66,11 +71,11 @@ class _FmsScreenState extends State<FmsScreen> {
         _users = results[3];
       });
     } catch (e) {
-      if (mounted) {
+      if (mounted && requestId == _loadRequestId) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -258,11 +263,7 @@ class _FmsScreenState extends State<FmsScreen> {
     );
   }
 
-  String _sitting(int mins) {
-    if (mins < 60) return 'Sitting $mins min';
-    if (mins < 1440) return 'Sitting ${(mins / 60).toStringAsFixed(1)} hrs';
-    return 'Sitting ${(mins / 1440).toStringAsFixed(1)} days';
-  }
+  String _sitting(int mins) => 'Sitting ${formatDurationMins(mins)}';
 
   Widget _bottleneckView() {
     if (_bottlenecks.isEmpty) return const Center(child: Text('No data yet'));
@@ -577,6 +578,12 @@ class _StageFormSheetState extends State<_StageFormSheet> {
   final _remarks = TextEditingController();
   String? _uploadingField;
 
+  @override
+  void dispose() {
+    _remarks.dispose();
+    super.dispose();
+  }
+
   List<String> _photoList(String label) =>
       _data.putIfAbsent(label, () => <String>[]) as List<String>;
 
@@ -661,11 +668,22 @@ class _StageFormSheetState extends State<_StageFormSheet> {
                               children: [
                                 ClipRRect(
                                   borderRadius: BorderRadius.circular(8),
-                                  child: Image.network(
-                                    url,
+                                  child: CachedNetworkImage(
+                                    imageUrl: url,
                                     width: 72,
                                     height: 72,
                                     fit: BoxFit.cover,
+                                    placeholder: (context, _) => Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                    ),
+                                    errorWidget: (context, _, _) => Container(
+                                      width: 72,
+                                      height: 72,
+                                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                                      child: Icon(Icons.broken_image_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                                    ),
                                   ),
                                 ),
                                 Positioned(
@@ -783,6 +801,14 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
     Api.users().then((u) {
       if (mounted) setState(() => _users = u);
     });
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _prefix.dispose();
+    _itemLabel.dispose();
+    super.dispose();
   }
 
   Future<void> _save() async {

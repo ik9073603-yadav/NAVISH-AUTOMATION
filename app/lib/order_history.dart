@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:animations/animations.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'api.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
 
@@ -38,9 +40,9 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     });
     try {
       final h = await Api.orderHistory(widget.orderId);
-      setState(() => _history = h);
+      if (mounted) setState(() => _history = h);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -57,17 +59,12 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     if (enteredAt == null) return '';
     final start = DateTime.parse(enteredAt);
     final end = completedAt != null ? DateTime.parse(completedAt) : DateTime.now();
-    final mins = end.difference(start).inMinutes;
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
+    return formatDurationMins(end.difference(start).inMinutes);
   }
 
   String? _plannedMinsLabel(int? plannedMins) {
     if (plannedMins == null) return null;
-    if (plannedMins < 60) return '$plannedMins min';
-    if (plannedMins < 1440) return '${(plannedMins / 60).toStringAsFixed(1)} hrs';
-    return '${(plannedMins / 1440).toStringAsFixed(1)} days';
+    return formatDurationMins(plannedMins);
   }
 
   @override
@@ -319,7 +316,23 @@ class _StageCard extends StatelessWidget {
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(8),
-                    child: Image.network(url, width: 64, height: 64, fit: BoxFit.cover),
+                    child: CachedNetworkImage(
+                      imageUrl: url,
+                      width: 64,
+                      height: 64,
+                      fit: BoxFit.cover,
+                      placeholder: (context, _) => Container(
+                        width: 64,
+                        height: 64,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      ),
+                      errorWidget: (context, _, _) => Container(
+                        width: 64,
+                        height: 64,
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: Icon(Icons.broken_image_outlined, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      ),
+                    ),
                   ),
                 );
               }).toList(),
@@ -355,7 +368,11 @@ class _FullScreenPhoto extends StatelessWidget {
       appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
       body: Center(
         child: InteractiveViewer(
-          child: Image.network(url),
+          child: CachedNetworkImage(
+            imageUrl: url,
+            placeholder: (context, _) => const CircularProgressIndicator(color: Colors.white54),
+            errorWidget: (context, _, _) => const Icon(Icons.broken_image_outlined, color: Colors.white38, size: 64),
+          ),
         ),
       ),
     );

@@ -33,12 +33,19 @@ class _InventoryScreenState extends State<InventoryScreen> {
     _load();
   }
 
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
+
   Future<void> _load() async {
     setState(() => _loading = true);
     try {
       final skusFuture = Api.skus(search: _search.text.trim(), status: _statusFilter);
       final summaryFuture = _canManage ? Api.inventorySummary() : Future.value(null);
       final results = await Future.wait([skusFuture, summaryFuture]);
+      if (!mounted) return;
       setState(() { _skus = results[0] as List<dynamic>; _summary = results[1] as Map<String, dynamic>?; });
     } catch (e) {
       if (mounted) {
@@ -268,6 +275,19 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
   final _unitCost = TextEditingController();
   bool _saving = false;
 
+  @override
+  void dispose() {
+    _name.dispose();
+    _code.dispose();
+    _category.dispose();
+    _unit.dispose();
+    _openingStock.dispose();
+    _minStock.dispose();
+    _maxStock.dispose();
+    _unitCost.dispose();
+    super.dispose();
+  }
+
   Future<void> _save() async {
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -412,7 +432,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
     setState(() => _loading = true);
     try {
       final h = await Api.skuHistory(widget.sku['id'] as String);
-      setState(() => _history = h);
+      if (mounted) setState(() => _history = h);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
@@ -653,6 +673,13 @@ class _MovementSheet extends StatefulWidget {
 class _MovementSheetState extends State<_MovementSheet> {
   final _quantity = TextEditingController();
   final _reason = TextEditingController();
+
+  @override
+  void dispose() {
+    _quantity.dispose();
+    _reason.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

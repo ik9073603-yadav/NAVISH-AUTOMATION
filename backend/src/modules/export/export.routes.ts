@@ -1,4 +1,5 @@
 import { Router, Request, Response, NextFunction } from 'express';
+import { TaskSource } from '@prisma/client';
 import { ZipArchive } from 'archiver';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
@@ -116,10 +117,13 @@ exportRouter.get('/tasks', async (req: Request, res: Response, next: NextFunctio
     const format = (req.query.format as string) === 'xlsx' ? 'xlsx' : 'csv';
     const { from, to } = parseRange(req);
     const source = req.query.source as string | undefined;
+    if (source && !Object.values(TaskSource).includes(source as TaskSource)) {
+      return res.status(400).json({ error: `source must be one of ${Object.values(TaskSource).join(', ')}` });
+    }
 
     const createdAt = dateRangeFilter(from, to);
     const tasks = await prisma.task.findMany({
-      where: { orgId, ...(source && { source: source as any }), ...(createdAt && { createdAt }) },
+      where: { orgId, ...(source && { source: source as TaskSource }), ...(createdAt && { createdAt }) },
       orderBy: { createdAt: 'desc' },
       take: 5000,
     });

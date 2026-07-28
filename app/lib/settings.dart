@@ -87,6 +87,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => _loading = true);
     try {
       final s = await Api.getSettings();
+      if (!mounted) return;
       setState(() {
         _companyName.text = s['name'] as String? ?? '';
         _industry.text = s['industry'] as String? ?? '';

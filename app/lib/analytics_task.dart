@@ -4,6 +4,7 @@ import 'api.dart';
 import 'export_actions.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
 import 'l10n/gen/app_localizations.dart';
 
@@ -29,6 +30,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
   String? _error;
   Map<String, dynamic>? _delegation;
   Map<String, dynamic>? _checklists;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -37,6 +39,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
     try {
@@ -44,14 +47,15 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         Api.analyticsDelegation(from, to),
         Api.analyticsChecklists(from, to),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _delegation = results[0];
         _checklists = results[1];
       });
     } catch (e) {
-      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+      if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -155,7 +159,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
           ],
         ),
         const SizedBox(height: 12),
-        Text('${totals['completionPct'] ?? 0}% completion rate · avg ${_fmtMins(totals['avgCompletionMins'] as int? ?? 0)} to finish',
+        Text('${totals['completionPct'] ?? 0}% completion rate · avg ${formatDurationMinsOrDash(totals['avgCompletionMins'] as int? ?? 0)} to finish',
             style: const TextStyle(fontWeight: FontWeight.w600)),
         const SizedBox(height: 16),
         if (trend.isEmpty)
@@ -360,12 +364,5 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         ],
       ),
     );
-  }
-
-  String _fmtMins(int mins) {
-    if (mins <= 0) return '—';
-    if (mins < 60) return '$mins min';
-    if (mins < 1440) return '${(mins / 60).toStringAsFixed(1)} hrs';
-    return '${(mins / 1440).toStringAsFixed(1)} days';
   }
 }

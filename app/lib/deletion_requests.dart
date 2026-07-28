@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'api.dart';
 import 'theme/app_theme.dart';
+import 'time_format.dart';
 
 // Owner: approve or deny pending account-deletion requests (Feature 176).
 // Approving deactivates the account — a soft action, not a hard data wipe.
@@ -24,21 +25,12 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
     setState(() => _loading = true);
     try {
       final requests = await Api.deletionRequests();
-      setState(() => _requests = requests);
+      if (mounted) setState(() => _requests = requests);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
     } finally {
       if (mounted) setState(() => _loading = false);
     }
-  }
-
-  String _timeAgo(String iso) {
-    final mins = DateTime.now().difference(DateTime.parse(iso).toLocal()).inMinutes;
-    if (mins < 1) return 'just now';
-    if (mins < 60) return '$mins min ago';
-    final hrs = mins ~/ 60;
-    if (hrs < 24) return '$hrs hr ago';
-    return '${hrs ~/ 24} day(s) ago';
   }
 
   Future<void> _complete(Map<String, dynamic> req) async {
@@ -100,7 +92,7 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
                         child: ListTile(
                           title: Text(user?['name'] ?? 'Unknown user'),
                           subtitle: Text(
-                              '${user?['email'] ?? ''} · requested ${_timeAgo(r['requestedAt'] as String)}'),
+                              '${user?['email'] ?? ''} · requested ${timeAgo(r['requestedAt'] as String)}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [

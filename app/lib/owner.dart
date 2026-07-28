@@ -23,6 +23,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
   String _taskStatus = 'ACTIVE';
   DateRangePreset _datePreset = DateRangePreset.all;
   String? _assigneeId;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     setState(() => _loading = true);
     try {
       final results = await Future.wait([
@@ -38,13 +40,14 @@ class _OwnerScreenState extends State<OwnerScreen> {
         Api.stats(),
         Api.users(),
       ]);
+      if (!mounted || requestId != _loadRequestId) return;
       setState(() { _tasks = results[0]; _stats = results[1]; _users = results[2]; });
     } catch (e) {
-      if (mounted) {
+      if (mounted && requestId == _loadRequestId) {
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
       }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
   }
 
@@ -322,11 +325,31 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
   @override
   void initState() {
     super.initState();
-    Api.users().then((u) => setState(() => _users = u));
+    Api.users().then((u) {
+      if (mounted) setState(() => _users = u);
+    });
+  }
+
+  @override
+  void dispose() {
+    _title.dispose();
+    _desc.dispose();
+    super.dispose();
   }
 
   Future<void> _save() async {
-    if (_title.text.trim().length < 2 || _selected.isEmpty) return;
+    if (_title.text.trim().length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Enter what needs doing (2+ characters)')),
+      );
+      return;
+    }
+    if (_selected.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Select at least one person to assign to')),
+      );
+      return;
+    }
     setState(() => _saving = true);
     try {
       await Api.createTask(
@@ -444,6 +467,15 @@ class _AddUserSheetState extends State<_AddUserSheet> {
   final _password = TextEditingController();
   String _role = 'EMPLOYEE';
   bool _saving = false;
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _email.dispose();
+    _phone.dispose();
+    _password.dispose();
+    super.dispose();
+  }
 
   Future<void> _save() async {
     final l10n = AppLocalizations.of(context);

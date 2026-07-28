@@ -9,7 +9,11 @@ String? normalizePhone(String? raw) {
   if (raw == null) return null;
   final digits = raw.replaceAll(RegExp(r'[^\d+]'), '');
   if (digits.isEmpty) return null;
-  if (digits.startsWith('+')) return digits;
+  if (digits.startsWith('+')) {
+    // A bare "+" or "+" followed by too few digits isn't a usable number —
+    // reject it the same as if no phone were present at all.
+    return digits.substring(1).length >= 8 ? digits : null;
+  }
   if (digits.length == 10) return '+91$digits';
   if (digits.startsWith('91') && digits.length == 12) return '+$digits';
   return '+$digits';
