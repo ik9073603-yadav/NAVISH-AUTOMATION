@@ -39,8 +39,20 @@ if (credentialSource) {
   );
 }
 
+// Must match the channel created client-side (MainApplication.kt) AND the
+// default_notification_channel_id meta-data in AndroidManifest.xml — Android
+// silently drops a notification whose channel doesn't exist on the device,
+// so all three must stay in sync if this ever changes.
+const ANDROID_CHANNEL_ID = 'high_importance_channel';
+
 // Fans a notification out to every device this user is logged in on.
 // No-op if Firebase isn't configured or the user has no registered devices.
+//
+// Never throws — this is called synchronously from notify() on the hot path
+// of business actions (task assign, FMS stage complete, ...). A push/FCM
+// failure must never fail the request that already succeeded (task created,
+// order advanced, etc.), so every failure mode here is caught and logged,
+// not propagated.
 export async function sendPush(
   userId: string,
   title: string,
@@ -49,30 +61,76 @@ export async function sendPush(
 ) {
   if (!app) return;
 
-  const devices = await prisma.deviceToken.findMany({ where: { userId } });
-  if (devices.length === 0) return;
+  let devices;
+  try {
+    devices = await prisma.deviceToken.findMany({ where: { userId } });
+  } catch (err) {
+    console.error(`🔔❌ sendPush: failed to load device tokens for user ${userId}:`, err);
+    return;
+  }
+  if (devices.length === 0) {
+    console.warn(`🔔⚠️  sendPush: user ${userId} has no registered devices — nothing to send`);
+    return;
+  }
 
-  const res = await getMessaging(app).sendEachForMulticast({
-    tokens: devices.map(d => d.token),
-    notification: { title, body },
-    data,
-  });
+  let res;
+  try {
+    // priority: 'high' bypasses Doze/App Standby batching so the message is
+    // delivered immediately instead of on the next maintenance window — the
+    // single biggest lever for "arrives late" on Android. channelId must
+    // point at a channel that already exists on the device (see comment above).
+    res = await getMessaging(app).sendEachForMulticast({
+      tokens: devices.map(d => d.token),
+      notification: { title, body },
+      data,
+      android: {
+        priority: 'high',
+        notification: {
+          channelId: ANDROID_CHANNEL_ID,
+          priority: 'max',
+          defaultSound: true,
+          defaultVibrateTimings: true,
+        },
+      },
+      apns: {
+        payload: { aps: { sound: 'default', contentAvailable: true } },
+      },
+    });
+  } catch (err) {
+    console.error(`🔔❌ sendPush: FCM send failed for user ${userId} (${devices.length} device(s)):`, err);
+    return;
+  }
 
   const staleTokens: string[] = [];
   res.responses.forEach((r, i) => {
-    if (!r.success) {
-      const code = r.error?.code;
-      if (
-        code === 'messaging/invalid-registration-token' ||
-        code === 'messaging/registration-token-not-registered'
-      ) {
-        staleTokens.push(devices[i].token);
-      }
+    if (r.success) return;
+    const device = devices[i];
+    const code = r.error?.code;
+    if (
+      code === 'messaging/invalid-registration-token' ||
+      code === 'messaging/registration-token-not-registered'
+    ) {
+      staleTokens.push(device.token);
+    } else {
+      // Any other failure (quota, auth, mismatched-credential, internal...)
+      // must be visible — silently ignoring it is how a real delivery
+      // failure ends up looking like a successful send.
+      console.error(
+        `🔔❌ sendPush: delivery failed for user ${userId} (platform=${device.platform}, code=${code ?? 'unknown'}):`,
+        r.error?.message ?? r.error,
+      );
     }
   });
 
+  const delivered = res.responses.length - res.responses.filter(r => !r.success).length;
+  console.log(`🔔 sendPush: ${delivered}/${devices.length} device(s) delivered for user ${userId} (type=${data?.type ?? 'n/a'})`);
+
   if (staleTokens.length > 0) {
-    await prisma.deviceToken.deleteMany({ where: { token: { in: staleTokens } } });
-    console.log(`🧹 Pruned ${staleTokens.length} stale device token(s)`);
+    try {
+      await prisma.deviceToken.deleteMany({ where: { token: { in: staleTokens } } });
+      console.log(`🧹 Pruned ${staleTokens.length} stale device token(s) for user ${userId}`);
+    } catch (err) {
+      console.error(`🔔❌ sendPush: failed to prune stale tokens for user ${userId}:`, err);
+    }
   }
 }

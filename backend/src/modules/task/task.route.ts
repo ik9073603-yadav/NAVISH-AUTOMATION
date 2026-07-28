@@ -197,6 +197,13 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req: Request, r
       })
     ));
 
+    // Same TASK_ASSIGNED notify() the single-assign endpoint above uses —
+    // bulk assign was silently skipping this, so a bulk-assigned task never
+    // reached anyone until the engine's first chase kicked in.
+    await Promise.all(created.map(t =>
+      notify(orgId, t.assigneeId, 'TASK_ASSIGNED', `New task: ${t.title}`, 'You have been assigned a new task.', t.id)
+    ));
+
     res.status(201).json({ created: created.length, tasks: created });
   } catch (err) { next(err); }
 });

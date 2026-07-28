@@ -36,6 +36,14 @@ void main() async {
   await ThemeController.load();
   await LocaleController.load();
   await PushService.init();
+  // Re-register the FCM token (and re-attach the refresh listener) on every
+  // cold start where the user is already logged in — not just right after
+  // the login button is pressed. Without this, a normal "already logged in,
+  // force-close and reopen" launch never refreshes a rotated token and the
+  // onTokenRefresh listener never gets attached for that session.
+  if (Api.isLoggedIn) {
+    await PushService.registerToken();
+  }
   await WriteQueue.init();
   ConnectivityService.start(Api.flushQueue);
   runApp(const NavishApp());

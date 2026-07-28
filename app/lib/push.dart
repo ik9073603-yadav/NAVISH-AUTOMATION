@@ -17,6 +17,7 @@ class PushService {
   static final ValueNotifier<Map<String, dynamic>?> pendingTap = ValueNotifier(null);
 
   static bool _ready = false;
+  static bool _refreshListenerAttached = false;
 
   static Future<void> init() async {
     try {
@@ -54,18 +55,31 @@ class PushService {
   static String get _platform =>
       defaultTargetPlatform == TargetPlatform.iOS ? 'ios' : 'android';
 
+  // Called both right after login AND on every cold start where the user is
+  // already authenticated (see main()) — FCM tokens rotate periodically, and
+  // a token that's never re-registered/re-listened-to on relaunch is the main
+  // way a previously-working device silently stops receiving pushes.
   static Future<void> registerToken() async {
     if (!_ready) return;
     try {
       final token = await FirebaseMessaging.instance.getToken();
       if (token != null) await Api.registerDevice(token, platform: _platform);
-
-      FirebaseMessaging.instance.onTokenRefresh.listen((newToken) {
-        Api.registerDevice(newToken, platform: _platform);
-      });
     } catch (e) {
       debugPrint('Failed to register push token: $e');
     }
+
+    // Attach at most once per process lifetime — registerToken() can be
+    // called again later (e.g. a fresh login after logout in the same app
+    // session); re-attaching would stack duplicate listeners.
+    if (_refreshListenerAttached) return;
+    _refreshListenerAttached = true;
+    FirebaseMessaging.instance.onTokenRefresh.listen((newToken) async {
+      try {
+        await Api.registerDevice(newToken, platform: _platform);
+      } catch (e) {
+        debugPrint('Failed to re-register refreshed push token: $e');
+      }
+    });
   }
 
   // Called on logout — a shared device shouldn't keep chasing the last user.
