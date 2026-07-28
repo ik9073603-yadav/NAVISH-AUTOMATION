@@ -1,0 +1,239 @@
+import 'package:flutter/material.dart';
+import 'package:fl_chart/fl_chart.dart';
+import 'api.dart';
+import 'responsive.dart';
+import 'theme/app_theme.dart';
+import 'widgets/analytics_range_bar.dart';
+import 'l10n/gen/app_localizations.dart';
+
+// Department Analysis — the same per-employee metrics rolled up by
+// department (Department model / User.departmentId). Users with no
+// department land in a single "Unassigned" bucket rather than being
+// dropped. A grouped bar chart compares departments head-to-head; tapping
+// one drills into its member employees.
+class DepartmentAnalysisScreen extends StatefulWidget {
+  const DepartmentAnalysisScreen({super.key});
+  @override
+  State<DepartmentAnalysisScreen> createState() => _DepartmentAnalysisScreenState();
+}
+
+class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
+  AnalyticsRangePreset _preset = AnalyticsRangePreset.week;
+  DateTime _customFrom = DateTime.now().subtract(const Duration(days: 7));
+  DateTime _customTo = DateTime.now();
+
+  bool _loading = true;
+  String? _error;
+  List<dynamic> _departments = [];
+  List<dynamic> _employees = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() { _loading = true; _error = null; });
+    final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
+    try {
+      final results = await Future.wait([
+        Api.analyticsDepartments(from, to),
+        Api.analyticsEmployees(from, to),
+      ]);
+      setState(() {
+        _departments = results[0];
+        _employees = results[1];
+      });
+    } catch (e) {
+      setState(() => _error = e.toString().replaceAll('Exception: ', ''));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _openDepartment(Map<String, dynamic> dept) {
+    final l10n = AppLocalizations.of(context);
+    final members = _employees.where((e) => e['departmentId'] == dept['departmentId']).toList();
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _DepartmentMembersScreen(
+      title: dept['departmentId'] == null ? l10n.notAssigned : dept['name'] as String,
+      members: members,
+    )));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(AppLocalizations.of(context).departmentAnalysisTitle)),
+      body: RefreshIndicator(
+        onRefresh: _load,
+        child: MaxWidthCenter(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              AnalyticsRangeBar(
+                preset: _preset,
+                customFrom: _customFrom,
+                customTo: _customTo,
+                onPresetChanged: (p) { setState(() => _preset = p); _load(); },
+                onCustomRangePicked: (r) {
+                  setState(() { _customFrom = r.start; _customTo = r.end; _preset = AnalyticsRangePreset.custom; });
+                  _load();
+                },
+              ),
+              const SizedBox(height: 16),
+              if (_loading) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
+              if (_error != null)
+                Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger))),
+              if (!_loading && _error == null) ..._content(context),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _content(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    if (_departments.isEmpty) {
+      return const [Padding(padding: EdgeInsets.only(top: 24), child: Center(child: Text('No departments yet.')))];
+    }
+    final withHeadcount = _departments.where((d) => (d['employeeCount'] as int) > 0).toList();
+    final totalEmployees = _departments.fold<int>(0, (a, d) => a + (d['employeeCount'] as int));
+
+    return [
+      Row(
+        children: [
+          Expanded(child: _statTile(context, '${_departments.length}', 'Groups')),
+          Expanded(child: _statTile(context, '$totalEmployees', 'People')),
+        ],
+      ),
+      const SizedBox(height: 20),
+      if (withHeadcount.isNotEmpty) ...[
+        const Text('On-time % vs checklist compliance %', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 4),
+        Row(children: [
+          _legendDot(context, Theme.of(context).colorScheme.primary, 'On-time %'),
+          const SizedBox(width: 16),
+          _legendDot(context, Theme.of(context).colorScheme.tertiary, 'Checklist %'),
+        ]),
+        const SizedBox(height: 12),
+        SizedBox(
+          height: 200,
+          child: BarChart(BarChartData(
+            maxY: 100,
+            barGroups: [
+              for (int i = 0; i < withHeadcount.length; i++)
+                BarChartGroupData(x: i, barRods: [
+                  BarChartRodData(toY: (withHeadcount[i]['onTimePct'] as int).toDouble(), color: Theme.of(context).colorScheme.primary, width: 12, borderRadius: const BorderRadius.vertical(top: Radius.circular(3))),
+                  BarChartRodData(toY: (withHeadcount[i]['checklistCompliancePct'] as int).toDouble(), color: Theme.of(context).colorScheme.tertiary, width: 12, borderRadius: const BorderRadius.vertical(top: Radius.circular(3))),
+                ]),
+            ],
+            titlesData: FlTitlesData(
+              bottomTitles: AxisTitles(sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (v, meta) {
+                  final i = v.toInt();
+                  if (i < 0 || i >= withHeadcount.length) return const SizedBox.shrink();
+                  final d = withHeadcount[i];
+                  final name = d['departmentId'] == null ? l10n.notAssigned : d['name'] as String;
+                  // Full name, not just the first word — unlike employee first
+                  // names, department names ("Not assigned") turn misleading
+                  // when truncated to one word ("Not").
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(name, style: const TextStyle(fontSize: 9), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                  );
+                },
+              )),
+              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 38)),
+              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            ),
+            borderData: FlBorderData(show: false),
+            gridData: const FlGridData(show: false),
+          )),
+        ),
+        const SizedBox(height: 20),
+      ],
+      const Text('Departments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      const SizedBox(height: 8),
+      ..._departments.map((d) {
+        final name = d['departmentId'] == null ? l10n.notAssigned : d['name'] as String;
+        final completed = d['completed'] as int;
+        final late = d['late'] as int;
+        return Card(
+          child: ListTile(
+            onTap: () => _openDepartment(d as Map<String, dynamic>),
+            leading: CircleAvatar(child: Text('${d['employeeCount']}')),
+            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
+            subtitle: Text(completed > 0 ? '$completed done · $late late · load ${d['currentLoad']}' : 'No completed tasks in this range'),
+            trailing: completed > 0
+                ? Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Text('${d['onTimePct']}%', style: TextStyle(fontWeight: FontWeight.bold, color: _colorFor(context, d['onTimePct'] as int))),
+                      const Text('on-time', style: TextStyle(fontSize: 10)),
+                    ],
+                  )
+                : const Icon(Icons.chevron_right),
+          ),
+        );
+      }),
+    ];
+  }
+
+  Widget _legendDot(BuildContext context, Color color, String label) {
+    return Row(mainAxisSize: MainAxisSize.min, children: [
+      Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+      const SizedBox(width: 6),
+      Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+    ]);
+  }
+
+  Color _colorFor(BuildContext context, int pct) {
+    final c = AppColors.of(context);
+    if (pct >= 80) return c.success;
+    if (pct >= 50) return c.warning;
+    return c.danger;
+  }
+
+  Widget _statTile(BuildContext context, String value, String label) {
+    return Column(
+      children: [
+        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+      ],
+    );
+  }
+}
+
+class _DepartmentMembersScreen extends StatelessWidget {
+  final String title;
+  final List<dynamic> members;
+  const _DepartmentMembersScreen({required this.title, required this.members});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: Text(title)),
+      body: members.isEmpty
+          ? const Center(child: Text('No employees in this group.'))
+          : ListView.builder(
+              padding: const EdgeInsets.all(12),
+              itemCount: members.length,
+              itemBuilder: (_, i) {
+                final e = members[i] as Map<String, dynamic>;
+                return Card(
+                  child: ListTile(
+                    title: Text(e['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                    subtitle: Text('${e['completed']} done · ${e['escalated']} escalated · load ${e['currentLoad']}'),
+                    trailing: Text('${e['onTimePct']}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                );
+              },
+            ),
+    );
+  }
+}

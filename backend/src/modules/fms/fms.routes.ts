@@ -266,32 +266,37 @@ fmsRouter.post('/orderstages/:id/complete', async (req: Request, res: Response, 
 fmsRouter.get('/bottlenecks', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
+    const key = `fms:bottlenecks:${orgId}`;
 
-    const stages = await prisma.stageDef.findMany({
-      where: { orgId },
-      include: { flow: { select: { name: true } } },
+    const data = await cached(key, ANALYTICS_CACHE_TTL_MS, async () => {
+      const stages = await prisma.stageDef.findMany({
+        where: { orgId },
+        include: { flow: { select: { name: true } } },
+      });
+
+      const [stuckRows, avgDelayRows] = await Promise.all([
+        prisma.orderStage.groupBy({
+          by: ['stageId'], where: { orgId, completedAt: null }, _count: { _all: true },
+        }),
+        prisma.orderStage.groupBy({
+          by: ['stageId'], where: { orgId, completedAt: { not: null }, delayMins: { not: null } }, _avg: { delayMins: true },
+        }),
+      ]);
+      const stuckByStage = new Map(stuckRows.map(r => [r.stageId, r._count._all]));
+      const avgDelayByStage = new Map(avgDelayRows.map(r => [r.stageId, r._avg.delayMins ?? 0]));
+
+      const result = stages.map((s) => ({
+        stageName: s.name,
+        flowName: s.flow.name,
+        ordersStuck: stuckByStage.get(s.id) ?? 0,
+        avgDelayMins: Math.round(avgDelayByStage.get(s.id) ?? 0),
+        plannedMins: s.plannedMins,
+      }));
+
+      return result.sort((a, b) => b.ordersStuck - a.ordersStuck);
     });
 
-    const [stuckRows, avgDelayRows] = await Promise.all([
-      prisma.orderStage.groupBy({
-        by: ['stageId'], where: { orgId, completedAt: null }, _count: { _all: true },
-      }),
-      prisma.orderStage.groupBy({
-        by: ['stageId'], where: { orgId, completedAt: { not: null }, delayMins: { not: null } }, _avg: { delayMins: true },
-      }),
-    ]);
-    const stuckByStage = new Map(stuckRows.map(r => [r.stageId, r._count._all]));
-    const avgDelayByStage = new Map(avgDelayRows.map(r => [r.stageId, r._avg.delayMins ?? 0]));
-
-    const result = stages.map((s) => ({
-      stageName: s.name,
-      flowName: s.flow.name,
-      ordersStuck: stuckByStage.get(s.id) ?? 0,
-      avgDelayMins: Math.round(avgDelayByStage.get(s.id) ?? 0),
-      plannedMins: s.plannedMins,
-    }));
-
-    res.json(result.sort((a, b) => b.ordersStuck - a.ordersStuck));
+    res.json(data);
   } catch (err) { next(err); }
 });
 

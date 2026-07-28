@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
-import 'export_actions.dart';
+import 'analytics_flow.dart';
+import 'analytics_employee.dart';
+import 'analytics_department.dart';
+import 'analytics_task.dart';
+import 'responsive.dart';
 import 'theme/app_theme.dart';
+import 'l10n/gen/app_localizations.dart';
 
-enum _RangePreset { today, week, month, custom }
-
-// Owner/Manager only. Date-ranged aggregates across every module — numbers
-// first, charts second. Each section calls its own analytics endpoint so a
-// slow one (FMS/inventory) never blocks the others from rendering.
+// Owner/Manager only. First screen is a hub of four analysis areas — each
+// card shows a cheap one-line summary (reusing the same cached, grouped-
+// aggregate endpoints the detail screens use, just with a fixed "this week"
+// window). Tapping a card opens that area's full, date-filterable analysis.
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
   @override
@@ -16,31 +19,13 @@ class AnalyticsScreen extends StatefulWidget {
 }
 
 class _AnalyticsScreenState extends State<AnalyticsScreen> {
-  _RangePreset _preset = _RangePreset.week;
-  DateTime _customFrom = DateTime.now().subtract(const Duration(days: 7));
-  DateTime _customTo = DateTime.now();
-
   bool _loading = true;
   String? _error;
-  List<dynamic> _employees = [];
-  List<dynamic> _delegation = [];
-  List<dynamic> _checklists = [];
-  Map<String, dynamic> _fms = {};
-  Map<String, dynamic> _inventory = {};
 
-  (DateTime, DateTime) get _range {
-    final now = DateTime.now();
-    switch (_preset) {
-      case _RangePreset.today:
-        return (DateTime(now.year, now.month, now.day), now);
-      case _RangePreset.week:
-        return (now.subtract(const Duration(days: 7)), now);
-      case _RangePreset.month:
-        return (DateTime(now.year, now.month, 1), now);
-      case _RangePreset.custom:
-        return (_customFrom, _customTo);
-    }
-  }
+  String _flowSummary = '';
+  String _employeeSummary = '';
+  String _departmentSummary = '';
+  String _taskSummary = '';
 
   @override
   void initState() {
@@ -50,21 +35,35 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
 
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; });
-    final (from, to) = _range;
+    final now = DateTime.now();
+    final weekAgo = now.subtract(const Duration(days: 7));
     try {
       final results = await Future.wait([
-        Api.analyticsEmployees(from, to),
-        Api.analyticsDelegation(from, to),
-        Api.analyticsChecklists(from, to),
-        Api.analyticsFms(from, to),
-        Api.analyticsInventory(from, to),
+        Api.fmsAnalyticsSummary(),
+        Api.analyticsEmployees(weekAgo, now),
+        Api.analyticsDepartments(weekAgo, now),
+        Api.analyticsDelegation(weekAgo, now),
+        Api.analyticsChecklists(weekAgo, now),
       ]);
+
+      final flow = results[0] as Map<String, dynamic>;
+      final employees = results[1] as List<dynamic>;
+      final departments = results[2] as List<dynamic>;
+      final delegation = results[3] as Map<String, dynamic>;
+      final checklists = results[4] as Map<String, dynamic>;
+
+      final delegationTotals = delegation['totals'] as Map<String, dynamic>? ?? {};
+      final checklistTotals = checklists['totals'] as Map<String, dynamic>? ?? {};
+
       setState(() {
-        _employees = results[0] as List<dynamic>;
-        _delegation = results[1] as List<dynamic>;
-        _checklists = results[2] as List<dynamic>;
-        _fms = results[3] as Map<String, dynamic>;
-        _inventory = results[4] as Map<String, dynamic>;
+        _flowSummary = '${flow['totalOrders'] ?? 0} orders · ${flow['delayed'] ?? 0} delayed';
+        _employeeSummary = employees.isEmpty
+            ? 'No active employees'
+            : '${employees.length} active · ${_avgOnTime(employees)}% avg on-time';
+        _departmentSummary = departments.isEmpty
+            ? 'No departments yet'
+            : '${departments.length} group(s) · ${_avgDeptOnTime(departments)}% avg on-time';
+        _taskSummary = '${delegationTotals['completionPct'] ?? 0}% delegation · ${checklistTotals['compliancePct'] ?? 0}% checklist';
       });
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -73,336 +72,143 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     }
   }
 
-  Future<void> _exportTasksReport() async {
-    final format = await showDialog<String>(
-      context: context,
-      builder: (_) => SimpleDialog(
-        title: const Text('Export format'),
-        children: [
-          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'csv'), child: const Text('CSV')),
-          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'xlsx'), child: const Text('Excel (.xlsx)')),
-        ],
-      ),
-    );
-    if (format == null || !mounted) return;
-
-    final (from, to) = _range;
-    try {
-      final (bytes, filename) = await Api.exportTasks(format, from: from, to: to);
-      await shareExportedFile(bytes, filename);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
-      }
-    }
+  int _avgOnTime(List<dynamic> employees) {
+    final withCompleted = employees.where((e) => (e['completed'] as int? ?? 0) > 0).toList();
+    if (withCompleted.isEmpty) return 0;
+    final sum = withCompleted.fold<int>(0, (a, e) => a + (e['onTimePct'] as int? ?? 0));
+    return (sum / withCompleted.length).round();
   }
 
-  Future<void> _pickCustomRange() async {
-    final picked = await showDateRangePicker(
-      context: context,
-      firstDate: DateTime.now().subtract(const Duration(days: 730)),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-      initialDateRange: DateTimeRange(start: _customFrom, end: _customTo),
-    );
-    if (picked == null) return;
-    setState(() {
-      _customFrom = picked.start;
-      _customTo = picked.end;
-      _preset = _RangePreset.custom;
-    });
-    _load();
+  int _avgDeptOnTime(List<dynamic> departments) {
+    final withCompleted = departments.where((d) => (d['completed'] as int? ?? 0) > 0).toList();
+    if (withCompleted.isEmpty) return 0;
+    final sum = withCompleted.fold<int>(0, (a, d) => a + (d['onTimePct'] as int? ?? 0));
+    return (sum / withCompleted.length).round();
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Analytics'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.ios_share),
-            tooltip: 'Export tasks report',
-            onPressed: _exportTasksReport,
-          ),
-        ],
-      ),
+      appBar: AppBar(title: Text(l10n.navAnalytics)),
       body: RefreshIndicator(
         onRefresh: _load,
-        child: ListView(
-          padding: const EdgeInsets.all(12),
-          children: [
-            _rangeSelector(),
-            const SizedBox(height: 12),
-            if (_loading) const Center(child: Padding(padding: EdgeInsets.all(24), child: CircularProgressIndicator())),
-            if (_error != null)
-              Padding(padding: const EdgeInsets.all(12), child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger))),
-            if (!_loading && _error == null) ...[
-              _sectionCard('Employee performance', _employeeSection()),
-              _sectionCard('Delegation completion rate', _delegationSection()),
-              _sectionCard('Checklist compliance', _checklistSection()),
-              _sectionCard('Flow Monitoring System', _fmsSection()),
-              _sectionCard('Inventory', _inventorySection()),
-            ],
-          ],
-        ),
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : _error != null
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(_error!, style: TextStyle(color: AppColors.of(context).danger)),
+                    ),
+                  )
+                : MaxWidthCenter(
+                    child: ListView(
+                      padding: const EdgeInsets.all(16),
+                      children: [
+                        GridView.count(
+                          crossAxisCount: switch (screenSizeOf(context)) {
+                            ScreenSize.compact => 1,
+                            ScreenSize.medium => 2,
+                            ScreenSize.expanded => 2,
+                          },
+                          shrinkWrap: true,
+                          physics: const NeverScrollableScrollPhysics(),
+                          mainAxisSpacing: 12,
+                          crossAxisSpacing: 12,
+                          childAspectRatio: 2.6,
+                          children: [
+                            _AnalyticsCard(
+                              icon: Icons.account_tree_outlined,
+                              title: l10n.flowAnalysisTitle,
+                              summary: _flowSummary,
+                              color: AppColors.of(context).info,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FlowAnalysisScreen())),
+                            ),
+                            _AnalyticsCard(
+                              icon: Icons.people_outline,
+                              title: l10n.employeeAnalysisTitle,
+                              summary: _employeeSummary,
+                              color: AppColors.of(context).success,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EmployeeAnalysisScreen())),
+                            ),
+                            _AnalyticsCard(
+                              icon: Icons.apartment_outlined,
+                              title: l10n.departmentAnalysisTitle,
+                              summary: _departmentSummary,
+                              color: Theme.of(context).colorScheme.tertiary,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DepartmentAnalysisScreen())),
+                            ),
+                            _AnalyticsCard(
+                              icon: Icons.fact_check_outlined,
+                              title: l10n.taskAnalysisTitle,
+                              summary: _taskSummary,
+                              color: AppColors.of(context).warning,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskAnalysisScreen())),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
       ),
     );
   }
+}
 
-  Widget _rangeSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        SegmentedButton<_RangePreset>(
-          segments: const [
-            ButtonSegment(value: _RangePreset.today, label: Text('Today')),
-            ButtonSegment(value: _RangePreset.week, label: Text('Week')),
-            ButtonSegment(value: _RangePreset.month, label: Text('Month')),
-            ButtonSegment(value: _RangePreset.custom, label: Text('Custom')),
-          ],
-          selected: {_preset},
-          onSelectionChanged: (s) {
-            if (s.first == _RangePreset.custom) {
-              _pickCustomRange();
-            } else {
-              setState(() => _preset = s.first);
-              _load();
-            }
-          },
-        ),
-        if (_preset == _RangePreset.custom)
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Text(
-              '${_customFrom.toLocal().toString().split(' ')[0]} → ${_customTo.toLocal().toString().split(' ')[0]}',
-              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12),
-            ),
-          ),
-      ],
-    );
-  }
+class _AnalyticsCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String summary;
+  final Color color;
+  final VoidCallback onTap;
 
-  Widget _sectionCard(String title, Widget child) {
+  const _AnalyticsCard({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-            const SizedBox(height: 10),
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _employeeSection() {
-    if (_employees.isEmpty) return const Text('No employee activity in this range.');
-    return Column(
-      children: [
-        ..._employees.map((e) => Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Row(
-                children: [
-                  Expanded(flex: 3, child: Text(e['name'], style: const TextStyle(fontWeight: FontWeight.w600))),
-                  Expanded(flex: 2, child: Text('${e['completed']} done')),
-                  Expanded(flex: 2, child: Text('${e['onTimePct']}% on-time')),
-                  Expanded(flex: 2, child: Text('${e['escalated']} escalated')),
-                  Expanded(flex: 2, child: Text('load: ${e['currentLoad']}')),
-                ],
-              ),
-            )),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 160,
-          child: BarChart(BarChartData(
-            barGroups: [
-              for (int i = 0; i < _employees.length; i++)
-                BarChartGroupData(x: i, barRods: [
-                  BarChartRodData(toY: (_employees[i]['onTimePct'] as int).toDouble(), color: AppColors.of(context).success, width: 18),
-                ]),
-            ],
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (v, meta) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= _employees.length) return const SizedBox.shrink();
-                  final name = _employees[i]['name'] as String;
-                  return Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(name.split(' ').first, style: const TextStyle(fontSize: 10)),
-                  );
-                },
-              )),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-            gridData: const FlGridData(show: false),
-            maxY: 100,
-          )),
-        ),
-      ],
-    );
-  }
-
-  Widget _delegationSection() {
-    if (_delegation.isEmpty) return const Text('No delegation tasks created in this range.');
-    final totalCreated = _delegation.fold<int>(0, (a, d) => a + (d['created'] as int));
-    final totalCompleted = _delegation.fold<int>(0, (a, d) => a + (d['completed'] as int));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('$totalCompleted / $totalCreated completed (${totalCreated > 0 ? (totalCompleted * 100 / totalCreated).round() : 0}%)'),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 160,
-          child: LineChart(LineChartData(
-            lineBarsData: [
-              LineChartBarData(
-                spots: [
-                  for (int i = 0; i < _delegation.length; i++)
-                    FlSpot(i.toDouble(), (_delegation[i]['completionPct'] as int).toDouble()),
-                ],
-                isCurved: true,
-                color: Theme.of(context).colorScheme.tertiary,
-                dotData: const FlDotData(show: true),
-              ),
-            ],
-            titlesData: const FlTitlesData(
-              bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
-            ),
-            borderData: FlBorderData(show: false),
-            gridData: const FlGridData(show: false),
-            minY: 0,
-            maxY: 100,
-          )),
-        ),
-      ],
-    );
-  }
-
-  Widget _checklistSection() {
-    if (_checklists.isEmpty) return const Text('No checklist activity in this range.');
-    return Column(
-      children: _checklists.map((c) {
-        final pct = c['compliancePct'] as int;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+      color: color.withValues(alpha: 0.06),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Expanded(flex: 3, child: Text(c['title'])),
-              Expanded(
-                flex: 4,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: pct / 100,
-                    minHeight: 10,
-                    color: pct >= 80
-                        ? AppColors.of(context).success
-                        : pct >= 50
-                            ? AppColors.of(context).warning
-                            : AppColors.of(context).danger,
-                    backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  ),
-                ),
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.14), shape: BoxShape.circle),
+                child: Icon(icon, color: color, size: 24),
               ),
-              const SizedBox(width: 8),
-              Text('$pct%'),
-            ],
-          ),
-        );
-      }).toList(),
-    );
-  }
-
-  Widget _fmsSection() {
-    final throughput = _fms['throughput'] as Map<String, dynamic>? ?? {};
-    final stages = (_fms['stages'] as List<dynamic>? ?? []);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('${throughput['completedOrders'] ?? 0} orders completed · avg cycle ${throughput['avgCycleTimeMins'] ?? 0} min'),
-        const SizedBox(height: 12),
-        if (stages.isEmpty)
-          const Text('No stage activity in this range.')
-        else
-          ...stages.map((s) => Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4),
-                child: Row(
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Expanded(flex: 3, child: Text('${s['flowName']} — ${s['stageName']}')),
-                    Expanded(flex: 2, child: Text('avg ${s['avgMins']}m')),
-                    Expanded(
-                      flex: 2,
-                      child: Text(
-                        s['avgDelayMins'] > 0 ? '+${s['avgDelayMins']}m late' : 'on time',
-                        style: TextStyle(
-                            color: s['avgDelayMins'] > 0
-                                ? AppColors.of(context).danger
-                                : AppColors.of(context).success),
-                      ),
+                    Text(title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    const SizedBox(height: 4),
+                    Text(
+                      summary,
+                      style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    Expanded(flex: 2, child: Text('${s['ordersStuckNow']} stuck now')),
                   ],
                 ),
-              )),
-      ],
-    );
-  }
-
-  Widget _inventorySection() {
-    final total = (_inventory['totalStockValue'] as num?)?.toDouble() ?? 0;
-    final dead = (_inventory['deadStockValue'] as num?)?.toDouble() ?? 0;
-    final low = _inventory['lowStockCount'] ?? 0;
-    final trend = (_inventory['movementTrend'] as List<dynamic>? ?? []);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Stock value: ₹${total.toStringAsFixed(0)}  ·  Dead stock: ₹${dead.toStringAsFixed(0)}  ·  Low stock: $low SKUs'),
-        const SizedBox(height: 12),
-        if (trend.isEmpty)
-          const Text('No stock movements in this range.')
-        else
-          SizedBox(
-            height: 160,
-            child: LineChart(LineChartData(
-              lineBarsData: [
-                LineChartBarData(
-                  spots: [for (int i = 0; i < trend.length; i++) FlSpot(i.toDouble(), (trend[i]['inQty'] as num).toDouble())],
-                  isCurved: true, color: AppColors.of(context).success, dotData: const FlDotData(show: false),
-                ),
-                LineChartBarData(
-                  spots: [for (int i = 0; i < trend.length; i++) FlSpot(i.toDouble(), (trend[i]['outQty'] as num).toDouble())],
-                  isCurved: true, color: AppColors.of(context).danger, dotData: const FlDotData(show: false),
-                ),
-              ],
-              titlesData: const FlTitlesData(
-                bottomTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                leftTitles: AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 32)),
               ),
-              borderData: FlBorderData(show: false),
-              gridData: const FlGridData(show: false),
-            )),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ],
           ),
-        if (trend.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text('green = IN, red = OUT',
-                style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ),
-      ],
+        ),
+      ),
     );
   }
 }

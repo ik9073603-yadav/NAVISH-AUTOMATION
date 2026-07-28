@@ -1339,6 +1339,36 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'All time'**
   String get allTimePreset;
+
+  /// No description provided for @customRangePreset.
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get customRangePreset;
+
+  /// No description provided for @flowAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Flow analysis'**
+  String get flowAnalysisTitle;
+
+  /// No description provided for @employeeAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Employee analysis'**
+  String get employeeAnalysisTitle;
+
+  /// No description provided for @departmentAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Department analysis'**
+  String get departmentAnalysisTitle;
+
+  /// No description provided for @taskAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Task analysis'**
+  String get taskAnalysisTitle;
 }
 
 class _AppLocalizationsDelegate

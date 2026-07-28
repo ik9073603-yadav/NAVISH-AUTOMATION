@@ -222,5 +222,11 @@
   "todayPreset": "आज",
   "thisWeekPreset": "इस हफ्ते",
   "thisMonthPreset": "इस महीने",
-  "allTimePreset": "सभी समय"
+  "allTimePreset": "सभी समय",
+  "customRangePreset": "कस्टम",
+
+  "flowAnalysisTitle": "फ्लो एनालिसिस",
+  "employeeAnalysisTitle": "एम्प्लॉई एनालिसिस",
+  "departmentAnalysisTitle": "डिपार्टमेंट एनालिसिस",
+  "taskAnalysisTitle": "टास्क एनालिसिस"
 }

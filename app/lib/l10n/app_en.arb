@@ -242,5 +242,11 @@
   "todayPreset": "Today",
   "thisWeekPreset": "This week",
   "thisMonthPreset": "This month",
-  "allTimePreset": "All time"
+  "allTimePreset": "All time",
+  "customRangePreset": "Custom",
+
+  "flowAnalysisTitle": "Flow analysis",
+  "employeeAnalysisTitle": "Employee analysis",
+  "departmentAnalysisTitle": "Department analysis",
+  "taskAnalysisTitle": "Task analysis"
 }

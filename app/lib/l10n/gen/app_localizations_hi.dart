@@ -678,4 +678,19 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get allTimePreset => 'सभी समय';
+
+  @override
+  String get customRangePreset => 'कस्टम';
+
+  @override
+  String get flowAnalysisTitle => 'फ्लो एनालिसिस';
+
+  @override
+  String get employeeAnalysisTitle => 'एम्प्लॉई एनालिसिस';
+
+  @override
+  String get departmentAnalysisTitle => 'डिपार्टमेंट एनालिसिस';
+
+  @override
+  String get taskAnalysisTitle => 'टास्क एनालिसिस';
 }

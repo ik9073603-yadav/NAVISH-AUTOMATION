@@ -834,15 +834,21 @@ class Api {
     return jsonDecode(res.body);
   }
 
-  static Future<List<dynamic>> analyticsDelegation(DateTime from, DateTime to) async {
+  static Future<Map<String, dynamic>> analyticsDelegation(DateTime from, DateTime to) async {
     final res = await http.get(_rangeUri('/api/analytics/delegation', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load delegation analytics');
     return jsonDecode(res.body);
   }
 
-  static Future<List<dynamic>> analyticsChecklists(DateTime from, DateTime to) async {
+  static Future<Map<String, dynamic>> analyticsChecklists(DateTime from, DateTime to) async {
     final res = await http.get(_rangeUri('/api/analytics/checklists', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load checklist analytics');
+    return jsonDecode(res.body);
+  }
+
+  static Future<List<dynamic>> analyticsDepartments(DateTime from, DateTime to) async {
+    final res = await http.get(_rangeUri('/api/analytics/departments', from, to), headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to load department analytics');
     return jsonDecode(res.body);
   }
 

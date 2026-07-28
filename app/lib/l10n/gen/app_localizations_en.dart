@@ -678,4 +678,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get allTimePreset => 'All time';
+
+  @override
+  String get customRangePreset => 'Custom';
+
+  @override
+  String get flowAnalysisTitle => 'Flow analysis';
+
+  @override
+  String get employeeAnalysisTitle => 'Employee analysis';
+
+  @override
+  String get departmentAnalysisTitle => 'Department analysis';
+
+  @override
+  String get taskAnalysisTitle => 'Task analysis';
 }
