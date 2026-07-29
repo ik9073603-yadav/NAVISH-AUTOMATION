@@ -104,6 +104,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get yourSystemsHeading => 'Your Systems';
 
   @override
+  String get needsAttentionHeading => 'Needs attention';
+
+  @override
   String get navHome => 'Home';
 
   @override

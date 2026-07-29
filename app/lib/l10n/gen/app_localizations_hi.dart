@@ -104,6 +104,9 @@ class AppLocalizationsHi extends AppLocalizations {
   String get yourSystemsHeading => 'आपके सिस्टम';
 
   @override
+  String get needsAttentionHeading => 'ध्यान देने योग्य';
+
+  @override
   String get navHome => 'होम';
 
   @override

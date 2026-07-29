@@ -2,13 +2,13 @@ import 'package:flutter/cupertino.dart' show CupertinoPageTransitionsBuilder;
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
-// The design system: a deliberate luxury palette (deep charcoal/near-black
-// in dark, warm cream/paper in light — one champagne-gold accent used
-// sparingly for emphasis) elevated into a full ColorScheme, a real type
-// scale (Sora for anything that should feel crafted — headings, buttons,
-// numbers; Inter for anything read in bulk — body copy, list rows), a
-// spacing scale, and shared card/surface shaping. Every screen pulls from
-// here instead of hardcoding TextStyle/Colors.* inline.
+// The design system: an operations-platform identity — neutral cool-gray
+// surfaces with a single restrained indigo accent (pulled from the app
+// icon's dominant hue, desaturated for all-day dashboard use), one type
+// family (Inter) sized for dense tables and long sessions rather than a
+// marketing-site display face, and status conveyed by color + icon/label
+// together, never color alone. Every screen pulls from here instead of
+// hardcoding TextStyle/Colors.* inline.
 
 class AppSpacing {
   static const xs = 4.0;
@@ -20,18 +20,17 @@ class AppSpacing {
 }
 
 class AppRadius {
-  static const sm = 10.0;
-  static const md = 16.0;
-  static const lg = 20.0;
+  static const sm = 8.0;
+  static const md = 12.0;
+  static const lg = 16.0;
   static const pill = 999.0;
 }
 
-// Semantic colors, tuned separately for light/dark rather than one set
-// dimmed by opacity — that's what keeps dark mode from reading as "light
-// mode with the lights off." Deliberately restrained jewel tones (deep
-// teal for success, muted ochre for warning, muted burgundy for danger) —
-// none of them the flat/bright hues that read cheap, and none of them
-// competing with the champagne-gold accent used for primary actions.
+// Semantic status colors, tuned separately for light/dark. Deliberately a
+// different hue family from the primary accent (teal-green / amber / brick
+// red / slate-blue vs. the indigo primary) so "this is clickable" and
+// "this is a status" are never visually confused — and each pair keeps
+// >=4.5:1 text contrast against its own container.
 class AppSemanticColors {
   final Color success;
   final Color onSuccess;
@@ -66,37 +65,37 @@ class AppSemanticColors {
   });
 
   static const light = AppSemanticColors(
-    success: Color(0xFF2F6F5E),
+    success: Color(0xFF1F7A5C),
     onSuccess: Color(0xFFFFFFFF),
-    successContainer: Color(0xFFDCEEE6),
-    onSuccessContainer: Color(0xFF0E3A2E),
-    warning: Color(0xFFA05D18),
+    successContainer: Color(0xFFD8F0E4),
+    onSuccessContainer: Color(0xFF0B3B2A),
+    warning: Color(0xFF8A5A00),
     onWarning: Color(0xFFFFFFFF),
-    warningContainer: Color(0xFFF5DFBD),
-    onWarningContainer: Color(0xFF402400),
-    danger: Color(0xFF9C3B3B),
+    warningContainer: Color(0xFFF6E2B8),
+    onWarningContainer: Color(0xFF3D2600),
+    danger: Color(0xFFB3261E),
     onDanger: Color(0xFFFFFFFF),
-    dangerContainer: Color(0xFFF2D9D6),
-    onDangerContainer: Color(0xFF4A1414),
-    info: Color(0xFF3D5A75),
-    infoContainer: Color(0xFFDCE6EE),
+    dangerContainer: Color(0xFFF9DEDC),
+    onDangerContainer: Color(0xFF410E0B),
+    info: Color(0xFF3B5BA5),
+    infoContainer: Color(0xFFDCE6F5),
   );
 
   static const dark = AppSemanticColors(
-    success: Color(0xFF6FC9AC),
-    onSuccess: Color(0xFF08281F),
-    successContainer: Color(0xFF17392E),
-    onSuccessContainer: Color(0xFFC9EEDF),
-    warning: Color(0xFFE3A55E),
-    onWarning: Color(0xFF3D2200),
-    warningContainer: Color(0xFF4A3115),
-    onWarningContainer: Color(0xFFF6DEB8),
-    danger: Color(0xFFE1877E),
-    onDanger: Color(0xFF400E0B),
-    dangerContainer: Color(0xFF5A211C),
-    onDangerContainer: Color(0xFFF6D9D4),
-    info: Color(0xFF9BC0DD),
-    infoContainer: Color(0xFF26445A),
+    success: Color(0xFF6FD3AE),
+    onSuccess: Color(0xFF07332A),
+    successContainer: Color(0xFF15382C),
+    onSuccessContainer: Color(0xFFBEEBD7),
+    warning: Color(0xFFE0A93D),
+    onWarning: Color(0xFF3D2900),
+    warningContainer: Color(0xFF493107),
+    onWarningContainer: Color(0xFFF6DFB0),
+    danger: Color(0xFFE2897F),
+    onDanger: Color(0xFF410E0B),
+    dangerContainer: Color(0xFF54221D),
+    onDangerContainer: Color(0xFFF9DAD6),
+    info: Color(0xFF9AC0EE),
+    infoContainer: Color(0xFF23375A),
   );
 }
 
@@ -113,116 +112,129 @@ class AppTheme {
   static ThemeData light() => _build(Brightness.light);
   static ThemeData dark() => _build(Brightness.dark);
 
+  // Applies tabular (fixed-width) figures to a text style — use for any
+  // numeral that appears in a table, stat tile, or the Health Score gauge,
+  // so digits align instead of jittering as they change.
+  static TextStyle tabularFigures(TextStyle? style) =>
+      (style ?? const TextStyle()).copyWith(
+        fontFeatures: const [FontFeature.tabularFigures()],
+      );
+
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
 
-    // Hand-tuned rather than ColorScheme.fromSeed — a true near-black base
-    // with a single champagne-gold accent needs deliberate values, not an
-    // algorithmic tonal palette (which never quite reaches "near-black").
+    // Hand-tuned rather than ColorScheme.fromSeed — a true neutral-gray
+    // base with one indigo accent needs deliberate values, not an
+    // algorithmic tonal palette built around the seed hue everywhere.
     final scheme = isDark
         ? const ColorScheme.dark(
-            primary: Color(0xFFC6A15B),
-            onPrimary: Color(0xFF1A1409),
-            primaryContainer: Color(0xFF3A2F17),
-            onPrimaryContainer: Color(0xFFE9CE96),
-            secondary: Color(0xFFB7B2A6),
-            onSecondary: Color(0xFF211F1A),
-            secondaryContainer: Color(0xFF33312A),
-            onSecondaryContainer: Color(0xFFDAD5C7),
-            tertiary: Color(0xFF8C6A3F),
-            onTertiary: Color(0xFFFFFFFF),
-            tertiaryContainer: Color(0xFF3E2F16),
-            onTertiaryContainer: Color(0xFFE9CE96),
-            error: Color(0xFFE1877E),
-            onError: Color(0xFF400E0B),
-            errorContainer: Color(0xFF5A211C),
-            onErrorContainer: Color(0xFFF6D9D4),
-            surface: Color(0xFF16151A),
-            onSurface: Color(0xFFF1ECE0),
-            onSurfaceVariant: Color(0xFFA29C8E),
-            outline: Color(0xFF56504A),
-            outlineVariant: Color(0xFF322F37),
-            surfaceContainerLowest: Color(0xFF08080A),
-            surfaceContainerLow: Color(0xFF121116),
-            surfaceContainer: Color(0xFF1B1A1F),
-            surfaceContainerHigh: Color(0xFF201E24),
-            surfaceContainerHighest: Color(0xFF29272E),
-            inverseSurface: Color(0xFFF1ECE0),
-            onInverseSurface: Color(0xFF201E24),
-            inversePrimary: Color(0xFF8A6A2E),
+            primary: Color(0xFF8C93F0),
+            onPrimary: Color(0xFF1B1F4D),
+            primaryContainer: Color(0xFF333B85),
+            onPrimaryContainer: Color(0xFFE1E2FA),
+            secondary: Color(0xFFAEB1C4),
+            onSecondary: Color(0xFF1F212B),
+            secondaryContainer: Color(0xFF383B4A),
+            onSecondaryContainer: Color(0xFFDCDDE8),
+            tertiary: Color(0xFF7C97C9),
+            onTertiary: Color(0xFF0F2038),
+            tertiaryContainer: Color(0xFF223357),
+            onTertiaryContainer: Color(0xFFD3E1F5),
+            error: Color(0xFFE2897F),
+            onError: Color(0xFF410E0B),
+            errorContainer: Color(0xFF54221D),
+            onErrorContainer: Color(0xFFF9DAD6),
+            surface: Color(0xFF121317),
+            onSurface: Color(0xFFE7E8ED),
+            onSurfaceVariant: Color(0xFFA6A9B4),
+            outline: Color(0xFF5C5F6B),
+            outlineVariant: Color(0xFF34363F),
+            surfaceContainerLowest: Color(0xFF08090B),
+            surfaceContainerLow: Color(0xFF17181D),
+            surfaceContainer: Color(0xFF1C1D23),
+            surfaceContainerHigh: Color(0xFF212228),
+            surfaceContainerHighest: Color(0xFF2A2B33),
+            inverseSurface: Color(0xFFE7E8ED),
+            onInverseSurface: Color(0xFF212228),
+            inversePrimary: Color(0xFF4B57C9),
             scrim: Colors.black,
             shadow: Colors.black,
           )
         : const ColorScheme.light(
-            primary: Color(0xFF8A6A2E),
+            primary: Color(0xFF4B57C9),
             onPrimary: Color(0xFFFFFFFF),
-            primaryContainer: Color(0xFFE8D9AE),
-            onPrimaryContainer: Color(0xFF4A3714),
-            secondary: Color(0xFF8A8272),
+            primaryContainer: Color(0xFFE1E2FA),
+            onPrimaryContainer: Color(0xFF232A73),
+            secondary: Color(0xFF5B5F73),
             onSecondary: Color(0xFFFFFFFF),
-            secondaryContainer: Color(0xFFEDE7D8),
-            onSecondaryContainer: Color(0xFF3A362A),
-            tertiary: Color(0xFF6E4F26),
+            secondaryContainer: Color(0xFFE2E2ED),
+            onSecondaryContainer: Color(0xFF32354A),
+            tertiary: Color(0xFF3F5B8C),
             onTertiary: Color(0xFFFFFFFF),
-            tertiaryContainer: Color(0xFFEFDFC0),
-            onTertiaryContainer: Color(0xFF3A2A10),
-            error: Color(0xFF9C3B3B),
+            tertiaryContainer: Color(0xFFD9E5F7),
+            onTertiaryContainer: Color(0xFF122544),
+            error: Color(0xFFB3261E),
             onError: Color(0xFFFFFFFF),
-            errorContainer: Color(0xFFF2D9D6),
-            onErrorContainer: Color(0xFF4A1414),
-            surface: Color(0xFFFFFDF8),
-            onSurface: Color(0xFF221C10),
-            onSurfaceVariant: Color(0xFF6B6252),
-            outline: Color(0xFFB4A98A),
-            outlineVariant: Color(0xFFE3D9BF),
+            errorContainer: Color(0xFFF9DEDC),
+            onErrorContainer: Color(0xFF410E0B),
+            surface: Color(0xFFF8F9FB),
+            onSurface: Color(0xFF1B1C20),
+            onSurfaceVariant: Color(0xFF5B5E68),
+            outline: Color(0xFF8B8E99),
+            outlineVariant: Color(0xFFD8DADF),
             surfaceContainerLowest: Color(0xFFFFFFFF),
-            surfaceContainerLow: Color(0xFFF7F2E7),
-            surfaceContainer: Color(0xFFF1EAD8),
-            surfaceContainerHigh: Color(0xFFEBE3CE),
-            surfaceContainerHighest: Color(0xFFE5DBC2),
-            inverseSurface: Color(0xFF362F22),
-            onInverseSurface: Color(0xFFF7F2E7),
-            inversePrimary: Color(0xFFC6A15B),
+            surfaceContainerLow: Color(0xFFF1F2F5),
+            surfaceContainer: Color(0xFFECEDF1),
+            surfaceContainerHigh: Color(0xFFE6E7ED),
+            surfaceContainerHighest: Color(0xFFE0E1E8),
+            inverseSurface: Color(0xFF2E2F36),
+            onInverseSurface: Color(0xFFF1F1F5),
+            inversePrimary: Color(0xFFBAC0F5),
             scrim: Colors.black,
             shadow: Colors.black,
           );
 
-    final displayFont = GoogleFonts.sora;
-    final bodyFont = GoogleFonts.inter;
-    // Sora/Inter only cover Latin glyphs. When the Hindi locale is active,
-    // Text widgets render Devanagari — without a fallback those characters
-    // draw as tofu boxes. Noto Sans Devanagari fills in exactly those
-    // glyphs while leaving Latin text on Sora/Inter untouched.
+    // One font family for the whole app — Inter — rather than a separate
+    // display face. Dense tables, stat tiles, and long sessions read
+    // better from one well-hinted grotesque than a two-family split whose
+    // only job was decorative flourish.
+    final uiFont = GoogleFonts.inter;
+    // Inter covers Latin only. When the Hindi locale is active, Text
+    // widgets render Devanagari — without a fallback those characters draw
+    // as tofu boxes. Noto Sans Devanagari fills in exactly those glyphs
+    // while leaving Latin text on Inter untouched.
     final devanagariFallback = [GoogleFonts.notoSansDevanagari().fontFamily!];
 
     final base = ThemeData(colorScheme: scheme, useMaterial3: true, brightness: brightness);
 
+    // Compressed vs. a marketing-site scale — almost every Navish screen
+    // is a list, table, or form, not a landing page, so display sizes stay
+    // modest and body/label sizes get the real estate.
     final textTheme = TextTheme(
-      displayLarge: displayFont(fontSize: 40, fontWeight: FontWeight.w800, letterSpacing: -0.6),
-      displayMedium: displayFont(fontSize: 32, fontWeight: FontWeight.w800, letterSpacing: -0.5),
-      displaySmall: displayFont(fontSize: 26, fontWeight: FontWeight.w700, letterSpacing: -0.3),
-      headlineLarge: displayFont(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.2),
-      headlineMedium: displayFont(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.1),
-      headlineSmall: displayFont(fontSize: 18, fontWeight: FontWeight.w700),
-      titleLarge: displayFont(fontSize: 17, fontWeight: FontWeight.w700),
-      titleMedium: bodyFont(fontSize: 15, fontWeight: FontWeight.w600),
-      titleSmall: bodyFont(fontSize: 13, fontWeight: FontWeight.w600),
-      bodyLarge: bodyFont(fontSize: 16, fontWeight: FontWeight.w400),
-      bodyMedium: bodyFont(fontSize: 14, fontWeight: FontWeight.w400),
-      bodySmall: bodyFont(fontSize: 12, fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
-      labelLarge: bodyFont(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: 0.2),
-      labelMedium: bodyFont(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.2),
-      labelSmall: bodyFont(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.2),
+      displayLarge: uiFont(fontSize: 28, fontWeight: FontWeight.w800, letterSpacing: -0.4),
+      displayMedium: uiFont(fontSize: 24, fontWeight: FontWeight.w700, letterSpacing: -0.3),
+      displaySmall: uiFont(fontSize: 20, fontWeight: FontWeight.w700, letterSpacing: -0.2),
+      headlineLarge: uiFont(fontSize: 18, fontWeight: FontWeight.w700, letterSpacing: -0.1),
+      headlineMedium: uiFont(fontSize: 17, fontWeight: FontWeight.w700),
+      headlineSmall: uiFont(fontSize: 16, fontWeight: FontWeight.w700),
+      titleLarge: uiFont(fontSize: 15, fontWeight: FontWeight.w700),
+      titleMedium: uiFont(fontSize: 14, fontWeight: FontWeight.w600),
+      titleSmall: uiFont(fontSize: 13, fontWeight: FontWeight.w600),
+      bodyLarge: uiFont(fontSize: 15, fontWeight: FontWeight.w400),
+      bodyMedium: uiFont(fontSize: 14, fontWeight: FontWeight.w400),
+      bodySmall: uiFont(fontSize: 12, fontWeight: FontWeight.w400, color: scheme.onSurfaceVariant),
+      labelLarge: uiFont(fontSize: 13, fontWeight: FontWeight.w600, letterSpacing: 0.1),
+      labelMedium: uiFont(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: 0.1),
+      labelSmall: uiFont(fontSize: 11, fontWeight: FontWeight.w600, letterSpacing: 0.1),
     ).apply(
       bodyColor: scheme.onSurface,
       displayColor: scheme.onSurface,
       fontFamilyFallback: devanagariFallback,
     );
 
-    // The scaffold sits a shade deeper than card/appbar/nav surfaces —
-    // that gentle separation is what reads as "layered, considered depth"
-    // instead of one flat slab of color.
-    final scaffoldBg = isDark ? const Color(0xFF0C0C0E) : const Color(0xFFF7F2E7);
+    // The scaffold sits a shade deeper than card/appbar/nav surfaces — that
+    // gentle separation reads as layered structure instead of one flat slab.
+    final scaffoldBg = isDark ? const Color(0xFF0A0B0D) : const Color(0xFFF2F3F6);
 
     return base.copyWith(
       scaffoldBackgroundColor: scaffoldBg,
@@ -239,13 +251,13 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         color: scheme.surface,
-        elevation: isDark ? 2 : 1,
-        shadowColor: Colors.black.withValues(alpha: isDark ? 0.5 : 0.10),
+        elevation: isDark ? 1 : 0,
+        shadowColor: Colors.black.withValues(alpha: isDark ? 0.4 : 0.08),
         surfaceTintColor: Colors.transparent,
         margin: const EdgeInsets.symmetric(vertical: AppSpacing.xs),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(AppRadius.lg),
-          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: isDark ? 0.7 : 0.6)),
+          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: isDark ? 0.7 : 0.8)),
         ),
       ),
       chipTheme: base.chipTheme.copyWith(
@@ -264,7 +276,7 @@ class AppTheme {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(AppRadius.sm),
-          borderSide: BorderSide(color: scheme.primary, width: 1.6),
+          borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.md),
       ),
@@ -280,7 +292,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppRadius.sm)),
           padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl, vertical: AppSpacing.md),
           textStyle: textTheme.labelLarge,
-          side: BorderSide(color: scheme.outline.withValues(alpha: 0.5)),
+          side: BorderSide(color: scheme.outline.withValues(alpha: 0.6)),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -300,7 +312,7 @@ class AppTheme {
         selectedLabelTextStyle: textTheme.labelMedium?.copyWith(color: scheme.onSurface),
         unselectedLabelTextStyle: textTheme.labelMedium?.copyWith(color: scheme.onSurfaceVariant),
       ),
-      dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: 0.6)),
+      dividerTheme: DividerThemeData(color: scheme.outlineVariant.withValues(alpha: 0.7)),
       snackBarTheme: SnackBarThemeData(
         backgroundColor: scheme.inverseSurface,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: scheme.onInverseSurface),

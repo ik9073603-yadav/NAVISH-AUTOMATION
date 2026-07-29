@@ -274,6 +274,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   List<dynamic> _tasks = [];
   List<dynamic> _notifs = [];
   int _stuckCount = 0;
+  int _lowStockCount = 0;
   Map<String, dynamic>? _healthScore;
   bool _loading = true;
   int _tab = 0;
@@ -353,15 +354,29 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final Future<Map<String, dynamic>?> healthFuture = isOwnerOrManager
           ? _tryHealthScore()
           : Future.value(null);
+      // Inventory summary is OWNER/MANAGER-only server-side too — same
+      // best-effort spirit: the low-stock stat just shows 0 if this fails.
+      final lowStockFuture = isOwnerOrManager
+          ? Api.inventorySummary().then((s) => s['lowStockCount'] as int? ?? 0).catchError((_) => 0)
+          : Future.value(0);
 
-      final results = await Future.wait([tasksFuture, notifsFuture, stuckFuture, healthFuture]);
+      final results =
+          await Future.wait([tasksFuture, notifsFuture, stuckFuture, healthFuture, lowStockFuture]);
       final tasks = results[0] as List<dynamic>;
       final notifs = results[1] as List<dynamic>;
       final stuckCount = results[2] as int;
       final healthScore = results[3] as Map<String, dynamic>?;
+      final lowStockCount = results[4] as int;
 
       if (!mounted) return;
-      setState(() { _user = user; _tasks = tasks; _notifs = notifs; _stuckCount = stuckCount; _healthScore = healthScore; });
+      setState(() {
+        _user = user;
+        _tasks = tasks;
+        _notifs = notifs;
+        _stuckCount = stuckCount;
+        _healthScore = healthScore;
+        _lowStockCount = lowStockCount;
+      });
       unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();
     } catch (e) {
@@ -654,9 +669,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }).length;
   }
 
-  // Dashboard-style landing hub: a greeting, an at-a-glance strip pulled
-  // from data already loaded this session, then a centered grid of module
-  // cards so "where do I go" is answered before the nav is even touched.
+  // Dashboard-style landing hub, ordered by the priority the data itself
+  // carries: Health Score first (the one number owners check daily), then
+  // what needs attention *right now* (stuck/due-today/low-stock), then the
+  // module grid last — since by the time someone reaches the grid, the
+  // things worth interrupting them for have already been surfaced.
   Widget _homeHub(List<String> labels) {
     final modules = labels.where((l) => l != 'Home').toList();
     final crossAxisCount = switch (screenSizeOf(context)) {
@@ -672,33 +689,40 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Widget entrance(Widget child, int index) {
       if (reduced) return child;
       return child
-          .animate(delay: (40 * index).ms)
-          .fadeIn(duration: 320.ms, curve: Curves.easeOut)
-          .slideY(begin: 0.08, end: 0, duration: 360.ms, curve: Curves.easeOutCubic);
+          .animate(delay: (30 * index).ms)
+          .fadeIn(duration: 280.ms, curve: Curves.easeOut)
+          .slideY(begin: 0.06, end: 0, duration: 320.ms, curve: Curves.easeOutCubic);
     }
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
         children: [
           entrance(
-            Text(
-              l10n.helloUser(_user?['nickname'] as String? ?? _user?['name'] ?? ''),
-              style: theme.textTheme.displaySmall,
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        l10n.helloUser(_user?['nickname'] as String? ?? _user?['name'] ?? ''),
+                        style: theme.textTheme.headlineLarge,
+                      ),
+                      Text(
+                        _user?['organization']?['name'] as String? ?? '',
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
             0,
           ),
-          const SizedBox(height: 4),
-          entrance(
-            Text(
-              _user?['organization']?['name'] as String? ?? '',
-              style: theme.textTheme.bodyMedium
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            1,
-          ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           if (_isOwner) ...[
             entrance(
               HealthGauge(
@@ -714,14 +738,19 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           )),
                         ),
               ),
-              2,
+              1,
             ),
             const SizedBox(height: 16),
           ],
           entrance(
+            Text(l10n.needsAttentionHeading, style: theme.textTheme.titleSmall),
+            2,
+          ),
+          const SizedBox(height: 8),
+          entrance(
             Row(
               children: [
-                if (_isOwner)
+                if (_isOwner) ...[
                   Expanded(
                     child: _glanceStat(
                       icon: Icons.warning_amber_rounded,
@@ -733,7 +762,20 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                           : null,
                     ),
                   ),
-                if (_isOwner) const SizedBox(width: 12),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _glanceStat(
+                      icon: Icons.inventory_2_outlined,
+                      label: l10n.navInventory,
+                      value: _lowStockCount,
+                      color: _lowStockCount > 0 ? semantic.warning : semantic.success,
+                      onTap: _lowStockCount > 0
+                          ? () => setState(() => _tab = labels.indexOf('Inventory'))
+                          : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                ],
                 Expanded(
                   child: _glanceStat(
                     icon: Icons.today_outlined,
@@ -746,51 +788,97 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             3,
           ),
-          const SizedBox(height: 28),
+          const SizedBox(height: 24),
           entrance(
-            Text(l10n.yourSystemsHeading, style: theme.textTheme.titleMedium),
+            Text(l10n.yourSystemsHeading, style: theme.textTheme.titleSmall),
             4,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           GridView.count(
             crossAxisCount: crossAxisCount,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.3,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 1.5,
             children: [
               for (final (i, m) in modules.indexed)
                 entrance(
-                  PressableScale(
-                    onTap: () => setState(() => _tab = labels.indexOf(m)),
-                    child: Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(16),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.all(10),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.primaryContainer,
-                                borderRadius: BorderRadius.circular(AppRadius.sm),
-                              ),
-                              child: Icon(_moduleIcon(m), size: 26,
-                                  color: theme.colorScheme.onPrimaryContainer),
-                            ),
-                            const SizedBox(height: 12),
-                            Text(_moduleDisplayLabel(l10n, m), style: theme.textTheme.titleMedium),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
+                  _moduleTile(m, labels, theme),
                   5 + i,
                 ),
             ],
           ),
         ],
+      ),
+    );
+  }
+
+  // A module tile's badge count, if any — the small signal that lets the
+  // grid double as a status board instead of a plain launcher, without
+  // adding a single extra tap or fetch beyond what Home already loads.
+  int? _moduleBadgeCount(String module) {
+    switch (module) {
+      case 'Stuck': return _stuckCount > 0 ? _stuckCount : null;
+      case 'Inventory': return _lowStockCount > 0 ? _lowStockCount : null;
+      default: return null;
+    }
+  }
+
+  Widget _moduleTile(String m, List<String> labels, ThemeData theme) {
+    final l10n = AppLocalizations.of(context);
+    final semantic = AppColors.of(context);
+    final badge = _moduleBadgeCount(m);
+    return PressableScale(
+      onTap: () => setState(() => _tab = labels.indexOf(m)),
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: [
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: theme.colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(AppRadius.sm),
+                    ),
+                    child: Icon(_moduleIcon(m), size: 22,
+                        color: theme.colorScheme.onPrimaryContainer),
+                  ),
+                  if (badge != null)
+                    Positioned(
+                      right: -6,
+                      top: -6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: semantic.danger,
+                          borderRadius: BorderRadius.circular(AppRadius.pill),
+                        ),
+                        child: Text(
+                          '$badge',
+                          style: AppTheme.tabularFigures(theme.textTheme.labelSmall)
+                              .copyWith(color: semantic.onDanger, fontSize: 10),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  _moduleDisplayLabel(l10n, m),
+                  style: theme.textTheme.titleSmall,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -805,24 +893,21 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     return PressableScale(
       onTap: onTap,
       child: Card(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.08),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: color, size: 22),
-              const SizedBox(width: 10),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('$value',
-                      style: Theme.of(context)
-                          .textTheme
-                          .headlineSmall
-                          ?.copyWith(color: color)),
-                  Text(label, style: Theme.of(context).textTheme.bodySmall),
-                ],
-              ),
+              Icon(icon, color: color, size: 18),
+              const SizedBox(height: 6),
+              Text('$value',
+                  style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineMedium)
+                      .copyWith(color: color)),
+              Text(label,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis),
             ],
           ),
         ),

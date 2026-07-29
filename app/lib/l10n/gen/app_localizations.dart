@@ -284,6 +284,12 @@ abstract class AppLocalizations {
   /// **'Your Systems'**
   String get yourSystemsHeading;
 
+  /// No description provided for @needsAttentionHeading.
+  ///
+  /// In en, this message translates to:
+  /// **'Needs attention'**
+  String get needsAttentionHeading;
+
   /// No description provided for @navHome.
   ///
   /// In en, this message translates to:
