@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
+import 'widgets/analytics_ui.dart';
 import 'l10n/gen/app_localizations.dart';
 
 // Employee Analysis — per-person on-time %, completed/late/escalated,
@@ -24,6 +24,7 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
   bool _loading = true;
   String? _error;
   List<dynamic> _employees = [];
+  List<dynamic> _previousEmployees = [];
   int _loadRequestId = 0;
 
   @override
@@ -36,14 +37,26 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
     final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
+    final (prevFrom, prevTo) = AnalyticsRangeBar.previousRangeFor(_preset, _customFrom, _customTo);
     try {
-      final data = await Api.analyticsEmployees(from, to);
-      if (mounted && requestId == _loadRequestId) setState(() => _employees = data);
+      final results = await Future.wait([
+        Api.analyticsEmployees(from, to),
+        Api.analyticsEmployees(prevFrom, prevTo),
+      ]);
+      if (mounted && requestId == _loadRequestId) {
+        setState(() { _employees = results[0]; _previousEmployees = results[1]; });
+      }
     } catch (e) {
       if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
     } finally {
       if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
     }
+  }
+
+  int _avgOnTime(List<dynamic> employees) {
+    final withActivity = employees.where((e) => (e['completed'] as int) > 0).toList();
+    if (withActivity.isEmpty) return 0;
+    return (withActivity.fold<int>(0, (a, e) => a + (e['onTimePct'] as int)) / withActivity.length).round();
   }
 
   List<dynamic> get _ranked {
@@ -99,75 +112,50 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
     final ranked = _ranked;
     final totalCompleted = _employees.fold<int>(0, (a, e) => a + (e['completed'] as int));
     final totalEscalated = _employees.fold<int>(0, (a, e) => a + (e['escalated'] as int));
-    final avgOnTime = ranked.isEmpty ? 0 : (ranked.fold<int>(0, (a, e) => a + (e['onTimePct'] as int)) / ranked.length).round();
+    final avgOnTime = _avgOnTime(_employees);
+    final prevAvgOnTime = _avgOnTime(_previousEmployees);
     final bottleneck = ranked.isNotEmpty ? ranked.last : null;
+    final semantic = AppColors.of(context);
+
+    final takeaway = bottleneck != null && (bottleneck['onTimePct'] as int) < 70
+        ? '${bottleneck['name']} has the lowest on-time rate (${bottleneck['onTimePct']}%) — likely the current bottleneck.'
+        : ranked.isEmpty
+            ? 'No completed work in this range yet.'
+            : 'Team on-time rate is $avgOnTime% — no single person is dragging it down.';
 
     return [
-      Row(
+      GridView.count(
+        crossAxisCount: 4,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.1,
         children: [
-          Expanded(child: _statTile(context, '${_employees.length}', 'Active people')),
-          Expanded(child: _statTile(context, '$totalCompleted', 'Completed')),
-          Expanded(child: _statTile(context, '$avgOnTime%', 'Avg on-time')),
-          Expanded(child: _statTile(context, '$totalEscalated', 'Escalated')),
+          HeroStat(value: '${_employees.length}', label: 'Active people'),
+          HeroStat(value: '$totalCompleted', label: 'Completed', accent: semantic.success),
+          HeroStat(
+            value: '$avgOnTime%', label: 'Avg on-time',
+            deltaPct: deltaPctOf(avgOnTime, prevAvgOnTime),
+            accent: semantic.info,
+          ),
+          HeroStat(value: '$totalEscalated', label: 'Escalated', accent: totalEscalated > 0 ? semantic.danger : semantic.success),
         ],
       ),
-      if (bottleneck != null && (bottleneck['onTimePct'] as int) < 70) ...[
-        const SizedBox(height: 16),
-        Card(
-          color: AppColors.of(context).warning.withValues(alpha: 0.08),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: [
-                Icon(Icons.report_gmailerrorred, color: AppColors.of(context).warning),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '${bottleneck['name']} has the lowest on-time rate (${bottleneck['onTimePct']}%) — likely the current bottleneck.',
-                    style: const TextStyle(fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
+      const SizedBox(height: 16),
+      TakeawayLine(text: takeaway, icon: bottleneck != null && (bottleneck['onTimePct'] as int) < 70 ? Icons.report_gmailerrorred : Icons.insights_outlined),
       const SizedBox(height: 20),
-      const Text('On-time %, best to worst', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-      const SizedBox(height: 12),
-      SizedBox(
-        height: 200,
-        child: BarChart(BarChartData(
-          maxY: 100,
-          barGroups: [
-            for (int i = 0; i < ranked.length; i++)
-              BarChartGroupData(x: i, barRods: [
-                BarChartRodData(
-                  toY: (ranked[i]['onTimePct'] as int).toDouble(),
-                  color: _colorFor(context, ranked[i]['onTimePct'] as int),
-                  width: 18,
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
-                ),
-              ]),
-          ],
-          titlesData: FlTitlesData(
-            bottomTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true,
-              getTitlesWidget: (v, meta) {
-                final i = v.toInt();
-                if (i < 0 || i >= ranked.length) return const SizedBox.shrink();
-                final name = ranked[i]['name'] as String;
-                return Padding(padding: const EdgeInsets.only(top: 4), child: Text(name.split(' ').first, style: const TextStyle(fontSize: 10)));
-              },
-            )),
-            leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 38)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+      const SectionHeader(title: 'On-time %, best to worst'),
+      RankedBarList(items: [
+        for (final e in ranked)
+          RankedBarItem(
+            label: (e['name'] as String).split(' ').first,
+            value: (e['onTimePct'] as int).toDouble(),
+            valueText: '${e['onTimePct']}%',
+            color: _colorFor(context, e['onTimePct'] as int),
+            onTap: () => _openDetail(e as Map<String, dynamic>),
           ),
-          borderData: FlBorderData(show: false),
-          gridData: const FlGridData(show: false),
-        )),
-      ),
+      ]),
       const SizedBox(height: 20),
       const Text('Everyone', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
       const SizedBox(height: 8),
@@ -186,6 +174,8 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
               ),
             ),
           )),
+      const SizedBox(height: 20),
+      AiInsightsCard(screenData: {'employees': _employees}),
     ];
   }
 
@@ -196,14 +186,6 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
     return c.danger;
   }
 
-  Widget _statTile(BuildContext context, String value, String label) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
-      ],
-    );
-  }
 }
 
 class _EmployeeDetailSheet extends StatelessWidget {

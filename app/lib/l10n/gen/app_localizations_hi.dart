@@ -696,4 +696,17 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get taskAnalysisTitle => 'टास्क एनालिसिस';
+
+  @override
+  String get inventoryAnalysisTitle => 'इन्वेंटरी एनालिसिस';
+
+  @override
+  String get aiInsightsTitle => 'AI इनसाइट्स';
+
+  @override
+  String get aiInsightsPlaceholder =>
+      'AI प्रोवाइडर कनेक्ट करने के बाद यहाँ AI इनसाइट्स दिखेंगी';
+
+  @override
+  String get vsPreviousPeriod => 'पिछली अवधि की तुलना में';
 }

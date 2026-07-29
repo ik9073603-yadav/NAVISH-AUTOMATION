@@ -4,6 +4,7 @@ import 'api.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'widgets/analytics_range_bar.dart';
+import 'widgets/analytics_ui.dart';
 import 'l10n/gen/app_localizations.dart';
 
 // Department Analysis — the same per-employee metrics rolled up by
@@ -103,16 +104,56 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
     }
     final withHeadcount = _departments.where((d) => (d['employeeCount'] as int) > 0).toList();
     final totalEmployees = _departments.fold<int>(0, (a, d) => a + (d['employeeCount'] as int));
+    final avgOnTime = withHeadcount.isEmpty
+        ? 0
+        : (withHeadcount.fold<int>(0, (a, d) => a + (d['onTimePct'] as int)) / withHeadcount.length).round();
+    final weakest = withHeadcount.isNotEmpty
+        ? (([...withHeadcount]..sort((a, b) => (a['onTimePct'] as int).compareTo(b['onTimePct'] as int))).first)
+        : null;
+    final semantic = AppColors.of(context);
+    final donutColors = [
+      Theme.of(context).colorScheme.primary, Theme.of(context).colorScheme.tertiary,
+      semantic.info, semantic.success, semantic.warning, semantic.danger,
+    ];
 
     return [
-      Row(
+      GridView.count(
+        crossAxisCount: 3,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
+        childAspectRatio: 1.3,
         children: [
-          Expanded(child: _statTile(context, '${_departments.length}', 'Groups')),
-          Expanded(child: _statTile(context, '$totalEmployees', 'People')),
+          HeroStat(value: '${_departments.length}', label: 'Groups'),
+          HeroStat(value: '$totalEmployees', label: 'People'),
+          HeroStat(value: '$avgOnTime%', label: 'Avg on-time', accent: semantic.info),
         ],
+      ),
+      const SizedBox(height: 16),
+      TakeawayLine(
+        text: weakest != null && (weakest['onTimePct'] as int) < 70
+            ? '${weakest['departmentId'] == null ? l10n.notAssigned : weakest['name']} is the weakest group at ${weakest['onTimePct']}% on-time.'
+            : withHeadcount.isEmpty
+                ? 'No department activity in this range yet.'
+                : 'All groups are performing within a healthy range.',
       ),
       const SizedBox(height: 20),
       if (withHeadcount.isNotEmpty) ...[
+        const SectionHeader(title: 'Headcount by department'),
+        DonutComposition(
+          centerValue: '$totalEmployees',
+          centerLabel: 'people',
+          slices: [
+            for (int i = 0; i < withHeadcount.length; i++)
+              DonutSlice(
+                withHeadcount[i]['departmentId'] == null ? l10n.notAssigned : withHeadcount[i]['name'] as String,
+                (withHeadcount[i]['employeeCount'] as int).toDouble(),
+                donutColors[i % donutColors.length],
+              ),
+          ],
+        ),
+        const SizedBox(height: 24),
         const Text('On-time % vs checklist compliance %', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 4),
         Row(children: [
@@ -184,6 +225,8 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
           ),
         );
       }),
+      const SizedBox(height: 20),
+      AiInsightsCard(screenData: {'departments': _departments}),
     ];
   }
 
@@ -202,14 +245,6 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
     return c.danger;
   }
 
-  Widget _statTile(BuildContext context, String value, String label) {
-    return Column(
-      children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
-      ],
-    );
-  }
 }
 
 class _DepartmentMembersScreen extends StatelessWidget {

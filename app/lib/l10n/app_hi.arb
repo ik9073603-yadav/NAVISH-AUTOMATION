@@ -229,5 +229,10 @@
   "flowAnalysisTitle": "फ्लो एनालिसिस",
   "employeeAnalysisTitle": "एम्प्लॉई एनालिसिस",
   "departmentAnalysisTitle": "डिपार्टमेंट एनालिसिस",
-  "taskAnalysisTitle": "टास्क एनालिसिस"
+  "taskAnalysisTitle": "टास्क एनालिसिस",
+  "inventoryAnalysisTitle": "इन्वेंटरी एनालिसिस",
+
+  "aiInsightsTitle": "AI इनसाइट्स",
+  "aiInsightsPlaceholder": "AI प्रोवाइडर कनेक्ट करने के बाद यहाँ AI इनसाइट्स दिखेंगी",
+  "vsPreviousPeriod": "पिछली अवधि की तुलना में"
 }

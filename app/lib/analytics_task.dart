@@ -6,6 +6,7 @@ import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
+import 'widgets/analytics_ui.dart';
 import 'l10n/gen/app_localizations.dart';
 
 enum _TaskAnalysisTab { delegation, checklist }
@@ -30,6 +31,8 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
   String? _error;
   Map<String, dynamic>? _delegation;
   Map<String, dynamic>? _checklists;
+  Map<String, dynamic>? _prevDelegation;
+  Map<String, dynamic>? _prevChecklists;
   int _loadRequestId = 0;
 
   @override
@@ -42,15 +45,20 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
     final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
+    final (prevFrom, prevTo) = AnalyticsRangeBar.previousRangeFor(_preset, _customFrom, _customTo);
     try {
       final results = await Future.wait([
         Api.analyticsDelegation(from, to),
         Api.analyticsChecklists(from, to),
+        Api.analyticsDelegation(prevFrom, prevTo),
+        Api.analyticsChecklists(prevFrom, prevTo),
       ]);
       if (!mounted || requestId != _loadRequestId) return;
       setState(() {
         _delegation = results[0];
         _checklists = results[1];
+        _prevDelegation = results[2];
+        _prevChecklists = results[3];
       });
     } catch (e) {
       if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -130,10 +138,19 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
 
   Widget _delegationSection(BuildContext context) {
     final d = _delegation ?? {};
+    final prevTotals = (_prevDelegation ?? {})['totals'] as Map<String, dynamic>? ?? {};
     final totals = d['totals'] as Map<String, dynamic>? ?? {};
     final trend = (d['trend'] as List<dynamic>? ?? []);
     final byPerson = (d['byPerson'] as List<dynamic>? ?? []);
     final accent = Theme.of(context).colorScheme.primary;
+    final semantic = AppColors.of(context);
+
+    final created = totals['created'] as int? ?? 0;
+    final completed = totals['completed'] as int? ?? 0;
+    final stuck = totals['stuck'] as int? ?? 0;
+    final other = (created - completed - stuck).clamp(0, created);
+    final completionPct = totals['completionPct'] as int? ?? 0;
+    final prevCompletionPct = prevTotals['completionPct'] as int? ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -158,9 +175,47 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
             _miniStat(context, '${totals['escalated'] ?? 0}', 'Escalated', AppColors.of(context).danger),
           ],
         ),
-        const SizedBox(height: 12),
-        Text('${totals['completionPct'] ?? 0}% completion rate · avg ${formatDurationMinsOrDash(totals['avgCompletionMins'] as int? ?? 0)} to finish',
-            style: const TextStyle(fontWeight: FontWeight.w600)),
+        const SizedBox(height: 16),
+        Row(
+          children: [
+            GaugeRing(pct: completionPct.toDouble(), centerLabel: 'completion'),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(children: [
+                    Text('$completionPct%', style: Theme.of(context).textTheme.headlineSmall),
+                    const SizedBox(width: 8),
+                    if (deltaPctOf(completionPct, prevCompletionPct) != null)
+                      DeltaBadge(deltaPct: deltaPctOf(completionPct, prevCompletionPct)!, higherIsBetter: true),
+                  ]),
+                  Text('completion rate · avg ${formatDurationMinsOrDash(totals['avgCompletionMins'] as int? ?? 0)} to finish',
+                      style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            ),
+          ],
+        ),
+        if (created > 0) ...[
+          const SizedBox(height: 16),
+          DonutComposition(
+            centerValue: '$created',
+            centerLabel: 'assigned',
+            slices: [
+              DonutSlice('Completed', completed.toDouble(), semantic.success),
+              DonutSlice('Stuck', stuck.toDouble(), semantic.warning),
+              DonutSlice('Other', other.toDouble(), Theme.of(context).colorScheme.surfaceContainerHighest),
+            ],
+          ),
+        ],
+        const SizedBox(height: 16),
+        TakeawayLine(
+          text: stuck > 0
+              ? '$stuck task${stuck == 1 ? ' is' : 's are'} stuck right now — completion rate is $completionPct%.'
+              : 'No stuck tasks in this range — completion rate is $completionPct%.',
+        ),
         const SizedBox(height: 16),
         if (trend.isEmpty)
           const Text('No delegation tasks created in this range.')
@@ -208,16 +263,22 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
                 ),
               )),
         ],
+        const SizedBox(height: 20),
+        AiInsightsCard(screenData: d),
       ],
     );
   }
 
   Widget _checklistSection(BuildContext context) {
     final c = _checklists ?? {};
+    final prevTotals = (_prevChecklists ?? {})['totals'] as Map<String, dynamic>? ?? {};
     final totals = c['totals'] as Map<String, dynamic>? ?? {};
     final perRule = (c['perRule'] as List<dynamic>? ?? []);
     final trend = (c['trend'] as List<dynamic>? ?? []);
     final accent = Theme.of(context).colorScheme.tertiary;
+    final compliancePct = totals['compliancePct'] as int? ?? 0;
+    final prevCompliancePct = prevTotals['compliancePct'] as int? ?? 0;
+    final worst = perRule.isNotEmpty ? perRule.first : null;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,6 +333,17 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 12),
+        Row(children: [
+          if (deltaPctOf(compliancePct, prevCompliancePct) != null)
+            DeltaBadge(deltaPct: deltaPctOf(compliancePct, prevCompliancePct)!, higherIsBetter: true),
+        ]),
+        const SizedBox(height: 8),
+        TakeawayLine(
+          text: worst != null && (worst['compliancePct'] as int) < 70
+              ? '"${worst['title']}" has the lowest compliance at ${worst['compliancePct']}%.'
+              : 'Compliance is $compliancePct% — no checklist is falling behind.',
         ),
         if (trend.isNotEmpty) ...[
           const SizedBox(height: 16),
@@ -334,6 +406,8 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
             );
           }),
         ],
+        const SizedBox(height: 20),
+        AiInsightsCard(screenData: c),
       ],
     );
   }

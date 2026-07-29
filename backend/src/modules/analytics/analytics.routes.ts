@@ -361,7 +361,10 @@ analyticsRouter.get('/fms', async (req: Request, res: Response, next: NextFuncti
   } catch (err) { next(err); }
 });
 
-// Inventory: dead-stock value, low-stock count, total stock value, movement trend.
+// Inventory: dead/low-stock counts+value, total stock value, value by
+// category, movement trend, fastest/slowest movers, reorder list. Two
+// findMany calls (SKUs, movements-in-range) reduced in JS — no per-SKU
+// query. Same shape whether consumed by a chart today or an AI prompt later.
 analyticsRouter.get('/inventory', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { orgId } = req.user!;
@@ -373,31 +376,72 @@ analyticsRouter.get('/inventory', async (req: Request, res: Response, next: Next
 
       let totalStockValue = 0;
       let lowStockCount = 0;
+      let deadStockCount = 0;
       let deadStockValue = 0;
+      const reorderList: any[] = [];
+      const byCategory = new Map<string, number>();
+
       for (const s of skus) {
         const value = (s.unitCost ?? 0) * s.currentStock;
         totalStockValue += value;
-        if (s.minStock != null && s.currentStock <= s.minStock) lowStockCount++;
-        if (classifyLiquidVsDead(s) === 'DEAD') deadStockValue += value;
+        byCategory.set(s.category ?? 'Uncategorized', (byCategory.get(s.category ?? 'Uncategorized') ?? 0) + value);
+
+        const isDead = classifyLiquidVsDead(s) === 'DEAD';
+        if (isDead) { deadStockCount++; deadStockValue += value; }
+
+        const isLow = s.minStock != null && s.currentStock <= s.minStock;
+        if (isLow) {
+          lowStockCount++;
+          const reorderQty = s.maxStock != null ? s.maxStock - s.currentStock : s.minStock! * 2 - s.currentStock;
+          reorderList.push({
+            id: s.id, name: s.name, code: s.code, unit: s.unit,
+            currentStock: s.currentStock, minStock: s.minStock, maxStock: s.maxStock,
+            suggestedReorderQty: Math.max(reorderQty, 0),
+          });
+        }
       }
+
+      const stockByCategory = [...byCategory.entries()]
+        .map(([category, value]) => ({ category, value }))
+        .sort((a, b) => b.value - a.value);
 
       const movements = await prisma.stockMovement.findMany({
         where: { orgId, createdAt: { gte: from, lte: to } },
-        select: { createdAt: true, type: true, quantity: true },
+        select: { createdAt: true, type: true, quantity: true, skuId: true },
       });
 
       const byDay: Record<string, { inQty: number; outQty: number }> = {};
+      const bySku = new Map<string, { inQty: number; outQty: number; moves: number }>();
       for (const m of movements) {
         const k = dayKey(m.createdAt);
         byDay[k] ??= { inQty: 0, outQty: 0 };
-        if (m.type === 'IN') byDay[k].inQty += m.quantity;
-        else if (m.type === 'OUT') byDay[k].outQty += m.quantity;
+        const skuAcc = bySku.get(m.skuId) ?? { inQty: 0, outQty: 0, moves: 0 };
+        skuAcc.moves++;
+        if (m.type === 'IN') { byDay[k].inQty += m.quantity; skuAcc.inQty += m.quantity; }
+        else if (m.type === 'OUT') { byDay[k].outQty += m.quantity; skuAcc.outQty += m.quantity; }
+        bySku.set(m.skuId, skuAcc);
       }
       const movementTrend = Object.entries(byDay)
         .sort(([a], [b]) => a.localeCompare(b))
         .map(([date, v]) => ({ date, ...v }));
 
-      return { totalStockValue, lowStockCount, deadStockValue, movementTrend };
+      const nameById = new Map(skus.map(s => [s.id, { name: s.name, unit: s.unit }]));
+      const movers = [...bySku.entries()]
+        .map(([skuId, v]) => ({
+          skuId,
+          name: nameById.get(skuId)?.name ?? 'Unknown',
+          unit: nameById.get(skuId)?.unit ?? '',
+          totalQty: v.inQty + v.outQty,
+          moves: v.moves,
+        }))
+        .sort((a, b) => b.totalQty - a.totalQty);
+      const fastestMoving = movers.slice(0, 5);
+      const slowestMoving = movers.slice(-5).reverse();
+
+      return {
+        totalStockValue, lowStockCount, deadStockCount, deadStockValue,
+        stockByCategory, movementTrend, fastestMoving, slowestMoving, reorderList,
+      };
     });
 
     res.json(data);

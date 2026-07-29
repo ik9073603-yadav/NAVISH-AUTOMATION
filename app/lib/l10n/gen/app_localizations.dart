@@ -1375,6 +1375,30 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Task analysis'**
   String get taskAnalysisTitle;
+
+  /// No description provided for @inventoryAnalysisTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Inventory analysis'**
+  String get inventoryAnalysisTitle;
+
+  /// No description provided for @aiInsightsTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Insights'**
+  String get aiInsightsTitle;
+
+  /// No description provided for @aiInsightsPlaceholder.
+  ///
+  /// In en, this message translates to:
+  /// **'AI insights will appear here once you connect an AI provider'**
+  String get aiInsightsPlaceholder;
+
+  /// No description provided for @vsPreviousPeriod.
+  ///
+  /// In en, this message translates to:
+  /// **'vs previous period'**
+  String get vsPreviousPeriod;
 }
 
 class _AppLocalizationsDelegate

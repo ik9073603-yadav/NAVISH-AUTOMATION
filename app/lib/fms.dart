@@ -14,7 +14,6 @@ import 'time_format.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'offline/write_queue.dart';
-import 'flow_analytics.dart';
 
 class FmsScreen extends StatefulWidget {
   final String? currentUserId;
@@ -44,8 +43,6 @@ class _FmsScreenState extends State<FmsScreen> {
     final responsibleId = o['responsibleId'];
     return responsibleId == null || responsibleId == widget.currentUserId;
   }
-
-  bool get _canSeeAnalytics => widget.role == 'OWNER' || widget.role == 'MANAGER';
 
   @override
   void initState() {
@@ -92,10 +89,9 @@ class _FmsScreenState extends State<FmsScreen> {
               children: [
                 Expanded(
                   child: SegmentedButton<int>(
-                    segments: [
-                      const ButtonSegment(value: 0, label: Text('Live board')),
-                      const ButtonSegment(value: 1, label: Text('Bottlenecks')),
-                      if (_canSeeAnalytics) const ButtonSegment(value: 2, label: Text('Analytics')),
+                    segments: const [
+                      ButtonSegment(value: 0, label: Text('Live board')),
+                      ButtonSegment(value: 1, label: Text('Bottlenecks')),
                     ],
                     selected: {_view},
                     onSelectionChanged: (s) => setState(() => _view = s.first),
@@ -113,7 +109,6 @@ class _FmsScreenState extends State<FmsScreen> {
           Expanded(
             child: switch (_view) {
               1 => _bottleneckView(),
-              2 when _canSeeAnalytics => const FlowAnalyticsView(),
               _ => _board(),
             },
           ),

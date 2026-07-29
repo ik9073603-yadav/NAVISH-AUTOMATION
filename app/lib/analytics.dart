@@ -4,14 +4,17 @@ import 'analytics_flow.dart';
 import 'analytics_employee.dart';
 import 'analytics_department.dart';
 import 'analytics_task.dart';
+import 'analytics_inventory.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'l10n/gen/app_localizations.dart';
 
-// Owner/Manager only. First screen is a hub of four analysis areas — each
+// Owner/Manager only. First screen is a hub of five analysis areas — each
 // card shows a cheap one-line summary (reusing the same cached, grouped-
 // aggregate endpoints the detail screens use, just with a fixed "this week"
 // window). Tapping a card opens that area's full, date-filterable analysis.
+// This hub is the ONLY place Flow analytics lives — the FMS module tab
+// keeps only its operational views (see fms.dart).
 class AnalyticsScreen extends StatefulWidget {
   const AnalyticsScreen({super.key});
   @override
@@ -26,6 +29,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   String _employeeSummary = '';
   String _departmentSummary = '';
   String _taskSummary = '';
+  String _inventorySummary = '';
 
   @override
   void initState() {
@@ -44,6 +48,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         Api.analyticsDepartments(weekAgo, now),
         Api.analyticsDelegation(weekAgo, now),
         Api.analyticsChecklists(weekAgo, now),
+        Api.analyticsInventory(weekAgo, now),
       ]);
 
       final flow = results[0] as Map<String, dynamic>;
@@ -51,9 +56,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
       final departments = results[2] as List<dynamic>;
       final delegation = results[3] as Map<String, dynamic>;
       final checklists = results[4] as Map<String, dynamic>;
+      final inventory = results[5] as Map<String, dynamic>;
 
       final delegationTotals = delegation['totals'] as Map<String, dynamic>? ?? {};
       final checklistTotals = checklists['totals'] as Map<String, dynamic>? ?? {};
+      final lowStockCount = inventory['lowStockCount'] as int? ?? 0;
 
       setState(() {
         _flowSummary = '${flow['totalOrders'] ?? 0} orders · ${flow['delayed'] ?? 0} delayed';
@@ -64,6 +71,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             ? 'No departments yet'
             : '${departments.length} group(s) · ${_avgDeptOnTime(departments)}% avg on-time';
         _taskSummary = '${delegationTotals['completionPct'] ?? 0}% delegation · ${checklistTotals['compliancePct'] ?? 0}% checklist';
+        _inventorySummary = lowStockCount > 0
+            ? '$lowStockCount low-stock alert${lowStockCount == 1 ? '' : 's'}'
+            : 'Stock levels healthy';
       });
     } catch (e) {
       setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -145,6 +155,13 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                               summary: _taskSummary,
                               color: AppColors.of(context).warning,
                               onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TaskAnalysisScreen())),
+                            ),
+                            _AnalyticsCard(
+                              icon: Icons.inventory_2_outlined,
+                              title: l10n.inventoryAnalysisTitle,
+                              summary: _inventorySummary,
+                              color: Theme.of(context).colorScheme.primary,
+                              onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const InventoryAnalysisScreen())),
                             ),
                           ],
                         ),

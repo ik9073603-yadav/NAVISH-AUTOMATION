@@ -58,6 +58,19 @@ class AnalyticsRangeBar extends StatelessWidget {
     }
   }
 
+  // The equal-length window immediately preceding the current one — used to
+  // compute "vs previous period" deltas on hero stat tiles, so every screen
+  // compares apples to apples (a 7-day range against the 7 days before it).
+  static (DateTime, DateTime) previousRangeFor(
+    AnalyticsRangePreset preset,
+    DateTime customFrom,
+    DateTime customTo,
+  ) {
+    final (from, to) = rangeFor(preset, customFrom, customTo);
+    final span = to.difference(from);
+    return (from.subtract(span), from);
+  }
+
   Future<void> _pickCustom(BuildContext context) async {
     final picked = await showDateRangePicker(
       context: context,

@@ -249,5 +249,10 @@
   "flowAnalysisTitle": "Flow analysis",
   "employeeAnalysisTitle": "Employee analysis",
   "departmentAnalysisTitle": "Department analysis",
-  "taskAnalysisTitle": "Task analysis"
+  "taskAnalysisTitle": "Task analysis",
+  "inventoryAnalysisTitle": "Inventory analysis",
+
+  "aiInsightsTitle": "AI Insights",
+  "aiInsightsPlaceholder": "AI insights will appear here once you connect an AI provider",
+  "vsPreviousPeriod": "vs previous period"
 }

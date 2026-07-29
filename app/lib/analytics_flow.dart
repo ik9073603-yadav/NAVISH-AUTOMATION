@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import 'api.dart';
 import 'flow_analytics.dart' show FlowOrdersListScreen;
 import 'theme/app_theme.dart';
 import 'time_format.dart';
 import 'widgets/analytics_range_bar.dart';
+import 'widgets/analytics_ui.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'l10n/gen/app_localizations.dart';
 
-// Flow Analysis — the deep-dive behind the "Flow analysis" hub card.
-// Deliberately a standalone screen (not a reuse of FlowAnalyticsView, which
-// stays exactly as-is embedded inside the FMS module's own Analytics tab)
-// so this richer version can't affect that existing surface.
+// Flow Analysis — the deep-dive behind the "Flow analysis" hub card, and the
+// only place Flow analytics lives (the FMS module tab keeps only its
+// operational views — live board, bottlenecks-as-ops-alert, stage actions).
 class FlowAnalysisScreen extends StatefulWidget {
   const FlowAnalysisScreen({super.key});
   @override
@@ -28,6 +27,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   Map<String, dynamic>? _summary; // all-time KPIs — current state, not date-ranged
   Map<String, dynamic>? _costOfDelay;
   Map<String, dynamic>? _stageMetrics;
+  Map<String, dynamic>? _prevStageMetrics;
   List<dynamic> _bottlenecks = []; // current state — which stages are backed up right now
   int _loadRequestId = 0;
 
@@ -41,12 +41,14 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
     final requestId = ++_loadRequestId;
     setState(() { _loading = true; _error = null; });
     final (from, to) = AnalyticsRangeBar.rangeFor(_preset, _customFrom, _customTo);
+    final (prevFrom, prevTo) = AnalyticsRangeBar.previousRangeFor(_preset, _customFrom, _customTo);
     try {
       final results = await Future.wait([
         Api.fmsAnalyticsSummary(),
         Api.fmsAnalyticsCostOfDelay(from: from, to: to),
         Api.analyticsFms(from, to),
         Api.bottlenecks(),
+        Api.analyticsFms(prevFrom, prevTo),
       ]);
       if (!mounted || requestId != _loadRequestId) return;
       setState(() {
@@ -54,6 +56,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
         _costOfDelay = results[1] as Map<String, dynamic>;
         _stageMetrics = results[2] as Map<String, dynamic>;
         _bottlenecks = results[3] as List<dynamic>;
+        _prevStageMetrics = results[4] as Map<String, dynamic>;
       });
     } catch (e) {
       if (mounted && requestId == _loadRequestId) setState(() => _error = e.toString().replaceAll('Exception: ', ''));
@@ -100,8 +103,18 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
     final s = _summary ?? {};
     final stageData = _stageMetrics ?? {};
     final throughput = stageData['throughput'] as Map<String, dynamic>? ?? {};
+    final prevThroughput = (_prevStageMetrics ?? {})['throughput'] as Map<String, dynamic>? ?? {};
     final stages = (stageData['stages'] as List<dynamic>? ?? []);
     final funnel = (stageData['funnel'] as List<dynamic>? ?? []);
+    final semantic = AppColors.of(context);
+
+    final pending = s['pending'] as int? ?? 0;
+    final completed = s['completed'] as int? ?? 0;
+    final delayed = s['delayed'] as int? ?? 0;
+    final onTime = s['onTime'] as int? ?? 0;
+    final onTimePct = (onTime + delayed) > 0 ? ((onTime / (onTime + delayed)) * 100).round() : 100;
+    final completedInRange = throughput['completedOrders'] as int? ?? 0;
+    final prevCompletedInRange = prevThroughput['completedOrders'] as int? ?? 0;
 
     return [
       GridView.count(
@@ -110,19 +123,38 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
         physics: const NeverScrollableScrollPhysics(),
         mainAxisSpacing: 12,
         crossAxisSpacing: 12,
-        childAspectRatio: 1.5,
+        childAspectRatio: 1.6,
         children: [
-          _kpiCard('Pending', s['pending'] as int? ?? 0, AppColors.of(context).info, Icons.hourglass_top,
-              () => _openCategory('PENDING', 'Pending orders')),
-          _kpiCard('Completed', s['completed'] as int? ?? 0, AppColors.of(context).success, Icons.check_circle,
-              () => _openCategory('COMPLETED', 'Completed orders')),
-          _kpiCard('Delayed', s['delayed'] as int? ?? 0, AppColors.of(context).danger, Icons.warning,
-              () => _openCategory('DELAYED', 'Delayed orders')),
-          _kpiCard('On-time', s['onTime'] as int? ?? 0, Theme.of(context).colorScheme.tertiary, Icons.thumb_up,
-              () => _openCategory('ONTIME', 'On-time orders')),
+          HeroStat(value: '$pending', label: 'Pending', accent: semantic.info, onTap: () => _openCategory('PENDING', 'Pending orders')),
+          HeroStat(value: '$completed', label: 'Completed', accent: semantic.success, onTap: () => _openCategory('COMPLETED', 'Completed orders')),
+          HeroStat(value: '$delayed', label: 'Delayed', accent: delayed > 0 ? semantic.danger : semantic.success, onTap: () => _openCategory('DELAYED', 'Delayed orders')),
+          HeroStat(
+            value: '$completedInRange', label: 'Completed in range',
+            deltaPct: deltaPctOf(completedInRange, prevCompletedInRange),
+            accent: Theme.of(context).colorScheme.tertiary,
+          ),
         ],
       ),
-      const SizedBox(height: 8),
+      const SizedBox(height: 16),
+      TakeawayLine(
+        text: delayed > 0
+            ? '$delayed order${delayed == 1 ? ' is' : 's are'} dragging on-time % down to $onTimePct%.'
+            : 'On-time performance is $onTimePct% — nothing is currently delayed.',
+      ),
+      const SizedBox(height: 20),
+      if (onTime + delayed + pending > 0) ...[
+        const SectionHeader(title: 'Order status composition'),
+        DonutComposition(
+          centerValue: '${s['totalOrders'] ?? 0}',
+          centerLabel: 'orders',
+          slices: [
+            DonutSlice('On-time', onTime.toDouble(), semantic.success),
+            DonutSlice('Delayed', delayed.toDouble(), semantic.danger),
+            DonutSlice('Pending', pending.toDouble(), semantic.info),
+          ],
+        ),
+        const SizedBox(height: 24),
+      ],
       Card(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -144,6 +176,8 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
       _stageMetricsSection(context, stages),
       const SizedBox(height: 20),
       _bottlenecksSection(context),
+      const SizedBox(height: 20),
+      AiInsightsCard(screenData: {'summary': s, 'stages': stageData, 'bottlenecks': _bottlenecks}),
     ];
   }
 
@@ -153,28 +187,6 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
         Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
         Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
       ],
-    );
-  }
-
-  Widget _kpiCard(String label, int count, Color color, IconData icon, VoidCallback onTap) {
-    return Card(
-      color: color.withValues(alpha: 0.08),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Icon(icon, color: color),
-              Text('$count', style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: color)),
-              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            ],
-          ),
-        ),
-      ),
     );
   }
 
@@ -261,47 +273,11 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
 
   Widget _funnelSection(BuildContext context, List<dynamic> funnel) {
     if (funnel.isEmpty) return const SizedBox.shrink();
-    final maxCount = funnel.fold<int>(0, (a, f) => (f['count'] as int) > a ? (f['count'] as int) : a);
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Order funnel', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text('Orders that reached each stage position in this range', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 12),
-        SizedBox(
-          height: 200,
-          child: BarChart(BarChartData(
-            alignment: BarChartAlignment.spaceAround,
-            maxY: maxCount <= 0 ? 1 : maxCount * 1.15,
-            barGroups: [
-              for (final f in funnel)
-                BarChartGroupData(x: f['sequence'] as int, barRods: [
-                  BarChartRodData(
-                    toY: (f['count'] as int).toDouble(),
-                    color: Theme.of(context).colorScheme.primary,
-                    width: 28,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                  ),
-                ]),
-            ],
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (v, meta) => Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Text('S${v.toInt()}', style: const TextStyle(fontSize: 11)),
-                ),
-              )),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 36)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-            gridData: const FlGridData(show: false),
-          )),
-        ),
+        const SectionHeader(title: 'Order funnel', subtitle: 'Orders that reached each stage position in this range'),
+        FunnelChart(steps: [for (final f in funnel) FunnelStep('Stage ${f['sequence']}', f['count'] as int)]),
       ],
     );
   }
@@ -335,33 +311,15 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
               ),
             )),
         const SizedBox(height: 12),
-        SizedBox(
-          height: 180,
-          child: BarChart(BarChartData(
-            barGroups: [
-              for (int i = 0; i < withActivity.length; i++)
-                BarChartGroupData(x: i, barRods: [
-                  BarChartRodData(toY: (withActivity[i]['avgMins'] as int).toDouble(), color: Theme.of(context).colorScheme.primary, width: 16),
-                ]),
-            ],
-            titlesData: FlTitlesData(
-              bottomTitles: AxisTitles(sideTitles: SideTitles(
-                showTitles: true,
-                getTitlesWidget: (v, meta) {
-                  final i = v.toInt();
-                  if (i < 0 || i >= withActivity.length) return const SizedBox.shrink();
-                  final name = withActivity[i]['stageName'] as String;
-                  return Padding(padding: const EdgeInsets.only(top: 4), child: Text(name.split(' ').first, style: const TextStyle(fontSize: 10)));
-                },
-              )),
-              leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true, reservedSize: 40)),
-              topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+        RankedBarList(items: [
+          for (final s in withActivity)
+            RankedBarItem(
+              label: (s['stageName'] as String).split(' ').first,
+              value: (s['avgMins'] as int).toDouble(),
+              valueText: formatDurationMinsOrDash(s['avgMins'] as int),
+              color: (s['avgDelayMins'] as int) > 0 ? AppColors.of(context).danger : AppColors.of(context).success,
             ),
-            borderData: FlBorderData(show: false),
-            gridData: const FlGridData(show: false),
-          )),
-        ),
+        ]),
       ],
     );
   }
