@@ -152,12 +152,15 @@ async function callGemini({ apiKey, model, systemPrompt, userPrompt, history }: 
 // Sensible cheap default model per provider — pre-filled in the UI, always
 // user-editable (provider model catalogs move faster than this file does).
 // Checked 2026-07-30: gpt-4.1-mini remains available via the OpenAI API
-// (only retired from the ChatGPT product UI). gemini-2.5-flash returns 404
-// "no longer available to new users" as of this date even though it's still
-// listed in Google's docs — gemini-2.5-flash-lite is the current
-// generally-available, budget-tier Flash model without that restriction.
+// (only retired from the ChatGPT product UI). The entire Gemini 2.5 Flash
+// family (both gemini-2.5-flash and gemini-2.5-flash-lite) has been
+// returning 404 "no longer available" since 2026-07-09 — a Google-side
+// incident well ahead of their documented Oct 16 2026 shutdown date,
+// reported broadly on Google's AI Developer forum, not specific to any one
+// key/account. Defaulting to the 3.x family instead: gemini-3.5-flash-lite
+// is the current stable, budget-tier Flash model.
 export const DEFAULT_MODEL: Record<AiProviderName, string> = {
   OPENAI: 'gpt-4.1-mini',
   ANTHROPIC: 'claude-haiku-4-5-20251001',
-  GEMINI: 'gemini-2.5-flash-lite',
+  GEMINI: 'gemini-3.5-flash-lite',
 };
