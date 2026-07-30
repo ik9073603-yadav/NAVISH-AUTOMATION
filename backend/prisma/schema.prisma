@@ -123,6 +123,8 @@ model User {
   department   Department?  @relation(fields: [departmentId], references: [id])
   manager      User?        @relation("ManagerChain", fields: [managerId], references: [id])
   reports      User[]       @relation("ManagerChain")
+  aiConfig     AiConfig?
+  aiUsageLogs  AiUsage[]
 
   @@unique([orgId, email])
   @@index([orgId])
@@ -512,4 +514,56 @@ model HealthSnapshot {
   @@unique([orgId, date])
   @@index([orgId, date])
   @@map("health_snapshots")
+}
+
+enum AiProvider {
+  OPENAI
+  ANTHROPIC
+  GEMINI
+}
+
+enum AiFeature {
+  OVERVIEW
+  ASSIST
+  INSIGHTS
+}
+
+// One row per user (never per-org) — each person brings their own provider
+// key and pays their own usage. encryptedApiKey is AES-256-GCM ciphertext
+// (iv:authTag:ciphertext, base64) using AI_ENCRYPTION_KEY — the plaintext
+// key is never stored and never returned to the client after saving.
+model AiConfig {
+  id              String     @id @default(uuid())
+  userId          String     @unique
+  orgId           String
+  provider        AiProvider
+  model           String
+  encryptedApiKey String
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([orgId])
+  @@map("ai_configs")
+}
+
+// Usage log for the per-user usage screen — token counts only, no cost
+// (the user's own key/plan, so cost isn't ours to report).
+model AiUsage {
+  id           String     @id @default(uuid())
+  userId       String
+  orgId        String
+  provider     AiProvider
+  model        String
+  feature      AiFeature
+  inputTokens  Int
+  outputTokens Int
+  createdAt    DateTime   @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([orgId])
+  @@map("ai_usage")
 }

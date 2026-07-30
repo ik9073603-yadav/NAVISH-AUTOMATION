@@ -709,4 +709,66 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get vsPreviousPeriod => 'पिछली अवधि की तुलना में';
+
+  @override
+  String get aiAssistantTitle => 'AI असिस्टेंट';
+
+  @override
+  String get aiProviderLabel => 'प्रोवाइडर';
+
+  @override
+  String get aiApiKeyLabel => 'API कुंजी';
+
+  @override
+  String get aiModelLabel => 'मॉडल (वैकल्पिक)';
+
+  @override
+  String get aiTestConnectionAction => 'कनेक्शन जांचें';
+
+  @override
+  String get aiConnectionSuccessful => 'कनेक्शन सफल रहा';
+
+  @override
+  String get aiSaveAction => 'सेव करें';
+
+  @override
+  String get aiKeySetStatus => 'कुंजी सेट है ••••';
+
+  @override
+  String get aiChangeAction => 'बदलें';
+
+  @override
+  String get aiRemoveAction => 'हटाएं';
+
+  @override
+  String get aiRemovedStatus => 'AI असिस्टेंट डिस्कनेक्ट कर दिया गया';
+
+  @override
+  String get aiNotConfiguredHint =>
+      'AI असिस्टेंट चालू करने के लिए OpenAI, Anthropic, या Gemini की अपनी API कुंजी जोड़ें। आप सीधे अपने प्रोवाइडर को भुगतान करते हैं — आपकी कुंजी एन्क्रिप्टेड है और सर्वर से बाहर कभी नहीं जाती।';
+
+  @override
+  String get aiChatInputHint => 'अपने बिज़नेस या ऐप के बारे में पूछें...';
+
+  @override
+  String get aiChatConnectPrompt =>
+      'चैट शुरू करने के लिए अपनी प्रोफाइल में AI प्रोवाइडर कनेक्ट करें।';
+
+  @override
+  String get aiChatConnectAction => 'AI कनेक्ट करें';
+
+  @override
+  String get aiBusinessOverviewAction => 'मेरा बिज़नेस कैसा चल रहा है?';
+
+  @override
+  String get aiUsageTitle => 'AI उपयोग';
+
+  @override
+  String get aiUsageTotalCalls => 'कुल कॉल्स';
+
+  @override
+  String get aiUsageTotalTokens => 'कुल टोकन';
+
+  @override
+  String get aiGenerateInsightsAction => 'इनसाइट्स जनरेट करें';
 }

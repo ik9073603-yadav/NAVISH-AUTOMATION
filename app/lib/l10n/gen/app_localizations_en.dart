@@ -709,4 +709,66 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get vsPreviousPeriod => 'vs previous period';
+
+  @override
+  String get aiAssistantTitle => 'AI Assistant';
+
+  @override
+  String get aiProviderLabel => 'Provider';
+
+  @override
+  String get aiApiKeyLabel => 'API key';
+
+  @override
+  String get aiModelLabel => 'Model (optional)';
+
+  @override
+  String get aiTestConnectionAction => 'Test connection';
+
+  @override
+  String get aiConnectionSuccessful => 'Connection successful';
+
+  @override
+  String get aiSaveAction => 'Save';
+
+  @override
+  String get aiKeySetStatus => 'Key set ••••';
+
+  @override
+  String get aiChangeAction => 'Change';
+
+  @override
+  String get aiRemoveAction => 'Remove';
+
+  @override
+  String get aiRemovedStatus => 'AI Assistant disconnected';
+
+  @override
+  String get aiNotConfiguredHint =>
+      'Connect your own API key from OpenAI, Anthropic, or Gemini to enable the AI Assistant. You pay your own provider directly — your key is encrypted and never leaves the server.';
+
+  @override
+  String get aiChatInputHint => 'Ask about your business or the app...';
+
+  @override
+  String get aiChatConnectPrompt =>
+      'Connect an AI provider in your profile to start chatting.';
+
+  @override
+  String get aiChatConnectAction => 'Connect AI';
+
+  @override
+  String get aiBusinessOverviewAction => 'How\'s my business doing?';
+
+  @override
+  String get aiUsageTitle => 'AI Usage';
+
+  @override
+  String get aiUsageTotalCalls => 'Total calls';
+
+  @override
+  String get aiUsageTotalTokens => 'Total tokens';
+
+  @override
+  String get aiGenerateInsightsAction => 'Generate insights';
 }

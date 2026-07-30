@@ -4,6 +4,7 @@ import 'analytics.dart';
 import 'change_password.dart';
 import 'legal.dart';
 import 'deletion_requests.dart';
+import 'ai_settings.dart';
 import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'widgets/avatar.dart';
@@ -210,6 +211,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
                             trailing: const Icon(Icons.chevron_right),
                             onTap: () => Navigator.push(context,
                                 sharedAxisRoute(const ChangePasswordScreen())),
+                          ),
+                          const Divider(height: 1),
+                          ListTile(
+                            leading: const Icon(Icons.smart_toy_outlined),
+                            title: Text(l10n.aiAssistantTitle),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () => Navigator.push(context,
+                                sharedAxisRoute(const AiSettingsScreen())),
                           ),
                           const Divider(height: 1),
                           ListTile(

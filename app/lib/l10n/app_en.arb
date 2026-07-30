@@ -254,5 +254,26 @@
 
   "aiInsightsTitle": "AI Insights",
   "aiInsightsPlaceholder": "AI insights will appear here once you connect an AI provider",
-  "vsPreviousPeriod": "vs previous period"
+  "vsPreviousPeriod": "vs previous period",
+
+  "aiAssistantTitle": "AI Assistant",
+  "aiProviderLabel": "Provider",
+  "aiApiKeyLabel": "API key",
+  "aiModelLabel": "Model (optional)",
+  "aiTestConnectionAction": "Test connection",
+  "aiConnectionSuccessful": "Connection successful",
+  "aiSaveAction": "Save",
+  "aiKeySetStatus": "Key set ••••",
+  "aiChangeAction": "Change",
+  "aiRemoveAction": "Remove",
+  "aiRemovedStatus": "AI Assistant disconnected",
+  "aiNotConfiguredHint": "Connect your own API key from OpenAI, Anthropic, or Gemini to enable the AI Assistant. You pay your own provider directly — your key is encrypted and never leaves the server.",
+  "aiChatInputHint": "Ask about your business or the app...",
+  "aiChatConnectPrompt": "Connect an AI provider in your profile to start chatting.",
+  "aiChatConnectAction": "Connect AI",
+  "aiBusinessOverviewAction": "How's my business doing?",
+  "aiUsageTitle": "AI Usage",
+  "aiUsageTotalCalls": "Total calls",
+  "aiUsageTotalTokens": "Total tokens",
+  "aiGenerateInsightsAction": "Generate insights"
 }

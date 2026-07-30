@@ -864,6 +864,84 @@ class Api {
     return jsonDecode(res.body);
   }
 
+  // ---------------- AI Assistant ----------------
+  // Every call is backend-side: the app never holds or sends a raw provider
+  // key, only OUR endpoints, which look up and decrypt the caller's own
+  // stored key server-side.
+
+  static Future<Map<String, dynamic>> aiConfigStatus() async {
+    final res = await http.get(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load AI settings');
+    return data;
+  }
+
+  static Future<Map<String, dynamic>> aiSaveConfig({
+    required String provider,
+    required String apiKey,
+    String? model,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/ai/config'),
+      headers: _headers,
+      body: jsonEncode({'provider': provider, 'apiKey': apiKey, if (model != null && model.isNotEmpty) 'model': model}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to save AI settings');
+    return data;
+  }
+
+  static Future<void> aiDeleteConfig() async {
+    final res = await http.delete(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to remove AI settings');
+  }
+
+  static Future<void> aiTestConnection({
+    required String provider,
+    required String apiKey,
+    String? model,
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/ai/config/test'),
+      headers: _headers,
+      body: jsonEncode({'provider': provider, 'apiKey': apiKey, if (model != null && model.isNotEmpty) 'model': model}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Connection test failed');
+  }
+
+  static Future<String> aiChat({
+    required String message,
+    List<Map<String, String>> history = const [],
+    String feature = 'ASSIST',
+  }) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/ai/chat'),
+      headers: _headers,
+      body: jsonEncode({'message': message, 'history': history, 'feature': feature}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'AI request failed');
+    return data['reply'] as String;
+  }
+
+  static Future<String> aiInsights({required String screen, required Map<String, dynamic> data}) async {
+    final res = await http.post(
+      Uri.parse('${Config.apiBase}/api/ai/insights'),
+      headers: _headers,
+      body: jsonEncode({'screen': screen, 'data': data}),
+    );
+    final body = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(body['error'] ?? 'Failed to generate insights');
+    return body['insight'] as String;
+  }
+
+  static Future<Map<String, dynamic>> aiUsage() async {
+    final res = await http.get(Uri.parse('${Config.apiBase}/api/ai/usage'), headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to load AI usage');
+    return jsonDecode(res.body);
+  }
+
   // ---------------- Superadmin ----------------
 
   static Future<Map<String, dynamic>> adminOverview() async {

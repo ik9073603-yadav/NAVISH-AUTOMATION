@@ -175,7 +175,7 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
             ),
           )),
       const SizedBox(height: 20),
-      AiInsightsCard(screenData: {'employees': _employees}),
+      AiInsightsCard(screenKey: 'employee', screenData: {'employees': _employees}),
     ];
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
+import '../api.dart';
+import '../ai_settings.dart';
 import '../theme/app_theme.dart';
 import '../l10n/gen/app_localizations.dart';
 
@@ -141,9 +143,42 @@ class TakeawayLine extends StatelessWidget {
 // shape a future AI call would receive) even though nothing is sent
 // anywhere yet, so wiring a real provider later is a matter of swapping
 // this widget's body, not re-plumbing every screen.
-class AiInsightsCard extends StatelessWidget {
+class AiInsightsCard extends StatefulWidget {
+  // Which analysis screen this is ('flow' | 'employee' | 'department' |
+  // 'task' | 'inventory') and that screen's already-fetched structured
+  // data — the exact payload sent to the AI on "Generate insights", so the
+  // insight is always grounded in what's on screen right now.
+  final String screenKey;
   final Map<String, dynamic> screenData;
-  const AiInsightsCard({super.key, required this.screenData});
+  const AiInsightsCard({super.key, required this.screenKey, required this.screenData});
+
+  @override
+  State<AiInsightsCard> createState() => _AiInsightsCardState();
+}
+
+class _AiInsightsCardState extends State<AiInsightsCard> {
+  bool _loading = false;
+  String? _insight;
+  String? _error;
+  bool _needsSetup = false;
+
+  Future<void> _generate() async {
+    setState(() { _loading = true; _error = null; _needsSetup = false; });
+    try {
+      final insight = await Api.aiInsights(screen: widget.screenKey, data: widget.screenData);
+      if (mounted) setState(() => _insight = insight);
+    } catch (e) {
+      final msg = e.toString().replaceAll('Exception: ', '');
+      if (mounted) {
+        setState(() {
+          _error = msg;
+          _needsSetup = msg.contains('Connect an AI provider');
+        });
+      }
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +193,7 @@ class AiInsightsCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
               padding: const EdgeInsets.all(10),
@@ -165,7 +201,11 @@ class AiInsightsCard extends StatelessWidget {
                 color: theme.colorScheme.surfaceContainerHighest,
                 shape: BoxShape.circle,
               ),
-              child: Icon(Icons.auto_awesome_outlined, color: theme.colorScheme.onSurfaceVariant, size: 20),
+              child: Icon(
+                _insight != null ? Icons.auto_awesome : Icons.auto_awesome_outlined,
+                color: _insight != null ? theme.colorScheme.primary : theme.colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
             ),
             const SizedBox(width: 14),
             Expanded(
@@ -175,15 +215,36 @@ class AiInsightsCard extends StatelessWidget {
                   Row(
                     children: [
                       Text(l10n.aiInsightsTitle, style: theme.textTheme.titleSmall),
-                      const SizedBox(width: 6),
-                      Icon(Icons.lock_outline, size: 13, color: theme.colorScheme.onSurfaceVariant),
+                      if (_insight == null) ...[
+                        const SizedBox(width: 6),
+                        Icon(Icons.lock_outline, size: 13, color: theme.colorScheme.onSurfaceVariant),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    l10n.aiInsightsPlaceholder,
-                    style: theme.textTheme.bodySmall,
-                  ),
+                  const SizedBox(height: 6),
+                  if (_insight != null)
+                    Text(_insight!, style: theme.textTheme.bodySmall)
+                  else if (_loading)
+                    Row(
+                      children: [
+                        SizedBox(height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2, color: theme.colorScheme.primary)),
+                        const SizedBox(width: 10),
+                        Expanded(child: Text(l10n.aiInsightsPlaceholder, style: theme.textTheme.bodySmall)),
+                      ],
+                    )
+                  else if (_error != null)
+                    Text(_error!, style: theme.textTheme.bodySmall?.copyWith(color: AppColors.of(context).danger))
+                  else
+                    Text(l10n.aiInsightsPlaceholder, style: theme.textTheme.bodySmall),
+                  if (!_loading && _insight == null) ...[
+                    const SizedBox(height: 10),
+                    _needsSetup
+                        ? OutlinedButton(
+                            onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AiSettingsScreen())),
+                            child: Text(l10n.aiChatConnectAction),
+                          )
+                        : OutlinedButton(onPressed: _generate, child: Text(l10n.aiGenerateInsightsAction)),
+                  ],
                 ],
               ),
             ),

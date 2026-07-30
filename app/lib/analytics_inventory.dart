@@ -248,7 +248,7 @@ class _InventoryAnalysisScreenState extends State<InventoryAnalysisScreen> {
         const SizedBox(height: 24),
       ],
 
-      AiInsightsCard(screenData: c),
+      AiInsightsCard(screenKey: 'inventory', screenData: c),
     ];
   }
 

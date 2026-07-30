@@ -1399,6 +1399,126 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'vs previous period'**
   String get vsPreviousPeriod;
+
+  /// No description provided for @aiAssistantTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assistant'**
+  String get aiAssistantTitle;
+
+  /// No description provided for @aiProviderLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Provider'**
+  String get aiProviderLabel;
+
+  /// No description provided for @aiApiKeyLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'API key'**
+  String get aiApiKeyLabel;
+
+  /// No description provided for @aiModelLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Model (optional)'**
+  String get aiModelLabel;
+
+  /// No description provided for @aiTestConnectionAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Test connection'**
+  String get aiTestConnectionAction;
+
+  /// No description provided for @aiConnectionSuccessful.
+  ///
+  /// In en, this message translates to:
+  /// **'Connection successful'**
+  String get aiConnectionSuccessful;
+
+  /// No description provided for @aiSaveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get aiSaveAction;
+
+  /// No description provided for @aiKeySetStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'Key set ••••'**
+  String get aiKeySetStatus;
+
+  /// No description provided for @aiChangeAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Change'**
+  String get aiChangeAction;
+
+  /// No description provided for @aiRemoveAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Remove'**
+  String get aiRemoveAction;
+
+  /// No description provided for @aiRemovedStatus.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Assistant disconnected'**
+  String get aiRemovedStatus;
+
+  /// No description provided for @aiNotConfiguredHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect your own API key from OpenAI, Anthropic, or Gemini to enable the AI Assistant. You pay your own provider directly — your key is encrypted and never leaves the server.'**
+  String get aiNotConfiguredHint;
+
+  /// No description provided for @aiChatInputHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Ask about your business or the app...'**
+  String get aiChatInputHint;
+
+  /// No description provided for @aiChatConnectPrompt.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect an AI provider in your profile to start chatting.'**
+  String get aiChatConnectPrompt;
+
+  /// No description provided for @aiChatConnectAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Connect AI'**
+  String get aiChatConnectAction;
+
+  /// No description provided for @aiBusinessOverviewAction.
+  ///
+  /// In en, this message translates to:
+  /// **'How\'s my business doing?'**
+  String get aiBusinessOverviewAction;
+
+  /// No description provided for @aiUsageTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'AI Usage'**
+  String get aiUsageTitle;
+
+  /// No description provided for @aiUsageTotalCalls.
+  ///
+  /// In en, this message translates to:
+  /// **'Total calls'**
+  String get aiUsageTotalCalls;
+
+  /// No description provided for @aiUsageTotalTokens.
+  ///
+  /// In en, this message translates to:
+  /// **'Total tokens'**
+  String get aiUsageTotalTokens;
+
+  /// No description provided for @aiGenerateInsightsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Generate insights'**
+  String get aiGenerateInsightsAction;
 }
 
 class _AppLocalizationsDelegate

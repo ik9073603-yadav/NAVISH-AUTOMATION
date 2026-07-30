@@ -234,5 +234,26 @@
 
   "aiInsightsTitle": "AI इनसाइट्स",
   "aiInsightsPlaceholder": "AI प्रोवाइडर कनेक्ट करने के बाद यहाँ AI इनसाइट्स दिखेंगी",
-  "vsPreviousPeriod": "पिछली अवधि की तुलना में"
+  "vsPreviousPeriod": "पिछली अवधि की तुलना में",
+
+  "aiAssistantTitle": "AI असिस्टेंट",
+  "aiProviderLabel": "प्रोवाइडर",
+  "aiApiKeyLabel": "API कुंजी",
+  "aiModelLabel": "मॉडल (वैकल्पिक)",
+  "aiTestConnectionAction": "कनेक्शन जांचें",
+  "aiConnectionSuccessful": "कनेक्शन सफल रहा",
+  "aiSaveAction": "सेव करें",
+  "aiKeySetStatus": "कुंजी सेट है ••••",
+  "aiChangeAction": "बदलें",
+  "aiRemoveAction": "हटाएं",
+  "aiRemovedStatus": "AI असिस्टेंट डिस्कनेक्ट कर दिया गया",
+  "aiNotConfiguredHint": "AI असिस्टेंट चालू करने के लिए OpenAI, Anthropic, या Gemini की अपनी API कुंजी जोड़ें। आप सीधे अपने प्रोवाइडर को भुगतान करते हैं — आपकी कुंजी एन्क्रिप्टेड है और सर्वर से बाहर कभी नहीं जाती।",
+  "aiChatInputHint": "अपने बिज़नेस या ऐप के बारे में पूछें...",
+  "aiChatConnectPrompt": "चैट शुरू करने के लिए अपनी प्रोफाइल में AI प्रोवाइडर कनेक्ट करें।",
+  "aiChatConnectAction": "AI कनेक्ट करें",
+  "aiBusinessOverviewAction": "मेरा बिज़नेस कैसा चल रहा है?",
+  "aiUsageTitle": "AI उपयोग",
+  "aiUsageTotalCalls": "कुल कॉल्स",
+  "aiUsageTotalTokens": "कुल टोकन",
+  "aiGenerateInsightsAction": "इनसाइट्स जनरेट करें"
 }

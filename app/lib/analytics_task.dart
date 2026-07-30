@@ -264,7 +264,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
               )),
         ],
         const SizedBox(height: 20),
-        AiInsightsCard(screenData: d),
+        AiInsightsCard(screenKey: 'task', screenData: d),
       ],
     );
   }
@@ -407,7 +407,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
           }),
         ],
         const SizedBox(height: 20),
-        AiInsightsCard(screenData: c),
+        AiInsightsCard(screenKey: 'task', screenData: c),
       ],
     );
   }

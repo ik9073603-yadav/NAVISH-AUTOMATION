@@ -177,7 +177,7 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
       const SizedBox(height: 20),
       _bottlenecksSection(context),
       const SizedBox(height: 20),
-      AiInsightsCard(screenData: {'summary': s, 'stages': stageData, 'bottlenecks': _bottlenecks}),
+      AiInsightsCard(screenKey: 'flow', screenData: {'summary': s, 'stages': stageData, 'bottlenecks': _bottlenecks}),
     ];
   }
 

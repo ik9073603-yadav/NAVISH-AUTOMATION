@@ -16,6 +16,7 @@ import 'stuck.dart';
 import 'health_score.dart';
 import 'settings.dart';
 import 'profile.dart';
+import 'ai_chat.dart';
 import 'analytics.dart';
 import 'admin.dart';
 import 'signup.dart';
@@ -466,6 +467,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         .then((_) => _load());
   }
 
+  void _openAiChat() {
+    Navigator.push(context, sharedAxisRoute(const AiChatScreen()));
+  }
+
   void _openSettings() {
     Navigator.push(context, sharedAxisRoute(const SettingsScreen()));
   }
@@ -574,6 +579,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             tooltip: l10n.navPasswordResetRequests,
             onPressed: _openResetRequests,
           ),
+        IconButton(
+          icon: const Icon(Icons.smart_toy_outlined),
+          tooltip: l10n.aiAssistantTitle,
+          onPressed: _openAiChat,
+        ),
         IconButton(
           icon: const Icon(Icons.person_outline),
           tooltip: l10n.navProfile,

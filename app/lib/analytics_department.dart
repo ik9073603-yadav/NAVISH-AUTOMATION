@@ -226,7 +226,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
         );
       }),
       const SizedBox(height: 20),
-      AiInsightsCard(screenData: {'departments': _departments}),
+      AiInsightsCard(screenKey: 'department', screenData: {'departments': _departments}),
     ];
   }
 
