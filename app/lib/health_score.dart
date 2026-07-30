@@ -5,17 +5,21 @@ import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 import 'l10n/gen/app_localizations.dart';
 
-Color _bandColor(BuildContext context, String? band) {
-  final semantic = AppColors.of(context);
+// The gauge's hero card is always a dark-ish fill (near-black in light
+// theme, rich violet in dark theme) — so text/accents drawn on it always
+// use the dark-mode-tuned semantic colors, regardless of the app's overall
+// brightness, since those are the ones built for legibility on a dark
+// surface.
+Color _bandColorOnHero(String? band) {
   switch (band) {
     case 'HEALTHY':
-      return semantic.success;
+      return AppSemanticColors.dark.success;
     case 'NEEDS_ATTENTION':
-      return semantic.warning;
+      return AppSemanticColors.dark.warning;
     case 'AT_RISK':
-      return semantic.danger;
+      return AppSemanticColors.dark.danger;
     default:
-      return Theme.of(context).colorScheme.onSurfaceVariant;
+      return const Color(0xFFACA6B8);
   }
 }
 
@@ -93,53 +97,60 @@ class HealthGauge extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
     final theme = Theme.of(context);
-    final semantic = AppColors.of(context);
-    final color = _bandColor(context, band);
+    final accents = AppAccents.of(context);
+    final heroColor = _bandColorOnHero(band);
     final reduced = reducedMotion(context);
     final target = (score ?? 0).toDouble();
 
+    // The one dark "hero" surface on the dashboard — everything else sits
+    // on light/tinted cards, so this single dark card reads as the anchor:
+    // the one number worth noticing first.
     return PressableScale(
       onTap: onTap,
-      child: Card(
-        color: color.withValues(alpha: 0.07),
+      child: Container(
+        decoration: BoxDecoration(
+          color: accents.hero,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(20),
           child: Row(
             children: [
               SizedBox(
-                width: 84,
-                height: 84,
+                width: 96,
+                height: 96,
                 child: TweenAnimationBuilder<double>(
                   tween: Tween(begin: 0, end: target),
                   duration: reduced ? Duration.zero : const Duration(milliseconds: 900),
                   curve: Curves.easeOutCubic,
                   builder: (context, value, _) => CustomPaint(
-                    painter: _GaugePainter(value: value, color: color, trackColor: color.withValues(alpha: 0.15)),
+                    painter: _GaugePainter(value: value, color: heroColor, trackColor: accents.onHero.withValues(alpha: 0.12)),
                     child: Center(
                       child: score == null
-                          ? const Text('—', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold))
+                          ? Text('—', style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: accents.onHero))
                           : Text(
                               '${value.round()}',
-                              style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold, color: color),
+                              style: theme.textTheme.headlineLarge?.copyWith(fontWeight: FontWeight.w800, color: accents.onHero),
                             ),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              const SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(l10n.companyHealthScore, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
+                    Text(l10n.companyHealthScore.toUpperCase(),
+                        style: AppTheme.eyebrow(context).copyWith(color: accents.onHero.withValues(alpha: 0.6))),
+                    const SizedBox(height: 6),
                     Text(
                       score == null ? l10n.noDataYet : _bandLabel(l10n, band),
-                      style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13),
+                      style: TextStyle(color: heroColor, fontWeight: FontWeight.w700, fontSize: 15),
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     if (delta == null)
-                      Text(l10n.healthNoTrendYet, style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant))
+                      Text(l10n.healthNoTrendYet, style: TextStyle(fontSize: 12, color: accents.onHero.withValues(alpha: 0.6)))
                     else
                       Row(
                         mainAxisSize: MainAxisSize.min,
@@ -147,21 +158,23 @@ class HealthGauge extends StatelessWidget {
                           Icon(
                             delta! > 0 ? Icons.trending_up : (delta! < 0 ? Icons.trending_down : Icons.trending_flat),
                             size: 15,
-                            color: delta! > 0 ? semantic.success : (delta! < 0 ? semantic.danger : theme.colorScheme.onSurfaceVariant),
+                            color: delta! > 0
+                                ? AppSemanticColors.dark.success
+                                : (delta! < 0 ? AppSemanticColors.dark.danger : accents.onHero.withValues(alpha: 0.6)),
                           ),
                           const SizedBox(width: 4),
                           Text(
                             delta! > 0
                                 ? l10n.healthTrendUpBy(delta!)
                                 : (delta! < 0 ? l10n.healthTrendDownBy(delta!) : l10n.healthTrendFlat),
-                            style: TextStyle(fontSize: 11, color: theme.colorScheme.onSurfaceVariant),
+                            style: TextStyle(fontSize: 12, color: accents.onHero.withValues(alpha: 0.75)),
                           ),
                         ],
                       ),
                   ],
                 ),
               ),
-              if (onTap != null) Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant),
+              if (onTap != null) Icon(Icons.chevron_right, color: accents.onHero.withValues(alpha: 0.5)),
             ],
           ),
         ),

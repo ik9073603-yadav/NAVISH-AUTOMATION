@@ -753,7 +753,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             const SizedBox(height: 16),
           ],
           entrance(
-            Text(l10n.needsAttentionHeading, style: theme.textTheme.titleSmall),
+            Text(l10n.needsAttentionHeading.toUpperCase(), style: AppTheme.eyebrow(context)),
             2,
           ),
           const SizedBox(height: 8),
@@ -766,7 +766,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       icon: Icons.warning_amber_rounded,
                       label: l10n.navStuck,
                       value: _stuckCount,
-                      color: _stuckCount > 0 ? semantic.danger : semantic.success,
+                      background: _stuckCount > 0 ? semantic.dangerContainer : semantic.successContainer,
+                      foreground: _stuckCount > 0 ? semantic.onDangerContainer : semantic.onSuccessContainer,
                       onTap: _stuckCount > 0
                           ? () => setState(() => _tab = labels.indexOf('Stuck'))
                           : null,
@@ -778,7 +779,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                       icon: Icons.inventory_2_outlined,
                       label: l10n.navInventory,
                       value: _lowStockCount,
-                      color: _lowStockCount > 0 ? semantic.warning : semantic.success,
+                      background: _lowStockCount > 0 ? semantic.warningContainer : semantic.successContainer,
+                      foreground: _lowStockCount > 0 ? semantic.onWarningContainer : semantic.onSuccessContainer,
                       onTap: _lowStockCount > 0
                           ? () => setState(() => _tab = labels.indexOf('Inventory'))
                           : null,
@@ -791,7 +793,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                     icon: Icons.today_outlined,
                     label: l10n.dueToday,
                     value: _dueTodayCount,
-                    color: semantic.info,
+                    background: semantic.infoContainer,
+                    foreground: semantic.onInfoContainer,
                   ),
                 ),
               ],
@@ -800,7 +803,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           ),
           const SizedBox(height: 24),
           entrance(
-            Text(l10n.yourSystemsHeading, style: theme.textTheme.titleSmall),
+            Text(l10n.yourSystemsHeading.toUpperCase(), style: AppTheme.eyebrow(context)),
             4,
           ),
           const SizedBox(height: 8),
@@ -835,10 +838,26 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
+  // Each module gets its own accent identity instead of a uniform tile —
+  // small, curated, and consistent (the same hue always means the same
+  // module), giving the grid genuine visual rhythm rather than a flat list.
+  (Color, Color) _moduleAccent(String m, ThemeData theme, AppSemanticColors semantic, AppAccents accents) {
+    switch (m) {
+      case 'Stuck': return (semantic.dangerContainer, semantic.onDangerContainer);
+      case 'Checklists': return (accents.tealContainer, accents.onTealContainer);
+      case 'Flows': return (accents.magentaContainer, accents.onMagentaContainer);
+      case 'Inventory': return (semantic.warningContainer, semantic.onWarningContainer);
+      case 'Analytics': return (semantic.infoContainer, semantic.onInfoContainer);
+      default: return (theme.colorScheme.primaryContainer, theme.colorScheme.onPrimaryContainer);
+    }
+  }
+
   Widget _moduleTile(String m, List<String> labels, ThemeData theme) {
     final l10n = AppLocalizations.of(context);
     final semantic = AppColors.of(context);
+    final accents = AppAccents.of(context);
     final badge = _moduleBadgeCount(m);
+    final (tileBg, tileFg) = _moduleAccent(m, theme, semantic, accents);
     return PressableScale(
       onTap: () => setState(() => _tab = labels.indexOf(m)),
       child: Card(
@@ -852,11 +871,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   Container(
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: theme.colorScheme.primaryContainer,
+                      color: tileBg,
                       borderRadius: BorderRadius.circular(AppRadius.sm),
                     ),
-                    child: Icon(_moduleIcon(m), size: 22,
-                        color: theme.colorScheme.onPrimaryContainer),
+                    child: Icon(_moduleIcon(m), size: 22, color: tileFg),
                   ),
                   if (badge != null)
                     Positioned(
@@ -893,33 +911,39 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     );
   }
 
+  // Color-blocked stat card: a full saturated-pastel fill (the container
+  // color, not a light tint of the base color) with the matching onXxx
+  // color for text/icon — the same technique as the reference's Workload/
+  // Sleep-debt cards, applied to Navish's own warm semantic palette.
   Widget _glanceStat({
     required IconData icon,
     required String label,
     required int value,
-    required Color color,
+    required Color background,
+    required Color foreground,
     VoidCallback? onTap,
   }) {
     return PressableScale(
       onTap: onTap,
-      child: Card(
-        color: color.withValues(alpha: 0.08),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(height: 6),
-              Text('$value',
-                  style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineMedium)
-                      .copyWith(color: color)),
-              Text(label,
-                  style: Theme.of(context).textTheme.bodySmall,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis),
-            ],
-          ),
+      child: Container(
+        decoration: BoxDecoration(
+          color: background,
+          borderRadius: BorderRadius.circular(AppRadius.lg),
+        ),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, color: foreground, size: 18),
+            const SizedBox(height: 8),
+            Text('$value',
+                style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineMedium)
+                    .copyWith(color: foreground, fontWeight: FontWeight.w800)),
+            Text(label,
+                style: TextStyle(color: foreground.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w600),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
+          ],
         ),
       ),
     );
