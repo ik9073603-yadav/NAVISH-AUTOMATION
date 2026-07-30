@@ -26,13 +26,29 @@ export interface CallAiResult {
 // A slow/hung provider must never hang the caller.
 const TIMEOUT_MS = 30_000;
 
-// Maps a failed provider call to a clear, safe-to-show message — never
-// leaks raw provider payloads (which can include account/billing detail).
+// Each provider's error JSON nests its human-readable message differently —
+// this is the one field worth surfacing (short, safe text like "model X not
+// found"), never the full payload (which can include account/billing detail).
+function extractProviderMessage(bodyText: string): string | null {
+  try {
+    const body = JSON.parse(bodyText);
+    return body?.error?.message ?? null;
+  } catch {
+    return null;
+  }
+}
+
+// Maps a failed provider call to a clear, safe-to-show message. Model-name
+// and other request-shape problems (4xx, not auth/rate-limit) surface the
+// provider's own message — e.g. "model X is no longer available" — so the
+// user can fix it by typing a different model, instead of a generic failure.
 function providerError(provider: string, status: number, bodyText: string): Error {
+  const providerMessage = extractProviderMessage(bodyText);
   let message: string;
   if (status === 401 || status === 403) message = `${provider} rejected the API key — check that it's correct and active.`;
   else if (status === 429) message = `${provider} rate-limited this request — wait a moment and try again.`;
   else if (status >= 500) message = `${provider} is currently unavailable — try again shortly.`;
+  else if (providerMessage) message = `${provider}: ${providerMessage}`;
   else message = `${provider} request failed (${status}).`;
   console.error(`AI provider error [${provider} ${status}]: ${bodyText.slice(0, 500)}`);
   return Object.assign(new Error(message), { status: status === 401 || status === 403 ? 401 : status === 429 ? 429 : 502 });
@@ -135,8 +151,13 @@ async function callGemini({ apiKey, model, systemPrompt, userPrompt, history }: 
 
 // Sensible cheap default model per provider — pre-filled in the UI, always
 // user-editable (provider model catalogs move faster than this file does).
+// Checked 2026-07-30: gpt-4.1-mini remains available via the OpenAI API
+// (only retired from the ChatGPT product UI). gemini-2.5-flash returns 404
+// "no longer available to new users" as of this date even though it's still
+// listed in Google's docs — gemini-2.5-flash-lite is the current
+// generally-available, budget-tier Flash model without that restriction.
 export const DEFAULT_MODEL: Record<AiProviderName, string> = {
   OPENAI: 'gpt-4.1-mini',
   ANTHROPIC: 'claude-haiku-4-5-20251001',
-  GEMINI: 'gemini-2.5-flash',
+  GEMINI: 'gemini-2.5-flash-lite',
 };

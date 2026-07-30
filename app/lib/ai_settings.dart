@@ -10,7 +10,7 @@ const _kAiProviderLabels = {'OPENAI': 'OpenAI', 'ANTHROPIC': 'Anthropic', 'GEMIN
 const _kAiDefaultModels = {
   'OPENAI': 'gpt-4.1-mini',
   'ANTHROPIC': 'claude-haiku-4-5-20251001',
-  'GEMINI': 'gemini-2.5-flash',
+  'GEMINI': 'gemini-2.5-flash-lite',
 };
 
 // Per-user AI provider setup — any role (owner/manager/employee) brings
