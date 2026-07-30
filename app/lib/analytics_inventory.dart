@@ -30,10 +30,15 @@ class _InventoryAnalysisScreenState extends State<InventoryAnalysisScreen> {
   Map<String, dynamic>? _previous;
   int _loadRequestId = 0;
 
-  static const _categoryColors = [
-    Color(0xFF4B57C9), Color(0xFF3B5BA5), Color(0xFF1F7A5C),
-    Color(0xFF8A5A00), Color(0xFFB3261E), Color(0xFF5B5F73),
-  ];
+  // Derived from the theme's brand accents (violet, teal, magenta) plus the
+  // semantic set, so category colors stay in sync with the app's current
+  // palette rather than a hardcoded snapshot of a previous one.
+  List<Color> _categoryColors(BuildContext context) {
+    final semantic = AppColors.of(context);
+    final accents = AppAccents.of(context);
+    final theme = Theme.of(context);
+    return [theme.colorScheme.primary, accents.teal, accents.magenta, semantic.warning, semantic.info, semantic.success];
+  }
 
   @override
   void initState() {
@@ -163,7 +168,7 @@ class _InventoryAnalysisScreenState extends State<InventoryAnalysisScreen> {
               DonutSlice(
                 stockByCategory[i]['category'] as String,
                 (stockByCategory[i]['value'] as num).toDouble(),
-                _categoryColors[i % _categoryColors.length],
+                _categoryColors(context)[i % _categoryColors(context).length],
               ),
           ],
         ),
@@ -239,10 +244,10 @@ class _InventoryAnalysisScreenState extends State<InventoryAnalysisScreen> {
         SectionHeader(title: 'Reorder needed', subtitle: '${reorderList.length} SKU(s) at or below minimum stock'),
         ...reorderList.map((r) => Card(
               child: ListTile(
-                title: Text(r['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Text('${r['currentStock']} ${r['unit']} left · min ${r['minStock']}'),
+                title: Text(r['name'] as String, style: Theme.of(context).textTheme.titleSmall),
+                subtitle: Text('${r['currentStock']} ${r['unit']} left · min ${r['minStock']}', style: Theme.of(context).textTheme.bodySmall),
                 trailing: Text('+${r['suggestedReorderQty']}',
-                    style: TextStyle(fontWeight: FontWeight.bold, color: semantic.warning)),
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: semantic.warning)),
               ),
             )),
         const SizedBox(height: 24),
@@ -256,7 +261,7 @@ class _InventoryAnalysisScreenState extends State<InventoryAnalysisScreen> {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 6),
-      Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
     ]);
   }
 }

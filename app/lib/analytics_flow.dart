@@ -182,10 +182,11 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   }
 
   Widget _summaryTile(BuildContext context, String value, String label) {
+    final theme = Theme.of(context);
     return Column(
       children: [
-        Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-        Text(label, style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant), textAlign: TextAlign.center),
+        Text(value, style: AppTheme.tabularFigures(theme.textTheme.titleLarge)),
+        Text(label, style: theme.textTheme.bodySmall, textAlign: TextAlign.center),
       ],
     );
   }
@@ -193,6 +194,8 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   Widget _costOfDelaySection(BuildContext context) {
     final c = _costOfDelay;
     if (c == null) return const SizedBox.shrink();
+    final theme = Theme.of(context);
+    final semantic = AppColors.of(context);
 
     final total = c['totalRupeesLost'] as num?;
     final missing = c['ordersMissingCostInfo'] as int? ?? 0;
@@ -205,54 +208,56 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
       children: [
         Row(
           children: [
-            const Text('Cost of Delay', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+            Text('Cost of Delay', style: theme.textTheme.titleMedium),
             const CostOfDelayInfoButton(),
           ],
         ),
         const SizedBox(height: 4),
-        Card(
-          color: AppColors.of(context).danger.withValues(alpha: 0.06),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  formatRupeesOrPrompt(total),
-                  style: TextStyle(
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    color: total == null ? Theme.of(context).colorScheme.onSurfaceVariant : AppColors.of(context).danger,
-                  ),
+        // A featured metric — full color-blocked fill, not a faint tint.
+        Container(
+          decoration: BoxDecoration(
+            color: total == null ? theme.colorScheme.surfaceContainerHigh : semantic.dangerContainer,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                formatRupeesOrPrompt(total),
+                style: AppTheme.tabularFigures(theme.textTheme.displaySmall).copyWith(
+                  color: total == null ? theme.colorScheme.onSurfaceVariant : semantic.onDangerContainer,
                 ),
-                Text(
-                  total == null ? 'Set a ₹/hr rate or capture order values to see ₹ lost to delay' : 'Total ₹ lost to delay in this range',
-                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+              Text(
+                total == null ? 'Set a ₹/hr rate or capture order values to see ₹ lost to delay' : 'Total ₹ lost to delay in this range',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: total == null ? theme.colorScheme.onSurfaceVariant : semantic.onDangerContainer.withValues(alpha: 0.8),
                 ),
-                if (missing > 0) ...[
-                  const SizedBox(height: 4),
-                  Text(
-                    '$missing delayed order(s) not counted — no rate or order value set',
-                    style: TextStyle(fontSize: 11, color: AppColors.of(context).warning),
-                  ),
-                ],
+              ),
+              if (missing > 0) ...[
+                const SizedBox(height: 4),
+                Text(
+                  '$missing delayed order(s) not counted — no rate or order value set',
+                  style: theme.textTheme.bodySmall?.copyWith(color: semantic.onDangerContainer),
+                ),
               ],
-            ),
+            ],
           ),
         ),
         if (mostExpensive.isNotEmpty) ...[
           const SizedBox(height: 12),
-          const Text('Most expensive delayed orders', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text('Most expensive delayed orders', style: theme.textTheme.titleSmall),
           ...mostExpensive.take(5).map((o) => _costRow(context, o['orderNumber'] as String, o['cost'] as num)),
         ],
         if (costliestStages.isNotEmpty) ...[
           const SizedBox(height: 12),
-          const Text('Costliest stage', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text('Costliest stage', style: theme.textTheme.titleSmall),
           ...costliestStages.take(3).map((s) => _costRow(context, '${s['stageName']} (${s['flowName']})', s['cost'] as num)),
         ],
         if (costliestPeople.isNotEmpty) ...[
           const SizedBox(height: 12),
-          const Text('Costliest person', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+          Text('Costliest person', style: theme.textTheme.titleSmall),
           ...costliestPeople.take(3).map((p) => _costRow(context, p['name'] as String, p['cost'] as num)),
         ],
       ],
@@ -260,12 +265,14 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
   }
 
   Widget _costRow(BuildContext context, String label, num cost) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 3),
       child: Row(
         children: [
-          Expanded(child: Text(label, style: const TextStyle(fontSize: 13))),
-          Text('₹${cost.toStringAsFixed(0)}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.of(context).danger)),
+          Expanded(child: Text(label, style: theme.textTheme.bodySmall)),
+          Text('₹${cost.toStringAsFixed(0)}',
+              style: AppTheme.tabularFigures(theme.textTheme.labelMedium).copyWith(color: AppColors.of(context).danger)),
         ],
       ),
     );
@@ -286,24 +293,24 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
     final withActivity = stages.where((s) => (s['completedInRange'] as int) > 0).toList()
       ..sort((a, b) => (b['completedInRange'] as int).compareTo(a['completedInRange'] as int));
     if (withActivity.isEmpty) return const SizedBox.shrink();
+    final theme = Theme.of(context);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Avg time per stage', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('Avg time per stage', style: theme.textTheme.titleMedium),
         const SizedBox(height: 10),
         ...withActivity.map((s) => Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Expanded(flex: 3, child: Text('${s['flowName']} — ${s['stageName']}', style: const TextStyle(fontSize: 13))),
-                  Expanded(flex: 2, child: Text('avg ${formatDurationMinsOrDash(s['avgMins'] as int)}', style: const TextStyle(fontSize: 12))),
+                  Expanded(flex: 3, child: Text('${s['flowName']} — ${s['stageName']}', style: theme.textTheme.bodySmall)),
+                  Expanded(flex: 2, child: Text('avg ${formatDurationMinsOrDash(s['avgMins'] as int)}', style: theme.textTheme.bodySmall)),
                   Expanded(
                     flex: 2,
                     child: Text(
                       (s['avgDelayMins'] as int) > 0 ? '+${formatDurationMinsOrDash(s['avgDelayMins'] as int)} late' : 'on time',
-                      style: TextStyle(
-                          fontSize: 12,
+                      style: theme.textTheme.bodySmall?.copyWith(
                           color: (s['avgDelayMins'] as int) > 0 ? AppColors.of(context).danger : AppColors.of(context).success),
                     ),
                   ),
@@ -326,15 +333,13 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
 
   Widget _bottlenecksSection(BuildContext context) {
     final top = _bottlenecks.where((b) => (b['ordersStuck'] as int) > 0).take(5).toList();
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Bottleneck stages', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-        const SizedBox(height: 4),
-        Text('Where orders are piling up right now', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-        const SizedBox(height: 10),
+        SectionHeader(title: 'Bottleneck stages', subtitle: 'Where orders are piling up right now'),
         if (top.isEmpty)
-          const Padding(padding: EdgeInsets.only(top: 4), child: Text('No stage is currently backed up.'))
+          Padding(padding: const EdgeInsets.only(top: 4), child: Text('No stage is currently backed up.', style: theme.textTheme.bodySmall))
         else
           ...top.map((b) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
@@ -342,8 +347,9 @@ class _FlowAnalysisScreenState extends State<FlowAnalysisScreen> {
                   children: [
                     Icon(Icons.warning_amber_rounded, size: 16, color: AppColors.of(context).danger),
                     const SizedBox(width: 8),
-                    Expanded(child: Text('${b['flowName']} — ${b['stageName']}', style: const TextStyle(fontSize: 13))),
-                    Text('${b['ordersStuck']} stuck', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.of(context).danger)),
+                    Expanded(child: Text('${b['flowName']} — ${b['stageName']}', style: theme.textTheme.bodySmall)),
+                    Text('${b['ordersStuck']} stuck',
+                        style: theme.textTheme.labelMedium?.copyWith(color: AppColors.of(context).danger)),
                   ],
                 ),
               )),

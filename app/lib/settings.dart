@@ -5,6 +5,7 @@ import 'export_actions.dart';
 import 'push.dart';
 import 'reset_requests.dart';
 import 'responsive.dart';
+import 'theme/app_theme.dart';
 import 'theme_controller.dart';
 import 'widgets/avatar.dart';
 import 'widgets/motion.dart';
@@ -305,7 +306,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const CostOfDelayInfoButton(),
               ],
             ),
-            Text(l10n.delayCostPerHourHint, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            Text(l10n.delayCostPerHourHint, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
             TextField(
               controller: _delayCostPerHour,
@@ -331,8 +332,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             if (_holidays.isEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Text(l10n.noHolidaysAdded,
-                    style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                child: Text(l10n.noHolidaysAdded, style: Theme.of(context).textTheme.bodySmall),
               )
             else
               Wrap(
@@ -396,10 +396,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const Divider(),
             const SizedBox(height: 8),
             _sectionLabel(l10n.dataSection),
-            Text(
-              l10n.dataExportDescription,
-              style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            ),
+            Text(l10n.dataExportDescription, style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 8),
             OutlinedButton.icon(
               onPressed: _backingUp ? null : _downloadBackup,
@@ -417,7 +414,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        child: Text(text.toUpperCase(), style: AppTheme.eyebrow(context)),
       );
 
   Widget _logoPicker() {

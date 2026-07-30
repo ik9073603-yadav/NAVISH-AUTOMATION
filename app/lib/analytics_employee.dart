@@ -157,19 +157,22 @@ class _EmployeeAnalysisScreenState extends State<EmployeeAnalysisScreen> {
           ),
       ]),
       const SizedBox(height: 20),
-      const Text('Everyone', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      Text('Everyone', style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 8),
       ...([..._employees]..sort((a, b) => (b['onTimePct'] as int).compareTo(a['onTimePct'] as int))).map((e) => Card(
             child: ListTile(
               onTap: () => _openDetail(e as Map<String, dynamic>),
-              title: Text(e['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-              subtitle: Text('${e['completed']} done · ${e['escalated']} escalated · load ${e['currentLoad']}'),
+              title: Text(e['name'] as String, style: Theme.of(context).textTheme.titleSmall),
+              subtitle: Text('${e['completed']} done · ${e['escalated']} escalated · load ${e['currentLoad']}',
+                  style: Theme.of(context).textTheme.bodySmall),
               trailing: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
-                  Text('${e['onTimePct']}%', style: TextStyle(fontWeight: FontWeight.bold, color: _colorFor(context, e['onTimePct'] as int))),
-                  const Text('on-time', style: TextStyle(fontSize: 10)),
+                  Text('${e['onTimePct']}%',
+                      style: AppTheme.tabularFigures(Theme.of(context).textTheme.titleMedium)
+                          .copyWith(color: _colorFor(context, e['onTimePct'] as int))),
+                  Text('on-time', style: Theme.of(context).textTheme.labelSmall),
                 ],
               ),
             ),
@@ -202,7 +205,7 @@ class _EmployeeDetailSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(e['name'] as String, style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(e['name'] as String, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
             _row(context, 'Completed', '${e['completed']}'),
             _row(context, 'Late (escalated before finishing)', '${e['late']}'),
@@ -219,13 +222,14 @@ class _EmployeeDetailSheet extends StatelessWidget {
   }
 
   Widget _row(BuildContext context, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text(label, style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant)),
+          Text(value, style: theme.textTheme.titleSmall),
         ],
       ),
     );

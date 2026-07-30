@@ -51,28 +51,39 @@ class LegalScreen extends StatelessWidget {
     }
   }
 
+  Widget _iconBadge(BuildContext context, IconData icon, Color background, Color foreground) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(color: background, shape: BoxShape.circle),
+      child: Icon(icon, color: foreground, size: 20),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final semantic = AppColors.of(context);
+    final accents = AppAccents.of(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Legal')),
       body: ListView(
+        padding: const EdgeInsets.symmetric(vertical: 8),
         children: [
           ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('Terms & Conditions'),
+            leading: _iconBadge(context, Icons.description_outlined, accents.tealContainer, accents.onTealContainer),
+            title: Text('Terms & Conditions', style: Theme.of(context).textTheme.titleSmall),
             trailing: const Icon(Icons.open_in_new, size: 18),
             onTap: () => _open('/legal/terms'),
           ),
           ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('Privacy Policy'),
+            leading: _iconBadge(context, Icons.privacy_tip_outlined, semantic.infoContainer, semantic.onInfoContainer),
+            title: Text('Privacy Policy', style: Theme.of(context).textTheme.titleSmall),
             trailing: const Icon(Icons.open_in_new, size: 18),
             onTap: () => _open('/legal/privacy'),
           ),
-          const Divider(),
+          const Divider(height: 24),
           ListTile(
-            leading: Icon(Icons.delete_forever_outlined, color: AppColors.of(context).danger),
-            title: Text('Delete my account', style: TextStyle(color: AppColors.of(context).danger)),
+            leading: _iconBadge(context, Icons.delete_forever_outlined, semantic.dangerContainer, semantic.danger),
+            title: Text('Delete my account', style: Theme.of(context).textTheme.titleSmall?.copyWith(color: semantic.danger)),
             subtitle: const Text('Files a request; your owner/admin actions it'),
             onTap: () => _requestDeletion(context),
           ),

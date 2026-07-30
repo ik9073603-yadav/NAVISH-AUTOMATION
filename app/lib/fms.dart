@@ -195,6 +195,12 @@ class _FmsScreenState extends State<FmsScreen> {
           final done = o['status'] == 'COMPLETED';
           final delayed = o['delayed'] == true;
           final canComplete = !done && o['orderStageId'] != null && _canComplete(o);
+          final semantic = AppColors.of(context);
+          final (statusBg, statusFg, statusIcon) = done
+              ? (semantic.successContainer, semantic.onSuccessContainer, Icons.check_circle)
+              : delayed
+                  ? (semantic.dangerContainer, semantic.onDangerContainer, Icons.warning)
+                  : (semantic.infoContainer, semantic.onInfoContainer, Icons.local_shipping);
           return StaggeredListItem(
             index: i,
             child: Card(
@@ -206,16 +212,12 @@ class _FmsScreenState extends State<FmsScreen> {
                     orderNumber: o['orderNumber'] as String,
                   )),
                 ),
-                leading: Icon(
-                  done
-                      ? Icons.check_circle
-                      : (delayed ? Icons.warning : Icons.local_shipping),
-                  color: done
-                      ? AppColors.of(context).success
-                      : (delayed ? AppColors.of(context).danger : AppColors.of(context).info),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: statusBg, shape: BoxShape.circle),
+                  child: Icon(statusIcon, color: statusFg, size: 20),
                 ),
-                title: Text(o['orderNumber'],
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                title: Text(o['orderNumber'], style: Theme.of(context).textTheme.titleSmall),
                 subtitle: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -271,29 +273,28 @@ class _FmsScreenState extends State<FmsScreen> {
           final b = _bottlenecks[i];
           final stuck = b['ordersStuck'] as int;
           final planned = b['plannedMins'];
+          final semantic = AppColors.of(context);
+          final (cardBg, cardFg) = stuck > 2
+              ? (semantic.dangerContainer, semantic.onDangerContainer)
+              : stuck > 0
+                  ? (semantic.warningContainer, semantic.onWarningContainer)
+                  : (semantic.successContainer, semantic.onSuccessContainer);
           return StaggeredListItem(
             index: i,
-            child: Card(
-              color: stuck > 0 ? AppColors.of(context).danger.withValues(alpha: 0.08) : null,
+            child: Container(
+              margin: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(color: cardBg, borderRadius: BorderRadius.circular(AppRadius.lg)),
               child: ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: stuck > 2
-                      ? AppColors.of(context).danger
-                      : (stuck > 0 ? AppColors.of(context).warning : AppColors.of(context).success),
-                  child: Text('$stuck',
-                      style: TextStyle(
-                          color: stuck > 2
-                              ? AppColors.of(context).onDanger
-                              : (stuck > 0
-                                  ? AppColors.of(context).onWarning
-                                  : AppColors.of(context).onSuccess))),
+                  backgroundColor: cardFg.withValues(alpha: 0.16),
+                  child: Text('$stuck', style: TextStyle(color: cardFg, fontWeight: FontWeight.w800)),
                 ),
-                title: Text(b['stageName'],
-                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(b['stageName'], style: TextStyle(fontWeight: FontWeight.w700, color: cardFg)),
                 subtitle: Text(
                   '${b['flowName']} · $stuck order(s) here'
                   '${planned == null ? " · unplanned" : ""}'
                   '${b['avgDelayMins'] != 0 ? " · avg delay ${b['avgDelayMins']} min" : ""}',
+                  style: TextStyle(color: cardFg.withValues(alpha: 0.85)),
                 ),
               ),
             ),
@@ -505,9 +506,8 @@ class _OrderValueSheetState extends State<_OrderValueSheet> {
         children: [
           Row(
             children: [
-              const Expanded(
-                child: Text('Order value (optional)',
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Expanded(
+                child: Text('Order value (optional)', style: Theme.of(context).textTheme.headlineSmall),
               ),
               const CostOfDelayInfoButton(),
             ],
@@ -622,9 +622,7 @@ class _StageFormSheetState extends State<_StageFormSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('${widget.orderNumber} — ${widget.stageName}',
-                style: const TextStyle(
-                    fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('${widget.orderNumber} — ${widget.stageName}', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
             if (widget.fields.isEmpty)
               Text('No fields to fill. Just confirm.',
@@ -851,8 +849,7 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Build a flow',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Build a flow', style: Theme.of(context).textTheme.headlineMedium),
             Text('Your own process. Any number of stages.',
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
             const SizedBox(height: 16),
@@ -881,10 +878,9 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
               ),
             ),
             const SizedBox(height: 20),
-            const Align(
+            Align(
               alignment: Alignment.centerLeft,
-              child: Text('Stages',
-                  style: TextStyle(fontWeight: FontWeight.bold)),
+              child: Text('STAGES', style: AppTheme.eyebrow(context)),
             ),
             const SizedBox(height: 8),
             ..._stages.asMap().entries.map((entry) {
@@ -1009,8 +1005,7 @@ class _StageCard extends StatelessWidget {
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
               dense: true,
-              title: const Text('Has a planned time?',
-                  style: TextStyle(fontSize: 14)),
+              title: Text('Has a planned time?', style: Theme.of(context).textTheme.titleSmall),
               subtitle: Text(
                 draft.hasPlannedTime
                     ? 'Late = chase + escalate'

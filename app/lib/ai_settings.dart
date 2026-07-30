@@ -123,6 +123,10 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           : ListView(
               padding: const EdgeInsets.all(16),
               children: [
+                Text('AI ASSISTANT', style: AppTheme.eyebrow(context)),
+                const SizedBox(height: 6),
+                Text(l10n.aiAssistantTitle, style: Theme.of(context).textTheme.headlineLarge),
+                const SizedBox(height: 8),
                 Text(l10n.aiNotConfiguredHint, style: Theme.of(context).textTheme.bodySmall),
                 const SizedBox(height: 20),
                 if (_configured && !_editing) _statusCard(l10n) else _form(l10n),
@@ -131,40 +135,45 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
     );
   }
 
+  // Color-blocked "connected" card — signals at a glance that AI is live,
+  // the same technique used for status cards on the Dashboard.
   Widget _statusCard(AppLocalizations l10n) {
-    final theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.smart_toy_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: 10),
-                Text(_kAiProviderLabels[_savedProvider] ?? _savedProvider ?? '', style: theme.textTheme.titleMedium),
-              ],
-            ),
-            const SizedBox(height: 4),
-            if (_savedModel != null && _savedModel!.isNotEmpty)
-              Text(_savedModel!, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 4),
-            Text(l10n.aiKeySetStatus, style: theme.textTheme.bodySmall),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                OutlinedButton(onPressed: () => setState(() => _editing = true), child: Text(l10n.aiChangeAction)),
-                const SizedBox(width: 12),
-                TextButton(
-                  onPressed: _remove,
-                  style: TextButton.styleFrom(foregroundColor: AppColors.of(context).danger),
-                  child: Text(l10n.aiRemoveAction),
-                ),
-              ],
-            ),
-          ],
-        ),
+    final accents = AppAccents.of(context);
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accents.tealContainer,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.check_circle, color: accents.onTealContainer, size: 20),
+              const SizedBox(width: 10),
+              Text(_kAiProviderLabels[_savedProvider] ?? _savedProvider ?? '',
+                  style: TextStyle(color: accents.onTealContainer, fontWeight: FontWeight.w700, fontSize: 15)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (_savedModel != null && _savedModel!.isNotEmpty)
+            Text(_savedModel!, style: TextStyle(color: accents.onTealContainer.withValues(alpha: 0.8), fontSize: 12)),
+          const SizedBox(height: 4),
+          Text(l10n.aiKeySetStatus, style: TextStyle(color: accents.onTealContainer.withValues(alpha: 0.8), fontSize: 12)),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              OutlinedButton(onPressed: () => setState(() => _editing = true), child: Text(l10n.aiChangeAction)),
+              const SizedBox(width: 12),
+              TextButton(
+                onPressed: _remove,
+                style: TextButton.styleFrom(foregroundColor: AppColors.of(context).danger),
+                child: Text(l10n.aiRemoveAction),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -175,7 +184,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       children: [
         DropdownButtonFormField<String>(
           initialValue: _provider,
-          decoration: InputDecoration(labelText: l10n.aiProviderLabel, border: const OutlineInputBorder()),
+          decoration: InputDecoration(labelText: l10n.aiProviderLabel),
           items: [for (final p in _kAiProviders) DropdownMenuItem(value: p, child: Text(_kAiProviderLabels[p]!))],
           onChanged: (v) {
             if (v == null) return;
@@ -189,7 +198,6 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           onChanged: (_) => setState(() {}),
           decoration: InputDecoration(
             labelText: l10n.aiApiKeyLabel,
-            border: const OutlineInputBorder(),
             suffixIcon: IconButton(
               icon: Icon(_obscureKey ? Icons.visibility_outlined : Icons.visibility_off_outlined),
               onPressed: () => setState(() => _obscureKey = !_obscureKey),
@@ -202,7 +210,6 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
           decoration: InputDecoration(
             labelText: l10n.aiModelLabel,
             hintText: _kAiDefaultModels[_provider],
-            border: const OutlineInputBorder(),
           ),
         ),
         const SizedBox(height: 16),

@@ -140,17 +140,17 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   Widget _otpBox(int index) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 46,
-      height: 56,
+      width: 48,
+      height: 58,
       child: TextField(
         controller: _otpControllers[index],
         focusNode: _otpFocusNodes[index],
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
-        style: theme.textTheme.headlineSmall,
+        style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.primary),
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(counterText: '', border: OutlineInputBorder()),
+        decoration: const InputDecoration(counterText: ''),
         onChanged: (v) => _onOtpChanged(index, v),
       ),
     );
@@ -168,8 +168,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(l10n.forgotPasswordStepEmailSubtitle, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 16),
+        Text(l10n.forgotPasswordTitle.toUpperCase(), style: AppTheme.eyebrow(context)),
+        const SizedBox(height: 6),
+        Text(l10n.forgotPasswordStepEmailSubtitle, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 20),
         TextField(
           controller: _email,
           keyboardType: TextInputType.emailAddress,
@@ -196,9 +198,12 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
+        Text(l10n.otpScreenTitle.toUpperCase(),
+            textAlign: TextAlign.center, style: AppTheme.eyebrow(context)),
+        const SizedBox(height: 6),
         Text(l10n.otpScreenSubtitle(_email.text.trim()),
-            textAlign: TextAlign.center, style: Theme.of(context).textTheme.bodyMedium),
-        const SizedBox(height: 20),
+            textAlign: TextAlign.center, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: 24),
         Row(mainAxisAlignment: MainAxisAlignment.spaceEvenly, children: List.generate(6, _otpBox)),
         const SizedBox(height: 16),
         _errorText(),
@@ -220,6 +225,8 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
+        Text(l10n.newPasswordLabel.toUpperCase(), style: AppTheme.eyebrow(context)),
+        const SizedBox(height: 12),
         TextField(
           controller: _newPassword,
           obscureText: true,

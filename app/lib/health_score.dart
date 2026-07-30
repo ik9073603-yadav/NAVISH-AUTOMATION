@@ -297,10 +297,12 @@ class _HealthScoreScreenState extends State<HealthScoreScreen> {
         children: [
           HealthGauge(score: overall, band: band, delta: trend?['delta'] as int?),
           const SizedBox(height: 28),
+          Text(l10n.healthBreakdownTitle.toUpperCase(), style: AppTheme.eyebrow(context)),
+          const SizedBox(height: 10),
           ...components.indexed.map((e) => StaggeredListItem(index: e.$1, child: _componentBar(l10n, e.$2))),
           const SizedBox(height: 16),
-          Text(l10n.healthBiggestDrags, style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-          const SizedBox(height: 8),
+          Text(l10n.healthBiggestDrags.toUpperCase(), style: AppTheme.eyebrow(context)),
+          const SizedBox(height: 10),
           if (drags.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 12),
@@ -373,12 +375,14 @@ class _HealthScoreScreenState extends State<HealthScoreScreen> {
     final module = d['module'] as String?;
 
     return Card(
+      color: semantic.dangerContainer,
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: Icon(Icons.trending_down, color: semantic.danger),
-        title: Text(_componentLabel(l10n, d['key'] as String), style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(_componentReason(l10n, match)),
-        trailing: module != null ? Icon(Icons.chevron_right, color: theme.colorScheme.onSurfaceVariant) : null,
+        title: Text(_componentLabel(l10n, d['key'] as String),
+            style: theme.textTheme.titleSmall?.copyWith(color: semantic.onDangerContainer)),
+        subtitle: Text(_componentReason(l10n, match), style: TextStyle(color: semantic.onDangerContainer.withValues(alpha: 0.85))),
+        trailing: module != null ? Icon(Icons.chevron_right, color: semantic.onDangerContainer.withValues(alpha: 0.7)) : null,
         onTap: module == null
             ? null
             : () {

@@ -142,7 +142,7 @@ class _FlowOrdersListScreenState extends State<FlowOrdersListScreen> {
                                       ),
                                     ),
                                     title: Text(o['orderNumber'] as String,
-                                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                                        style: Theme.of(context).textTheme.titleSmall),
                                     subtitle: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [

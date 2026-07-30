@@ -112,25 +112,35 @@ class _AiChatScreenState extends State<AiChatScreen> {
   }
 
   Widget _connectPrompt(AppLocalizations l10n) {
-    final theme = Theme.of(context);
+    final accents = AppAccents.of(context);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.smart_toy_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text(l10n.aiChatConnectPrompt, textAlign: TextAlign.center, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 20),
-            FilledButton(onPressed: _openSettings, child: Text(l10n.aiChatConnectAction)),
-          ],
+        child: Container(
+          padding: const EdgeInsets.all(28),
+          decoration: BoxDecoration(
+            color: accents.hero,
+            borderRadius: BorderRadius.circular(AppRadius.lg),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.auto_awesome, size: 40, color: accents.onHero),
+              const SizedBox(height: 16),
+              Text(l10n.aiChatConnectPrompt,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: accents.onHero, fontSize: 14, fontWeight: FontWeight.w500)),
+              const SizedBox(height: 20),
+              FilledButton(onPressed: _openSettings, child: Text(l10n.aiChatConnectAction)),
+            ],
+          ),
         ),
       ),
     );
   }
 
   Widget _chatBody(AppLocalizations l10n) {
+    final accents = AppAccents.of(context);
     return Column(
       children: [
         Expanded(
@@ -138,10 +148,17 @@ class _AiChatScreenState extends State<AiChatScreen> {
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: OutlinedButton.icon(
-                      icon: const Icon(Icons.insights_outlined),
-                      label: Text(l10n.aiBusinessOverviewAction),
-                      onPressed: () => _send(l10n.aiBusinessOverviewAction, feature: 'OVERVIEW'),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.auto_awesome, size: 36, color: accents.teal),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          icon: const Icon(Icons.insights_outlined),
+                          label: Text(l10n.aiBusinessOverviewAction),
+                          onPressed: () => _send(l10n.aiBusinessOverviewAction, feature: 'OVERVIEW'),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -190,6 +207,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   Widget _bubble(_Message m) {
     final theme = Theme.of(context);
+    final accents = AppAccents.of(context);
     final isUser = m.role == 'user';
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -200,6 +218,10 @@ class _AiChatScreenState extends State<AiChatScreen> {
         decoration: BoxDecoration(
           color: isUser ? theme.colorScheme.primaryContainer : theme.colorScheme.surfaceContainerHigh,
           borderRadius: BorderRadius.circular(AppRadius.lg),
+          // A slim teal edge marks the assistant's own bubbles — a small,
+          // consistent signature so the AI feature reads as its own thing
+          // rather than borrowing the app's general primary color.
+          border: isUser ? null : Border(left: BorderSide(color: accents.teal, width: 3)),
         ),
         child: Text(
           m.text,

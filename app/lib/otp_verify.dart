@@ -116,17 +116,20 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
   Widget _box(int index) {
     final theme = Theme.of(context);
     return SizedBox(
-      width: 46,
-      height: 56,
+      width: 48,
+      height: 58,
       child: TextField(
         controller: _controllers[index],
         focusNode: _focusNodes[index],
         textAlign: TextAlign.center,
         keyboardType: TextInputType.number,
         maxLength: 1,
-        style: theme.textTheme.headlineSmall,
+        style: theme.textTheme.headlineMedium?.copyWith(color: theme.colorScheme.primary),
         inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-        decoration: const InputDecoration(counterText: '', border: OutlineInputBorder()),
+        // No explicit border here — inherits the theme's filled, rounded,
+        // primary-highlighted-on-focus input styling instead of a flat
+        // rectangle that ignored the rest of the design system.
+        decoration: const InputDecoration(counterText: ''),
         onChanged: (v) => _onChanged(index, v),
       ),
     );
@@ -145,12 +148,15 @@ class _OtpVerifyScreenState extends State<OtpVerifyScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
+                Text(l10n.otpScreenTitle.toUpperCase(),
+                    textAlign: TextAlign.center, style: AppTheme.eyebrow(context)),
+                const SizedBox(height: 8),
                 Text(
                   l10n.otpScreenSubtitle(widget.email),
                   textAlign: TextAlign.center,
-                  style: Theme.of(context).textTheme.bodyLarge,
+                  style: Theme.of(context).textTheme.titleMedium,
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 32),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: List.generate(6, _box),

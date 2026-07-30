@@ -154,7 +154,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
           ],
         ),
         const SizedBox(height: 24),
-        const Text('On-time % vs checklist compliance %', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        Text('On-time % vs checklist compliance %', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 4),
         Row(children: [
           _legendDot(context, Theme.of(context).colorScheme.primary, 'On-time %'),
@@ -186,7 +186,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
                   // when truncated to one word ("Not").
                   return Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(name, style: const TextStyle(fontSize: 9), textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
+                    child: Text(name, style: Theme.of(context).textTheme.labelSmall, textAlign: TextAlign.center, overflow: TextOverflow.ellipsis),
                   );
                 },
               )),
@@ -200,25 +200,29 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
         ),
         const SizedBox(height: 20),
       ],
-      const Text('Departments', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+      Text('Departments', style: Theme.of(context).textTheme.titleMedium),
       const SizedBox(height: 8),
       ..._departments.map((d) {
         final name = d['departmentId'] == null ? l10n.notAssigned : d['name'] as String;
         final completed = d['completed'] as int;
         final late = d['late'] as int;
+        final theme = Theme.of(context);
         return Card(
           child: ListTile(
             onTap: () => _openDepartment(d as Map<String, dynamic>),
             leading: CircleAvatar(child: Text('${d['employeeCount']}')),
-            title: Text(name, style: const TextStyle(fontWeight: FontWeight.w600)),
-            subtitle: Text(completed > 0 ? '$completed done · $late late · load ${d['currentLoad']}' : 'No completed tasks in this range'),
+            title: Text(name, style: theme.textTheme.titleSmall),
+            subtitle: Text(completed > 0 ? '$completed done · $late late · load ${d['currentLoad']}' : 'No completed tasks in this range',
+                style: theme.textTheme.bodySmall),
             trailing: completed > 0
                 ? Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
-                      Text('${d['onTimePct']}%', style: TextStyle(fontWeight: FontWeight.bold, color: _colorFor(context, d['onTimePct'] as int))),
-                      const Text('on-time', style: TextStyle(fontSize: 10)),
+                      Text('${d['onTimePct']}%',
+                          style: AppTheme.tabularFigures(theme.textTheme.titleMedium)
+                              .copyWith(color: _colorFor(context, d['onTimePct'] as int))),
+                      Text('on-time', style: theme.textTheme.labelSmall),
                     ],
                   )
                 : const Icon(Icons.chevron_right),
@@ -234,7 +238,7 @@ class _DepartmentAnalysisScreenState extends State<DepartmentAnalysisScreen> {
     return Row(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
       const SizedBox(width: 6),
-      Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+      Text(label, style: Theme.of(context).textTheme.bodySmall),
     ]);
   }
 
@@ -261,13 +265,15 @@ class _DepartmentMembersScreen extends StatelessWidget {
           : ListView.builder(
               padding: const EdgeInsets.all(12),
               itemCount: members.length,
-              itemBuilder: (_, i) {
+              itemBuilder: (context, i) {
                 final e = members[i] as Map<String, dynamic>;
+                final theme = Theme.of(context);
                 return Card(
                   child: ListTile(
-                    title: Text(e['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-                    subtitle: Text('${e['completed']} done · ${e['escalated']} escalated · load ${e['currentLoad']}'),
-                    trailing: Text('${e['onTimePct']}%', style: const TextStyle(fontWeight: FontWeight.bold)),
+                    title: Text(e['name'] as String, style: theme.textTheme.titleSmall),
+                    subtitle: Text('${e['completed']} done · ${e['escalated']} escalated · load ${e['currentLoad']}',
+                        style: theme.textTheme.bodySmall),
+                    trailing: Text('${e['onTimePct']}%', style: AppTheme.tabularFigures(theme.textTheme.titleMedium)),
                   ),
                 );
               },

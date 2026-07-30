@@ -96,54 +96,80 @@ class _InventoryScreenState extends State<InventoryScreen> {
 
   Widget _summaryCard() {
     final s = _summary!;
+    final theme = Theme.of(context);
+    final semantic = AppColors.of(context);
     final lowCount = s['lowStockCount'] as int;
     final deadCount = s['deadStockCount'] as int;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
           children: [
-            Row(
-              children: [
-                const Expanded(
-                  child: Text('Inventory summary',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.ios_share, size: 20),
-                  tooltip: 'Export movements',
-                  onPressed: _exportMovements,
-                ),
-              ],
+            Expanded(
+              child: Text('INVENTORY SUMMARY', style: AppTheme.eyebrow(context)),
             ),
-            const SizedBox(height: 12),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _statTile('₹${(s['totalStockValue'] as num).toStringAsFixed(0)}', 'Stock value'),
-                _statTile('$lowCount', 'Low stock', color: lowCount > 0 ? AppColors.of(context).danger : null),
-                _statTile(
-                  '$deadCount',
-                  'Dead (₹${(s['deadStockValue'] as num).toStringAsFixed(0)})',
-                  color: deadCount > 0 ? Theme.of(context).colorScheme.onSurfaceVariant : null,
-                ),
-              ],
+            IconButton(
+              icon: const Icon(Icons.ios_share, size: 20),
+              tooltip: 'Export movements',
+              onPressed: _exportMovements,
             ),
           ],
         ),
-      ),
+        const SizedBox(height: 4),
+        Row(
+          children: [
+            Expanded(
+              flex: 2,
+              child: _statBlock(
+                '₹${(s['totalStockValue'] as num).toStringAsFixed(0)}',
+                'Stock value',
+                background: theme.colorScheme.primaryContainer,
+                foreground: theme.colorScheme.onPrimaryContainer,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _statBlock(
+                '$lowCount',
+                'Low stock',
+                background: lowCount > 0 ? semantic.warningContainer : semantic.successContainer,
+                foreground: lowCount > 0 ? semantic.onWarningContainer : semantic.onSuccessContainer,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _statBlock(
+                '$deadCount',
+                '₹${(s['deadStockValue'] as num).toStringAsFixed(0)} dead',
+                background: deadCount > 0 ? semantic.dangerContainer : semantic.successContainer,
+                foreground: deadCount > 0 ? semantic.onDangerContainer : semantic.onSuccessContainer,
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
-  Widget _statTile(String value, String label, {Color? color}) {
-    return Column(
-      children: [
-        Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-        Text(label,
-            style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            textAlign: TextAlign.center),
-      ],
+  // Color-blocked stat card — a full saturated-pastel fill (not a light
+  // tint), matching the design system's featured-metric treatment.
+  Widget _statBlock(String value, String label, {required Color background, required Color foreground}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value,
+              style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineSmall)
+                  .copyWith(color: foreground, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label,
+              style: TextStyle(fontSize: 11, color: foreground.withValues(alpha: 0.85), fontWeight: FontWeight.w600),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis),
+        ],
+      ),
     );
   }
 
@@ -181,31 +207,28 @@ class _InventoryScreenState extends State<InventoryScreen> {
     final liquidClass = sku['liquidClass'] as String;
     final isLow = sku['isLow'] == true;
     final semantic = AppColors.of(context);
-    final badgeColor = switch (liquidClass) {
-      'LIQUID' => semantic.success,
-      'SLOW' => semantic.warning,
-      _ => Theme.of(context).colorScheme.onSurfaceVariant,
+    final (badgeBg, badgeFg) = switch (liquidClass) {
+      'LIQUID' => (semantic.successContainer, semantic.onSuccessContainer),
+      'SLOW' => (semantic.warningContainer, semantic.onWarningContainer),
+      _ => (semantic.dangerContainer, semantic.onDangerContainer), // DEAD
     };
 
     return Card(
       child: ListTile(
         onTap: () => _openSkuDetail(sku),
-        title: Text(sku['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
+        title: Text(sku['name'], style: Theme.of(context).textTheme.titleSmall),
         subtitle: Text(
           '${sku['code']} · ${sku['currentStock']} ${sku['unit']}',
           style: TextStyle(
-            color: isLow ? semantic.danger : null,
+            color: isLow ? semantic.danger : Theme.of(context).colorScheme.onSurfaceVariant,
             fontWeight: isLow ? FontWeight.w600 : null,
           ),
         ),
         trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-          decoration: BoxDecoration(
-            color: badgeColor.withValues(alpha: 0.15),
-            borderRadius: BorderRadius.circular(12),
-          ),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(color: badgeBg, borderRadius: BorderRadius.circular(AppRadius.pill)),
           child: Text(liquidClass,
-              style: TextStyle(color: badgeColor, fontWeight: FontWeight.bold, fontSize: 11)),
+              style: TextStyle(color: badgeFg, fontWeight: FontWeight.bold, fontSize: 11)),
         ),
       ),
     );
@@ -328,7 +351,7 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Add SKU', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('Add SKU', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
             TextField(
               controller: _name,
@@ -497,8 +520,8 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
       children: [
         Row(
           children: [
-            const Expanded(
-              child: Text('Barcode', style: TextStyle(fontWeight: FontWeight.bold)),
+            Expanded(
+              child: Text('BARCODE', style: AppTheme.eyebrow(context)),
             ),
             ToggleButtons(
               isSelected: [!_showQr, _showQr],
@@ -567,8 +590,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Expanded(
-                    child: Text(widget.sku['name'],
-                        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    child: Text(widget.sku['name'], style: Theme.of(context).textTheme.headlineSmall),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
@@ -613,9 +635,9 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                 ),
               if (widget.allowIn || widget.allowOut) const SizedBox(height: 20),
               _barcodeSection(),
-              const Align(
+              Align(
                 alignment: Alignment.centerLeft,
-                child: Text('History', style: TextStyle(fontWeight: FontWeight.bold)),
+                child: Text('HISTORY', style: AppTheme.eyebrow(context)),
               ),
               const SizedBox(height: 8),
               Expanded(
@@ -693,7 +715,7 @@ class _MovementSheetState extends State<_MovementSheet> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Text(widget.type == 'IN' ? 'Stock IN' : 'Stock OUT',
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+              style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 16),
           TextField(
             controller: _quantity,

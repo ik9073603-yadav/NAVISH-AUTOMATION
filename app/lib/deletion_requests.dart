@@ -88,21 +88,27 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
                     itemBuilder: (_, i) {
                       final r = _requests[i] as Map<String, dynamic>;
                       final user = r['user'] as Map<String, dynamic>?;
+                      final semantic = AppColors.of(context);
                       return Card(
                         child: ListTile(
-                          title: Text(user?['name'] ?? 'Unknown user'),
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(color: semantic.warningContainer, shape: BoxShape.circle),
+                            child: Icon(Icons.person_remove_outlined, color: semantic.onWarningContainer, size: 20),
+                          ),
+                          title: Text(user?['name'] ?? 'Unknown user', style: Theme.of(context).textTheme.titleSmall),
                           subtitle: Text(
                               '${user?['email'] ?? ''} · requested ${timeAgo(r['requestedAt'] as String)}'),
                           trailing: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               IconButton(
-                                icon: Icon(Icons.check_circle, color: AppColors.of(context).success),
+                                icon: Icon(Icons.check_circle, color: semantic.success),
                                 tooltip: 'Approve (deactivate)',
                                 onPressed: () => _complete(r),
                               ),
                               IconButton(
-                                icon: Icon(Icons.cancel, color: AppColors.of(context).danger),
+                                icon: Icon(Icons.cancel, color: semantic.danger),
                                 tooltip: 'Deny',
                                 onPressed: () => _deny(r),
                               ),

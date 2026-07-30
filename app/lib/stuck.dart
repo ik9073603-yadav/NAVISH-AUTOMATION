@@ -155,33 +155,33 @@ class _PersonSummaryRow extends StatelessWidget {
 
   const _PersonSummaryRow({required this.group, required this.onTap});
 
-  Color _severityColor(BuildContext context) {
+  // Full color-blocked fill (container + onContainer), not a light alpha
+  // tint — this is inherently the "needs attention" screen, so the strong
+  // warm-danger/warning treatment is the point, not decoration.
+  (Color, Color, Color) _colors(BuildContext context) {
     final semantic = AppColors.of(context);
-    return group.worstSeverity == 'HIGH' ? semantic.danger : semantic.warning;
-  }
-
-  Color _onSeverityColor(BuildContext context) {
-    final semantic = AppColors.of(context);
-    return group.worstSeverity == 'HIGH' ? semantic.onDanger : semantic.onWarning;
+    return group.worstSeverity == 'HIGH'
+        ? (semantic.dangerContainer, semantic.onDangerContainer, semantic.danger)
+        : (semantic.warningContainer, semantic.onWarningContainer, semantic.warning);
   }
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context);
-    final color = _severityColor(context);
+    final (bg, fg, avatarColor) = _colors(context);
     final initial = group.who.isNotEmpty ? group.who[0].toUpperCase() : '?';
 
     return Card(
-      color: color.withValues(alpha: 0.06),
+      color: bg,
       child: ListTile(
         onTap: onTap,
         leading: CircleAvatar(
-          backgroundColor: color,
-          child: Text(initial, style: TextStyle(color: _onSeverityColor(context), fontWeight: FontWeight.bold)),
+          backgroundColor: avatarColor,
+          child: Text(initial, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
         ),
-        title: Text(group.who, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(l10n.stuckCountForPerson(group.count)),
-        trailing: const Icon(Icons.chevron_right),
+        title: Text(group.who, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: fg)),
+        subtitle: Text(l10n.stuckCountForPerson(group.count), style: TextStyle(color: fg.withValues(alpha: 0.85))),
+        trailing: Icon(Icons.chevron_right, color: fg.withValues(alpha: 0.7)),
       ),
     );
   }
@@ -260,16 +260,10 @@ class _PersonStuckScreen extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(4, 12, 4, 8),
                 child: Row(
                   children: [
-                    Icon(_moduleIcon(module), size: 18, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    Icon(_moduleIcon(module), size: 15, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     const SizedBox(width: 6),
-                    Text(_moduleLabel(l10n, module),
-                        style: TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: Theme.of(context).colorScheme.onSurfaceVariant)),
-                    const SizedBox(width: 6),
-                    Text('(${items.length})',
-                        style: TextStyle(
-                            color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7))),
+                    Text('${_moduleLabel(l10n, module).toUpperCase()} (${items.length})',
+                        style: AppTheme.eyebrow(context)),
                   ],
                 ),
               ),
@@ -296,41 +290,31 @@ class _StuckRow extends StatelessWidget {
 
   const _StuckRow({required this.item, required this.phone, required this.onTap});
 
-  Color _severityColor(BuildContext context) {
+  (Color, Color, Color) _colors(BuildContext context) {
     final semantic = AppColors.of(context);
-    switch (item['severity']) {
-      case 'HIGH': return semantic.danger;
-      case 'MEDIUM': return semantic.warning;
-      default: return semantic.warning;
-    }
-  }
-
-  Color _onSeverityColor(BuildContext context) {
-    final semantic = AppColors.of(context);
-    switch (item['severity']) {
-      case 'HIGH': return semantic.onDanger;
-      case 'MEDIUM': return semantic.onWarning;
-      default: return semantic.onWarning;
-    }
+    final isHigh = item['severity'] == 'HIGH';
+    return isHigh
+        ? (semantic.dangerContainer, semantic.onDangerContainer, semantic.danger)
+        : (semantic.warningContainer, semantic.onWarningContainer, semantic.warning);
   }
 
   @override
   Widget build(BuildContext context) {
     final who = item['who'] as String;
     final stuckForMins = item['stuckForMins'] as int;
-    final color = _severityColor(context);
+    final (bg, fg, avatarColor) = _colors(context);
 
     return Card(
-      color: color.withValues(alpha: 0.06),
+      color: bg,
       child: ListTile(
         onTap: onTap,
         leading: CircleAvatar(
-          backgroundColor: color,
+          backgroundColor: avatarColor,
           child: Text(item['severity'].toString().substring(0, 1),
-              style: TextStyle(color: _onSeverityColor(context), fontSize: 12, fontWeight: FontWeight.bold)),
+              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
         ),
-        title: Text(item['title'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text('$who · stuck for ${formatDurationMins(stuckForMins)}'),
+        title: Text(item['title'] as String, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: fg)),
+        subtitle: Text('$who · stuck for ${formatDurationMins(stuckForMins)}', style: TextStyle(color: fg.withValues(alpha: 0.85))),
         trailing: ContactButtons(
           phone: phone,
           message: 'Hi $who, checking on: ${item['title']} (pending since ${formatDurationMins(stuckForMins)}).',

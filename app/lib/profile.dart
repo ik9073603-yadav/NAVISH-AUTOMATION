@@ -310,7 +310,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _sectionLabel(String text) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
-        child: Text(text, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        child: Text(text.toUpperCase(), style: AppTheme.eyebrow(context)),
       );
 
   Widget _textField(
@@ -417,17 +417,21 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
                       children: [
                         Row(
                           children: [
-                            Expanded(child: _statCard(l10n.activeTasksStat, '$_activeCount', AppColors.of(context).warning)),
+                            Expanded(child: _statCard(Icons.schedule_outlined, l10n.activeTasksStat, '$_activeCount',
+                                AppColors.of(context).warningContainer, AppColors.of(context).onWarningContainer)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard(l10n.completedStat, '$_doneCount', AppColors.of(context).success)),
+                            Expanded(child: _statCard(Icons.check_circle_outline, l10n.completedStat, '$_doneCount',
+                                AppColors.of(context).successContainer, AppColors.of(context).onSuccessContainer)),
                           ],
                         ),
                         const SizedBox(height: 12),
                         Row(
                           children: [
-                            Expanded(child: _statCard(l10n.onTimePctStat, '$onTimePct%', AppColors.of(context).info)),
+                            Expanded(child: _statCard(Icons.bolt_outlined, l10n.onTimePctStat, '$onTimePct%',
+                                AppColors.of(context).infoContainer, AppColors.of(context).onInfoContainer)),
                             const SizedBox(width: 12),
-                            Expanded(child: _statCard(l10n.escalatedStat, '$_escalatedCount', AppColors.of(context).danger)),
+                            Expanded(child: _statCard(Icons.warning_amber_rounded, l10n.escalatedStat, '$_escalatedCount',
+                                AppColors.of(context).dangerContainer, AppColors.of(context).onDangerContainer)),
                           ],
                         ),
                       ],
@@ -437,18 +441,23 @@ class _MyStatsScreenState extends State<MyStatsScreen> {
     );
   }
 
-  Widget _statCard(String label, String value, Color color) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, color: color)),
-            const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
-        ),
+  // Color-blocked stat card — a full saturated-pastel fill, matching the
+  // same technique used on the Home dashboard's "Needs attention" row.
+  Widget _statCard(IconData icon, String label, String value, Color background, Color foreground) {
+    return Container(
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: foreground, size: 18),
+          const SizedBox(height: 8),
+          Text(value,
+              style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineMedium)
+                  .copyWith(color: foreground, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: foreground.withValues(alpha: 0.85), fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }

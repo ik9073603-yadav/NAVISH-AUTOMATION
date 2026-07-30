@@ -158,7 +158,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(color: accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-          child: Text('DELEGATION', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent, letterSpacing: 0.5)),
+          child: Text('DELEGATION', style: AppTheme.eyebrow(context).copyWith(color: accent)),
         ),
         const SizedBox(height: 12),
         GridView.count(
@@ -218,9 +218,9 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         ),
         const SizedBox(height: 16),
         if (trend.isEmpty)
-          const Text('No delegation tasks created in this range.')
+          Text('No delegation tasks created in this range.', style: Theme.of(context).textTheme.bodyMedium)
         else ...[
-          const Text('Completion rate over time', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Completion rate over time', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           SizedBox(
             height: 160,
@@ -249,16 +249,16 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         ],
         if (byPerson.isNotEmpty) ...[
           const SizedBox(height: 20),
-          const Text('By person', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('By person', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           ...byPerson.map((p) => Padding(
                 padding: const EdgeInsets.symmetric(vertical: 4),
                 child: Row(
                   children: [
-                    Expanded(flex: 3, child: Text(p['name'] as String, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-                    Expanded(flex: 2, child: Text('${p['completed']}/${p['created']} done', style: const TextStyle(fontSize: 12))),
-                    Expanded(flex: 2, child: Text('${p['stuck']} stuck', style: const TextStyle(fontSize: 12))),
-                    Expanded(flex: 2, child: Text('${p['completionPct']}%', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600))),
+                    Expanded(flex: 3, child: Text(p['name'] as String, style: Theme.of(context).textTheme.titleSmall)),
+                    Expanded(flex: 2, child: Text('${p['completed']}/${p['created']} done', style: Theme.of(context).textTheme.bodySmall)),
+                    Expanded(flex: 2, child: Text('${p['stuck']} stuck', style: Theme.of(context).textTheme.bodySmall)),
+                    Expanded(flex: 2, child: Text('${p['completionPct']}%', style: Theme.of(context).textTheme.labelMedium)),
                   ],
                 ),
               )),
@@ -286,7 +286,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           decoration: BoxDecoration(color: accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-          child: Text('CHECKLIST', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: accent, letterSpacing: 0.5)),
+          child: Text('CHECKLIST', style: AppTheme.eyebrow(context).copyWith(color: accent)),
         ),
         const SizedBox(height: 12),
         Row(
@@ -315,7 +315,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
                         ),
                       ],
                     )),
-                    Text('${totals['compliancePct'] ?? 0}%', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                    Text('${totals['compliancePct'] ?? 0}%', style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineMedium)),
                   ],
                 ),
               ),
@@ -328,7 +328,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
                   _legendRow(context, AppColors.of(context).success, 'Done', '${totals['done'] ?? 0}'),
                   _legendRow(context, Theme.of(context).colorScheme.surfaceContainerHighest, 'Missed', '${totals['missed'] ?? 0}'),
                   const SizedBox(height: 6),
-                  Text('${totals['total'] ?? 0} total occurrences', style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  Text('${totals['total'] ?? 0} total occurrences', style: Theme.of(context).textTheme.bodySmall),
                 ],
               ),
             ),
@@ -347,7 +347,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
         ),
         if (trend.isNotEmpty) ...[
           const SizedBox(height: 16),
-          const Text('Adherence over time', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Adherence over time', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           SizedBox(
             height: 160,
@@ -375,18 +375,19 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
           ),
         ],
         if (perRule.isEmpty)
-          const Padding(padding: EdgeInsets.only(top: 16), child: Text('No checklist activity in this range.'))
+          Padding(padding: const EdgeInsets.only(top: 16), child: Text('No checklist activity in this range.', style: Theme.of(context).textTheme.bodyMedium))
         else ...[
           const SizedBox(height: 20),
-          const Text('Per checklist', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+          Text('Per checklist', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 8),
           ...perRule.map((r) {
             final pct = r['compliancePct'] as int;
+            final theme = Theme.of(context);
             return Padding(
               padding: const EdgeInsets.symmetric(vertical: 4),
               child: Row(
                 children: [
-                  Expanded(flex: 3, child: Text(r['title'] as String, style: const TextStyle(fontSize: 13))),
+                  Expanded(flex: 3, child: Text(r['title'] as String, style: theme.textTheme.bodySmall)),
                   Expanded(
                     flex: 4,
                     child: ClipRRect(
@@ -395,12 +396,12 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
                         value: pct / 100,
                         minHeight: 10,
                         color: pct >= 80 ? AppColors.of(context).success : pct >= 50 ? AppColors.of(context).warning : AppColors.of(context).danger,
-                        backgroundColor: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        backgroundColor: theme.colorScheme.surfaceContainerHighest,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  Text('$pct%'),
+                  Text('$pct%', style: AppTheme.tabularFigures(theme.textTheme.labelMedium)),
                 ],
               ),
             );
@@ -413,28 +414,31 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
   }
 
   Widget _legendRow(BuildContext context, Color color, String label, String value) {
+    final theme = Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 2),
       child: Row(
         children: [
           Container(width: 10, height: 10, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
           const SizedBox(width: 6),
-          Text('$label: ', style: const TextStyle(fontSize: 12)),
-          Text(value, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
+          Text('$label: ', style: theme.textTheme.bodySmall),
+          Text(value, style: theme.textTheme.labelMedium),
         ],
       ),
     );
   }
 
   Widget _miniStat(BuildContext context, String value, String label, Color color) {
+    final theme = Theme.of(context);
+    final background = Color.alphaBlend(color.withValues(alpha: 0.16), theme.colorScheme.surface);
     return Container(
-      decoration: BoxDecoration(color: color.withValues(alpha: 0.08), borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.md)),
       alignment: Alignment.center,
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: color)),
-          Text(label, style: const TextStyle(fontSize: 10), textAlign: TextAlign.center),
+          Text(value, style: AppTheme.tabularFigures(theme.textTheme.titleLarge).copyWith(color: color, fontWeight: FontWeight.w800)),
+          Text(label, style: theme.textTheme.labelSmall?.copyWith(color: color.withValues(alpha: 0.85)), textAlign: TextAlign.center),
         ],
       ),
     );

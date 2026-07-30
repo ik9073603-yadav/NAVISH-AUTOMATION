@@ -155,17 +155,22 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
                 itemBuilder: (_, i) {
                   final r = _rules[i];
                   final active = r['active'] == true;
+                  final semantic = AppColors.of(context);
                   return StaggeredListItem(
                     index: i,
                     child: Card(
                       child: ListTile(
-                        leading: Icon(Icons.event_repeat,
-                            color: active
-                                ? AppColors.of(context).success
-                                : Theme.of(context).colorScheme.onSurfaceVariant),
+                        leading: Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: active ? semantic.successContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.event_repeat, size: 20,
+                              color: active ? semantic.onSuccessContainer : Theme.of(context).colorScheme.onSurfaceVariant),
+                        ),
                         title: Text(r['title'],
-                            style: TextStyle(
-                                fontWeight: FontWeight.w600,
+                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
                                 color: active ? null : Theme.of(context).colorScheme.onSurfaceVariant)),
                         subtitle: Text('${r['assigneeName']} · ${_schedule(r)}'),
                         trailing: Switch(
@@ -265,8 +270,7 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('New recurring checklist',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text('New recurring checklist', style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 4),
             Text('Fires automatically. Nobody has to remember.',
                 style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant, fontSize: 12)),
@@ -333,8 +337,7 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('Time of day'),
-              trailing: Text(_timeStr,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+              trailing: Text(_timeStr, style: Theme.of(context).textTheme.titleMedium),
               onTap: () async {
                 final t = await showTimePicker(context: context, initialTime: _time);
                 if (t != null) setState(() => _time = t);

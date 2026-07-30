@@ -45,7 +45,7 @@ class _TemplateListSheet extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const Text('Start from template', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text('Start from template', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 12),
             if (templates.isEmpty)
               const Padding(padding: EdgeInsets.all(16), child: Text('No templates available.')),
@@ -151,7 +151,7 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(s['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                          Text(s['name'] as String, style: Theme.of(context).textTheme.titleSmall),
                           Text(
                             s['plannedMins'] != null ? 'Planned: ${s['plannedMins']} min' : 'Unplanned — no deadline',
                             style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),

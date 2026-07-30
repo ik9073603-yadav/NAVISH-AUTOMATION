@@ -128,17 +128,27 @@ class _OwnerScreenState extends State<OwnerScreen> {
           final t = _tasks[i];
           final escalated = t['escalatedAt'] != null;
           final done = t['status'] == 'DONE';
+          final semantic = AppColors.of(context);
+          final (statusBg, statusFg, statusIcon) = done
+              ? (semantic.successContainer, semantic.onSuccessContainer, Icons.check_circle)
+              : escalated
+                  ? (semantic.dangerContainer, semantic.onDangerContainer, Icons.warning)
+                  : (semantic.warningContainer, semantic.onWarningContainer, Icons.schedule);
+          final priorityColor = switch (t['priority']) {
+            'HIGH' => semantic.danger,
+            'LOW' => Theme.of(context).colorScheme.onSurfaceVariant,
+            _ => semantic.info,
+          };
           return StaggeredListItem(
             index: i,
             child: Card(
               child: ListTile(
-                leading: Icon(
-                  done ? Icons.check_circle : (escalated ? Icons.warning : Icons.schedule),
-                  color: done
-                      ? AppColors.of(context).success
-                      : (escalated ? AppColors.of(context).danger : AppColors.of(context).warning),
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(color: statusBg, shape: BoxShape.circle),
+                  child: Icon(statusIcon, color: statusFg, size: 20),
                 ),
-                title: Text(t['title']),
+                title: Text(t['title'], style: Theme.of(context).textTheme.titleSmall),
                 subtitle: Text(
                   '${t['assigneeName']} · ${t['status']}'
                   '${t['chaseCount'] > 0 ? " · chased ${t['chaseCount']}x" : ""}'
@@ -147,7 +157,15 @@ class _OwnerScreenState extends State<OwnerScreen> {
                 trailing: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text(t['priority'], style: const TextStyle(fontSize: 11)),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: priorityColor.withValues(alpha: 0.14),
+                        borderRadius: BorderRadius.circular(AppRadius.pill),
+                      ),
+                      child: Text(t['priority'],
+                          style: TextStyle(fontSize: 10, fontWeight: FontWeight.w700, color: priorityColor)),
+                    ),
                     ContactButtons(
                       phone: phoneByAssignee[t['assigneeId']],
                       message: 'Hi ${t['assigneeName']}, checking on: ${t['title']}.',
@@ -187,7 +205,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
             index: i,
             child: Card(
               child: ListTile(
-                title: Text(u['name'] as String, style: const TextStyle(fontWeight: FontWeight.w600)),
+                title: Text(u['name'] as String, style: Theme.of(context).textTheme.titleSmall),
                 subtitle: Text(
                   s == null
                       ? l10n.noTasksYetRole(role)
@@ -381,8 +399,7 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(l10n.assignATask,
-                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+            Text(l10n.assignATask, style: Theme.of(context).textTheme.headlineMedium),
             const SizedBox(height: 16),
             TextField(
               controller: _title,
@@ -396,7 +413,7 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
                   labelText: l10n.detailsOptional, border: const OutlineInputBorder()),
             ),
             const SizedBox(height: 16),
-            Align(alignment: Alignment.centerLeft, child: Text(l10n.assignTo)),
+            Align(alignment: Alignment.centerLeft, child: Text(l10n.assignTo.toUpperCase(), style: AppTheme.eyebrow(context))),
             ..._users.map((u) => CheckboxListTile(
                   dense: true,
                   value: _selected.contains(u['id']),
@@ -513,8 +530,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Text(l10n.addAPerson,
-              style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(l10n.addAPerson, style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 16),
           TextField(
             controller: _name,

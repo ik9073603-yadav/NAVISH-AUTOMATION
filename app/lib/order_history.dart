@@ -97,11 +97,13 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
 
     final semantic = AppColors.of(context);
     late final String text;
-    late final Color color;
+    late final Color bg;
+    late final Color fg;
     late final IconData icon;
     switch (sla) {
       case 'DELAYED':
-        color = semantic.danger;
+        bg = semantic.dangerContainer;
+        fg = semantic.onDangerContainer;
         icon = Icons.warning;
         final names = lateStages.map((s) => s['name'] as String).join(', ');
         text = lateStages.length == 1
@@ -109,28 +111,30 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             : 'Delayed — late at ${lateStages.length} stages: $names';
         break;
       case 'ON_TIME':
-        color = semantic.success;
+        bg = semantic.successContainer;
+        fg = semantic.onSuccessContainer;
         icon = Icons.check_circle;
         text = 'On time so far';
         break;
       default:
-        color = Theme.of(context).colorScheme.onSurfaceVariant;
+        bg = Theme.of(context).colorScheme.surfaceContainerHigh;
+        fg = Theme.of(context).colorScheme.onSurfaceVariant;
         icon = Icons.info_outline;
         text = 'No SLA — every stage here is unplanned';
     }
 
     return Container(
       width: double.infinity,
-      color: color.withValues(alpha: 0.1),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      color: bg,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(icon, color: color, size: 18),
+              Icon(icon, color: fg, size: 18),
               const SizedBox(width: 8),
-              Expanded(child: Text(text, style: TextStyle(color: color, fontWeight: FontWeight.w600, fontSize: 13))),
+              Expanded(child: Text(text, style: TextStyle(color: fg, fontWeight: FontWeight.w700, fontSize: 13))),
             ],
           ),
           if (sla == 'DELAYED') ...[
@@ -140,7 +144,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 const SizedBox(width: 26),
                 Text(
                   'Total lost to delay: ${formatRupeesOrPrompt(_history?['orderDelayCost'] as num?)}',
-                  style: TextStyle(color: color, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 13),
                 ),
                 const CostOfDelayInfoButton(iconSize: 16),
               ],
@@ -256,7 +260,7 @@ class _StageCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            Text(name, style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 6),
             Text('Planned: ${plannedLabel ?? "no deadline (unplanned)"}',
                 style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),

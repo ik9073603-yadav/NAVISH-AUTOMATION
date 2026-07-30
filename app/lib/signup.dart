@@ -102,6 +102,20 @@ class _SignupScreenState extends State<SignupScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                stagger(
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 20),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(l10n.createYourCompany.toUpperCase(), style: AppTheme.eyebrow(context)),
+                        const SizedBox(height: 6),
+                        Text(l10n.createAccount, style: theme.textTheme.displaySmall),
+                      ],
+                    ),
+                  ),
+                  0,
+                ),
                 stagger(TextField(
                   controller: _companyName,
                   decoration: InputDecoration(labelText: l10n.companyNameLabel),

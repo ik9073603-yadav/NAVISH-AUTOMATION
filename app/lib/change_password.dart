@@ -58,25 +58,26 @@ class _ChangePasswordScreenState extends State<ChangePasswordScreen> {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
+          Text('SECURITY', style: AppTheme.eyebrow(context)),
+          const SizedBox(height: 6),
+          Text('Update your password', style: Theme.of(context).textTheme.headlineLarge),
+          const SizedBox(height: 20),
           TextField(
             controller: _current,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Current password', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Current password'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _newPass,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'New password', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'New password'),
           ),
           const SizedBox(height: 12),
           TextField(
             controller: _confirm,
             obscureText: true,
-            decoration: const InputDecoration(
-              labelText: 'Confirm new password', border: OutlineInputBorder()),
+            decoration: const InputDecoration(labelText: 'Confirm new password'),
           ),
           const SizedBox(height: 20),
           if (_error != null)

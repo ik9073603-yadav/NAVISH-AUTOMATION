@@ -39,7 +39,18 @@ class HeroStat extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final color = accent ?? theme.colorScheme.primary;
-    return Card(
+    // A genuine color-blocked fill derived from whatever accent is passed
+    // (works for any of the app's semantic/brand colors without needing a
+    // background/foreground pair at every call site) — a soft saturated
+    // tint, not a washed-out card, matching the app's featured-metric
+    // language elsewhere (see main.dart's _glanceStat).
+    final background = Color.alphaBlend(color.withValues(alpha: 0.16), theme.colorScheme.surface);
+    return Container(
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(AppRadius.lg),
+        border: Border.all(color: color.withValues(alpha: 0.18)),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(AppRadius.lg),
@@ -48,9 +59,9 @@ class HeroStat extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(value, style: AppTheme.tabularFigures(theme.textTheme.headlineLarge).copyWith(color: color)),
+              Text(value, style: AppTheme.tabularFigures(theme.textTheme.headlineLarge).copyWith(color: color, fontWeight: FontWeight.w800)),
               const SizedBox(height: 2),
-              Text(label, style: theme.textTheme.bodySmall, maxLines: 2, overflow: TextOverflow.ellipsis),
+              Text(label, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600), maxLines: 2, overflow: TextOverflow.ellipsis),
               if (deltaPct != null) ...[
                 const SizedBox(height: 6),
                 DeltaBadge(deltaPct: deltaPct!, higherIsBetter: higherIsBetter),

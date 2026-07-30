@@ -99,9 +99,11 @@ class _AdminScreenState extends State<AdminScreen> {
                   child: ListView(
                     padding: const EdgeInsets.all(12),
                     children: [
-                      _overviewCard(),
-                      const SizedBox(height: 16),
-                      const Text('Companies', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      _heroCard(),
+                      const SizedBox(height: 12),
+                      _statRow(),
+                      const SizedBox(height: 20),
+                      Text('COMPANIES', style: AppTheme.eyebrow(context)),
                       const SizedBox(height: 8),
                       ..._orgs.map(_orgCard),
                     ],
@@ -110,35 +112,69 @@ class _AdminScreenState extends State<AdminScreen> {
     );
   }
 
-  Widget _overviewCard() {
-    final byRole = (_overview['activeAccountsByRole'] as Map<String, dynamic>? ?? {});
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Wrap(
-          spacing: 24,
-          runSpacing: 12,
-          children: [
-            _stat('Companies', '${_overview['totalCompanies'] ?? 0}'),
-            _stat('Active last 7d', '${_overview['orgsActiveLast7Days'] ?? 0}'),
-            _stat('Total tasks', '${_overview['totalTasks'] ?? 0}'),
-            _stat('Owners', '${byRole['OWNER'] ?? 0}'),
-            _stat('Managers', '${byRole['MANAGER'] ?? 0}'),
-            _stat('Employees', '${byRole['EMPLOYEE'] ?? 0}'),
-          ],
-        ),
+  // The one dark "hero" card — total companies is the single number a
+  // platform operator cares about first, same anchor treatment as the
+  // Home dashboard's Health Score.
+  Widget _heroCard() {
+    final theme = Theme.of(context);
+    final accents = AppAccents.of(context);
+    return Container(
+      decoration: BoxDecoration(color: accents.hero, borderRadius: BorderRadius.circular(AppRadius.lg)),
+      padding: const EdgeInsets.all(20),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('PLATFORM', style: AppTheme.eyebrow(context).copyWith(color: accents.onHero.withValues(alpha: 0.6))),
+                const SizedBox(height: 6),
+                Text('${_overview['totalCompanies'] ?? 0}',
+                    style: AppTheme.tabularFigures(theme.textTheme.displayLarge).copyWith(color: accents.onHero, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text('companies', style: theme.textTheme.bodySmall?.copyWith(color: accents.onHero.withValues(alpha: 0.75))),
+              ],
+            ),
+          ),
+          Icon(Icons.apartment, color: accents.onHero.withValues(alpha: 0.35), size: 40),
+        ],
       ),
     );
   }
 
-  Widget _stat(String label, String value) {
-    return SizedBox(
-      width: 120,
+  Widget _statRow() {
+    final byRole = (_overview['activeAccountsByRole'] as Map<String, dynamic>? ?? {});
+    final semantic = AppColors.of(context);
+    final accents = AppAccents.of(context);
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.3,
+      children: [
+        _stat('${_overview['orgsActiveLast7Days'] ?? 0}', 'Active 7d', semantic.successContainer, semantic.onSuccessContainer),
+        _stat('${_overview['totalTasks'] ?? 0}', 'Total tasks', semantic.infoContainer, semantic.onInfoContainer),
+        _stat('${byRole['OWNER'] ?? 0}', 'Owners', accents.tealContainer, accents.onTealContainer),
+        _stat('${byRole['MANAGER'] ?? 0}', 'Managers', accents.magentaContainer, accents.onMagentaContainer),
+        _stat('${byRole['EMPLOYEE'] ?? 0}', 'Employees', semantic.warningContainer, semantic.onWarningContainer),
+      ],
+    );
+  }
+
+  Widget _stat(String value, String label, Color background, Color foreground) {
+    return Container(
+      decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(AppRadius.md)),
+      padding: const EdgeInsets.all(12),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(value, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-          Text(label, style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+          Text(value,
+              style: AppTheme.tabularFigures(Theme.of(context).textTheme.headlineSmall)
+                  .copyWith(color: foreground, fontWeight: FontWeight.w800)),
+          Text(label, style: TextStyle(color: foreground.withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w600)),
         ],
       ),
     );
@@ -147,18 +183,25 @@ class _AdminScreenState extends State<AdminScreen> {
   Widget _orgCard(dynamic org) {
     final enabled = org['enabled'] as bool;
     final activeRecently = org['activeRecently'] as bool;
+    final semantic = AppColors.of(context);
     return Card(
       child: ListTile(
-        title: Text(org['name'], style: const TextStyle(fontWeight: FontWeight.w600)),
-        subtitle: Text(
-          '${org['accountCount']} accounts · ${org['taskCount']} tasks · '
-          '${activeRecently ? "active recently" : "quiet 7d+"}'
-          '${enabled ? "" : " · SUSPENDED"}',
-          style: TextStyle(color: enabled ? null : AppColors.of(context).danger),
-        ),
-        trailing: Switch(
-          value: enabled,
-          onChanged: (_) => _toggle(org),
+        title: Text(org['name'], style: Theme.of(context).textTheme.titleMedium),
+        subtitle: Text('${org['accountCount']} accounts · ${org['taskCount']} tasks · '
+            '${activeRecently ? "active recently" : "quiet 7d+"}'),
+        trailing: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (!enabled)
+              Container(
+                margin: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: semantic.dangerContainer, borderRadius: BorderRadius.circular(AppRadius.pill)),
+                child: Text('SUSPENDED',
+                    style: TextStyle(color: semantic.onDangerContainer, fontSize: 10, fontWeight: FontWeight.w700, letterSpacing: 0.4)),
+              ),
+            Switch(value: enabled, onChanged: (_) => _toggle(org)),
+          ],
         ),
       ),
     );

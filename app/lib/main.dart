@@ -160,25 +160,33 @@ class _LoginScreenState extends State<LoginScreen> {
                   stagger(
                     Center(
                       child: Container(
-                        width: 64,
-                        height: 64,
+                        width: 68,
+                        height: 68,
                         decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(AppRadius.md),
-                          color: theme.colorScheme.primary,
+                          borderRadius: BorderRadius.circular(AppRadius.lg),
+                          // The one deliberate gradient in the whole app —
+                          // the actual brand mark, echoing the app icon's
+                          // violet -> teal -> magenta sweep. Everywhere else
+                          // stays flat; this is the meaningful exception.
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: [
+                              theme.colorScheme.primary,
+                              AppAccents.of(context).teal,
+                              AppAccents.of(context).magenta,
+                            ],
+                          ),
                           boxShadow: [
                             BoxShadow(
                               color: theme.colorScheme.primary.withValues(alpha: 0.35),
-                              blurRadius: 24,
-                              offset: const Offset(0, 8),
+                              blurRadius: 28,
+                              offset: const Offset(0, 10),
                             ),
                           ],
                         ),
                         alignment: Alignment.center,
-                        child: Text('N',
-                            style: TextStyle(
-                                color: theme.colorScheme.onPrimary,
-                                fontSize: 30,
-                                fontWeight: FontWeight.w800)),
+                        child: Text('N', style: theme.textTheme.displaySmall?.copyWith(color: Colors.white)),
                       ),
                     ),
                     0,

@@ -79,19 +79,23 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
         ),
         const SizedBox(height: 24),
         if (byFeature.isNotEmpty) ...[
-          const SectionHeader(title: 'By feature'),
+          Text('BY FEATURE', style: AppTheme.eyebrow(context)),
+          const SizedBox(height: 8),
           for (final entry in byFeature.entries)
             Card(
               child: ListTile(
+                leading: Icon(_featureIcon(entry.key), color: _featureColor(context, entry.key)),
                 title: Text(_featureLabel(entry.key)),
                 subtitle: Text('${(entry.value as Map)['calls']} calls'),
-                trailing: Text('${(entry.value)['inputTokens'] + (entry.value)['outputTokens']} tok'),
+                trailing: Text('${(entry.value)['inputTokens'] + (entry.value)['outputTokens']} tok',
+                    style: AppTheme.tabularFigures(Theme.of(context).textTheme.labelMedium)),
               ),
             ),
           const SizedBox(height: 24),
         ],
         if (trend.length > 1) ...[
-          const SectionHeader(title: 'Tokens over time'),
+          Text('TOKENS OVER TIME', style: AppTheme.eyebrow(context)),
+          const SizedBox(height: 8),
           SizedBox(
             height: 180,
             child: LineChart(LineChartData(
@@ -121,8 +125,16 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
         ],
         if (calls == 0)
           Padding(
-            padding: const EdgeInsets.only(top: 40),
-            child: Center(child: Text('No AI usage yet.', style: Theme.of(context).textTheme.bodyMedium)),
+            padding: const EdgeInsets.only(top: 48),
+            child: Center(
+              child: Column(
+                children: [
+                  Icon(Icons.query_stats, size: 40, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  const SizedBox(height: 12),
+                  Text('No AI usage yet.', style: Theme.of(context).textTheme.bodyMedium),
+                ],
+              ),
+            ),
           ),
       ],
     );
@@ -134,6 +146,25 @@ class _AiUsageScreenState extends State<AiUsageScreen> {
       case 'ASSIST': return 'App assist / chat';
       case 'INSIGHTS': return 'Analytics insights';
       default: return key;
+    }
+  }
+
+  IconData _featureIcon(String key) {
+    switch (key) {
+      case 'OVERVIEW': return Icons.insights_outlined;
+      case 'ASSIST': return Icons.chat_bubble_outline;
+      case 'INSIGHTS': return Icons.auto_awesome_outlined;
+      default: return Icons.smart_toy_outlined;
+    }
+  }
+
+  Color _featureColor(BuildContext context, String key) {
+    final accents = AppAccents.of(context);
+    switch (key) {
+      case 'OVERVIEW': return Theme.of(context).colorScheme.primary;
+      case 'ASSIST': return accents.teal;
+      case 'INSIGHTS': return accents.magenta;
+      default: return Theme.of(context).colorScheme.onSurfaceVariant;
     }
   }
 }
