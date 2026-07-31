@@ -104,9 +104,17 @@ model User {
   // Single-active-session enforcement. Embedded in every issued JWT; bumped
   // on each login. requireAuth 401s ("session ended") any token whose
   // embedded version no longer matches this — i.e. a newer login elsewhere
-  // silently kicks out every older session. 0 = never logged in yet, so the
-  // very first login never shows the "already active" warning.
+  // silently kicks out every older session.
   tokenVersion Int           @default(0)
+
+  // Whether A session is currently active anywhere — distinct from
+  // tokenVersion, which only ever counts up and so can't tell "still logged
+  // in elsewhere" from "logged out cleanly, logging back in now". Set true
+  // on login, false on an explicit logout; never touched by a forced
+  // kick-out (that device lost its session, but the one that kicked it out
+  // is still active). login() only shows the "already active" warning when
+  // this is true.
+  sessionActive Boolean      @default(false)
 
   // Gates login until the signup/add-person OTP is confirmed (see OtpCode
   // below). Existing pre-verification accounts are backfilled to true by

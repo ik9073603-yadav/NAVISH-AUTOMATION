@@ -37,7 +37,7 @@ async function sendOtpEmail(email: string, code: string, purpose: OtpPurpose, na
 async function issueSessionToken(user: { id: string; orgId: string; role: 'OWNER' | 'MANAGER' | 'EMPLOYEE'; isSuperAdmin: boolean }) {
   const updated = await prisma.user.update({
     where: { id: user.id },
-    data: { tokenVersion: { increment: 1 } },
+    data: { tokenVersion: { increment: 1 }, sessionActive: true },
     select: { tokenVersion: true },
   });
   return signToken({
@@ -236,10 +236,9 @@ export async function login(input: { email: string; password: string; confirm?: 
     throw Object.assign(new Error('This company account has been suspended'), { status: 403 });
   }
 
-  // tokenVersion > 0 means a previous login already issued a session that
-  // nothing has since superseded — warn before silently kicking it out.
-  // The client re-calls with confirm:true to proceed anyway.
-  if (user.tokenVersion > 0 && !input.confirm) {
+  // A session is currently active elsewhere — warn before silently kicking
+  // it out. The client re-calls with confirm:true to proceed anyway.
+  if (user.sessionActive && !input.confirm) {
     throw Object.assign(
       new Error('Already active on another device. Log in here and sign out there?'),
       { status: 409, sessionActive: true },
@@ -262,4 +261,11 @@ export async function login(input: { email: string; password: string; confirm?: 
     user: { id: user.id, name: user.name, email: user.email, role: user.role, isSuperAdmin: user.isSuperAdmin },
     organization: { id: user.organization.id, name: user.organization.name },
   };
+}
+
+// Explicit, user-initiated logout only — never called for a forced kick-out
+// (that device's token just stops matching tokenVersion; the session that
+// superseded it is still active, so sessionActive must stay true).
+export async function logout(userId: string) {
+  await prisma.user.update({ where: { id: userId }, data: { sessionActive: false } });
 }

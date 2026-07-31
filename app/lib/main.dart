@@ -349,7 +349,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     super.initState();
     _load();
     PushService.pendingTap.addListener(_onPushTapLive);
+    // Blanks this screen the instant a session-ended 401 is seen, instead of
+    // falling through to render normal chrome around now-stale/empty data
+    // while the forced navigation to LoginScreen is still in flight.
+    Api.sessionEnded.addListener(_onSessionEndedChanged);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _onSessionEndedChanged() {
+    if (mounted) setState(() {});
   }
 
   // Extra reliability alongside the connectivity-change trigger: a resumed
@@ -362,6 +370,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     PushService.pendingTap.removeListener(_onPushTapLive);
+    Api.sessionEnded.removeListener(_onSessionEndedChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -431,7 +440,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       unawaited(LocaleController.syncFromProfile(user['language'] as String?));
       _consumePendingTap();
     } catch (e) {
-      if (mounted) {
+      // A session-ended 401 already triggers its own dedicated redirect +
+      // message (see Api._handleSessionEnded) — showing this generic
+      // "Failed to load ..." on top of it is just noise.
+      if (mounted && !Api.sessionEnded.value) {
         ScaffoldMessenger.of(context)
             .showSnackBar(SnackBar(content: Text(e.toString())));
       }
@@ -613,6 +625,15 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // The forced-logout redirect (see Api._handleSessionEnded) is already on
+    // its way — show nothing here rather than this screen's own (now stale)
+    // data with a fully-working AppBar sitting on top of it.
+    if (Api.sessionEnded.value) {
+      return _withBackHandling(
+        const Scaffold(body: Center(child: CircularProgressIndicator())),
+      );
+    }
+
     if (_loading && _user == null) {
       return _withBackHandling(
         const Scaffold(body: Center(child: CircularProgressIndicator())),

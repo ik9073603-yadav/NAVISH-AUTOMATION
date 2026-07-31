@@ -132,6 +132,18 @@ authRouter.post('/reset-password', async (req: Request, res: Response, next: Nex
   }
 });
 
+// Explicit logout — clears sessionActive so the NEXT login on this account
+// doesn't wrongly warn "already active elsewhere". Does not touch
+// tokenVersion: this token simply won't be used again from the client side.
+authRouter.post('/logout', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await authService.logout(req.user!.userId);
+    res.json({ loggedOut: true });
+  } catch (err) {
+    next(err);
+  }
+});
+
 // Proves the token works and shows what the server thinks you are.
 authRouter.get('/me', requireAuth, async (req: Request, res: Response, next: NextFunction) => {
   try {

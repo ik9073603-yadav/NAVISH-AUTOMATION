@@ -85,10 +85,19 @@ class Api {
       (_) => throw StateError('Api.loginScreenBuilder not set');
   static bool _handlingSessionEnd = false;
 
+  // Flips true the instant a "session ended" 401 is seen — screens that hold
+  // now-stale data (HomeScreen) watch this to blank themselves immediately,
+  // rather than falling through to render normal chrome around empty/null
+  // data while the actual navigation to LoginScreen is still in flight.
+  static final ValueNotifier<bool> sessionEnded = ValueNotifier(false);
+
   static void _handleSessionEnded() {
     if (_handlingSessionEnd) return;
     _handlingSessionEnd = true;
-    logout();
+    sessionEnded.value = true;
+    // This device got kicked out — the OTHER session (the one that
+    // superseded it) is still active, so don't clear sessionActive.
+    logout(notifyServer: false);
     navigatorKey.currentState?.pushAndRemoveUntil(
       MaterialPageRoute(
         builder: (_) => loginScreenBuilder(
@@ -109,11 +118,24 @@ class Api {
   static Future<void> _saveToken(String token) async {
     _token = token;
     _handlingSessionEnd = false;
+    sessionEnded.value = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
   }
 
-  static Future<void> logout() async {
+  // notifyServer is false only for a forced kick-out (this device's session
+  // got superseded by a newer login elsewhere) — that other session is still
+  // active, so it must NOT be cleared just because this device is logging
+  // out locally. A real user-initiated logout (the default) clears it so the
+  // next login on this account doesn't wrongly warn "already active".
+  static Future<void> logout({bool notifyServer = true}) async {
+    if (notifyServer && _token != null) {
+      try {
+        await _client.post(Uri.parse('${Config.apiBase}/api/auth/logout'), headers: _headers);
+      } catch (_) {
+        // Best-effort — still clear local state below even if this fails.
+      }
+    }
     _token = null;
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('token');
