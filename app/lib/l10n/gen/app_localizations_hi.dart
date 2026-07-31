@@ -771,4 +771,86 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get aiGenerateInsightsAction => 'इनसाइट्स जनरेट करें';
+
+  @override
+  String get customizeSkuFields => 'फ़ील्ड कस्टमाइज़ करें';
+
+  @override
+  String get customizeFieldsTooltip => 'SKU फ़ील्ड कस्टमाइज़ करें';
+
+  @override
+  String get noCustomFieldsYet =>
+      'अभी कोई कस्टम फ़ील्ड नहीं है। जोड़ने के लिए + दबाएं — जैसे रंग, साइज़, बैच, एक्सपायरी।';
+
+  @override
+  String get addField => 'फ़ील्ड जोड़ें';
+
+  @override
+  String get editField => 'फ़ील्ड संपादित करें';
+
+  @override
+  String get deleteFieldTitle => 'फ़ील्ड डिलीट करें?';
+
+  @override
+  String deleteFieldConfirm(Object label) {
+    return '\"$label\" डिलीट करें? मौजूदा SKU का सेव किया गया मान बना रहेगा, पर अब दिखेगा या बदला नहीं जा सकेगा।';
+  }
+
+  @override
+  String get fieldLabel => 'फ़ील्ड लेबल (जैसे रंग)';
+
+  @override
+  String get fieldTypeLabel => 'प्रकार';
+
+  @override
+  String get fieldTypeText => 'टेक्स्ट';
+
+  @override
+  String get fieldTypeNumber => 'संख्या';
+
+  @override
+  String get fieldTypeDropdown => 'ड्रॉपडाउन';
+
+  @override
+  String get fieldTypeDate => 'तारीख';
+
+  @override
+  String get fieldTypeYesNo => 'हां / नहीं';
+
+  @override
+  String get fieldOptionsHint => 'विकल्प, कॉमा से अलग करें (A,B,C)';
+
+  @override
+  String get requiredField => 'आवश्यक';
+
+  @override
+  String get scanBarcodeTooltip => 'बारकोड स्कैन करें';
+
+  @override
+  String get scanBarcodeTitle => 'बारकोड स्कैन करें';
+
+  @override
+  String get cameraUnavailable => 'कैमरा उपलब्ध नहीं है';
+
+  @override
+  String get noSkuFoundTitle => 'कोई SKU नहीं मिला';
+
+  @override
+  String skuNotFoundForCode(Object code) {
+    return 'कोड \"$code\" के लिए कोई SKU नहीं मिला';
+  }
+
+  @override
+  String createSkuWithCodeQuestion(Object code) {
+    return 'कोड \"$code\" से कोई SKU मेल नहीं खाता। इस कोड के साथ नया बनाएं?';
+  }
+
+  @override
+  String get create => 'बनाएं';
+
+  @override
+  String get editSku => 'SKU संपादित करें';
+
+  @override
+  String get detailsSection => 'विवरण';
 }

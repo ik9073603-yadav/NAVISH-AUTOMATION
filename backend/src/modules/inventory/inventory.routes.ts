@@ -2,7 +2,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
-import { recordMovement, checkStockAlertForSku, classifyLiquidVsDead, generateUniqueSkuCode, canRecordMovement } from './inventory.service';
+import { recordMovement, checkStockAlertForSku, classifyLiquidVsDead, generateUniqueSkuCode, canRecordMovement, validateSkuCustomData } from './inventory.service';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(requireAuth);
@@ -17,6 +17,7 @@ const skuCreateSchema = z.object({
   minStock: z.number().nonnegative().optional(),
   maxStock: z.number().nonnegative().optional(),
   unitCost: z.number().nonnegative().optional(),
+  customData: z.record(z.string(), z.any()).optional(),
 });
 
 const skuUpdateSchema = z.object({
@@ -29,6 +30,97 @@ const skuUpdateSchema = z.object({
   maxStock: z.number().nonnegative().nullable().optional(),
   unitCost: z.number().nonnegative().nullable().optional(),
   active: z.boolean().optional(),
+  customData: z.record(z.string(), z.any()).optional(),
+});
+
+// ---------- SKU CUSTOM FIELD DEFS (Owner/Manager decide their own SKU shape) ----------
+
+const skuFieldSchema = z.object({
+  label: z.string().min(1),
+  type: z.enum(['TEXT', 'NUMBER', 'DROPDOWN', 'DATE', 'PHOTO', 'YESNO']),
+  required: z.boolean().optional(),
+  options: z.string().optional(),
+});
+
+inventoryRouter.get('/sku-fields', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const defs = await prisma.skuFieldDef.findMany({
+      where: { orgId: req.user!.orgId },
+      orderBy: { sequence: 'asc' },
+    });
+    res.json(defs);
+  } catch (err) { next(err); }
+});
+
+inventoryRouter.post('/sku-fields', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = skuFieldSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId } = req.user!;
+    const maxSeq = await prisma.skuFieldDef.aggregate({ where: { orgId }, _max: { sequence: true } });
+
+    const def = await prisma.skuFieldDef.create({
+      data: {
+        orgId,
+        label: parsed.data.label,
+        type: parsed.data.type,
+        required: parsed.data.required ?? false,
+        options: parsed.data.options,
+        sequence: (maxSeq._max.sequence ?? -1) + 1,
+      },
+    });
+
+    res.status(201).json(def);
+  } catch (err) { next(err); }
+});
+
+const skuFieldUpdateSchema = skuFieldSchema.partial();
+
+inventoryRouter.patch('/sku-fields/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = skuFieldUpdateSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId } = req.user!;
+    const def = await prisma.skuFieldDef.findFirst({ where: { id: req.params.id as string, orgId } });
+    if (!def) return res.status(404).json({ error: 'Field not found' });
+
+    const updated = await prisma.skuFieldDef.update({ where: { id: def.id }, data: parsed.data });
+    res.json(updated);
+  } catch (err) { next(err); }
+});
+
+inventoryRouter.delete('/sku-fields/:id', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orgId } = req.user!;
+    const def = await prisma.skuFieldDef.findFirst({ where: { id: req.params.id as string, orgId } });
+    if (!def) return res.status(404).json({ error: 'Field not found' });
+
+    await prisma.skuFieldDef.delete({ where: { id: def.id } });
+    res.json({ deleted: true });
+  } catch (err) { next(err); }
+});
+
+const reorderSchema = z.object({ ids: z.array(z.string().uuid()).min(1) });
+
+inventoryRouter.put('/sku-fields/reorder', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = reorderSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId } = req.user!;
+    const owned = await prisma.skuFieldDef.findMany({ where: { orgId, id: { in: parsed.data.ids } }, select: { id: true } });
+    if (owned.length !== parsed.data.ids.length) {
+      return res.status(400).json({ error: 'One or more fields not found in your company' });
+    }
+
+    await prisma.$transaction(
+      parsed.data.ids.map((id, i) => prisma.skuFieldDef.update({ where: { id }, data: { sequence: i } })),
+    );
+
+    res.json({ reordered: true });
+  } catch (err) { next(err); }
 });
 
 const movementSchema = z.object({
@@ -90,6 +182,11 @@ inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req: Reque
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
 
     const { orgId } = req.user!;
+
+    const fieldDefs = await prisma.skuFieldDef.findMany({ where: { orgId } });
+    const customDataError = validateSkuCustomData(fieldDefs, parsed.data.customData ?? {});
+    if (customDataError) return res.status(400).json({ error: customDataError });
+
     const opening = parsed.data.currentStock ?? 0;
     const code = parsed.data.code?.trim() || await generateUniqueSkuCode(orgId);
 
@@ -106,6 +203,7 @@ inventoryRouter.post('/skus', requireRole('OWNER', 'MANAGER'), async (req: Reque
         maxStock: parsed.data.maxStock,
         unitCost: parsed.data.unitCost,
         lastMovedAt: opening > 0 ? new Date() : null,
+        customData: parsed.data.customData ?? undefined,
       },
     });
 
@@ -127,6 +225,15 @@ inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req: 
     const sku = await prisma.sku.findFirst({ where: { id: req.params.id as string, orgId } });
     if (!sku) return res.status(404).json({ error: 'SKU not found' });
 
+    // customData, when sent, is a wholesale replacement (the edit form always
+    // sends every field's current value) — validated against every def, same
+    // as create. Omitted entirely = leave whatever's already stored alone.
+    if (parsed.data.customData !== undefined) {
+      const fieldDefs = await prisma.skuFieldDef.findMany({ where: { orgId } });
+      const customDataError = validateSkuCustomData(fieldDefs, parsed.data.customData);
+      if (customDataError) return res.status(400).json({ error: customDataError });
+    }
+
     const updated = await prisma.sku.update({ where: { id: sku.id }, data: parsed.data });
 
     // Thresholds may have just changed — re-check whether an alert should fire/close.
@@ -137,6 +244,19 @@ inventoryRouter.patch('/skus/:id', requireRole('OWNER', 'MANAGER'), async (req: 
     if (err?.code === 'P2002') return res.status(409).json({ error: 'A SKU with this code already exists' });
     next(err);
   }
+});
+
+// Exact-match lookup for the camera barcode scan — the scanned code IS the
+// SKU code, so this is a single indexed lookup, not the fuzzy /skus search.
+inventoryRouter.get('/skus/by-code/:code', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const { orgId } = req.user!;
+    const sku = await prisma.sku.findFirst({
+      where: { orgId, code: { equals: req.params.code as string, mode: 'insensitive' } },
+    });
+    if (!sku) return res.status(404).json({ error: 'No SKU found for this code' });
+    res.json({ ...sku, ...skuView(sku) });
+  } catch (err) { next(err); }
 });
 
 // Shop-floor work — gated per-person. Owner/manager always allowed; an

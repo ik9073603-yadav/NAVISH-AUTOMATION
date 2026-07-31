@@ -771,4 +771,86 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get aiGenerateInsightsAction => 'Generate insights';
+
+  @override
+  String get customizeSkuFields => 'Customize fields';
+
+  @override
+  String get customizeFieldsTooltip => 'Customize SKU fields';
+
+  @override
+  String get noCustomFieldsYet =>
+      'No custom fields yet. Tap + to add one — e.g. Color, Size, Batch, Expiry.';
+
+  @override
+  String get addField => 'Add field';
+
+  @override
+  String get editField => 'Edit field';
+
+  @override
+  String get deleteFieldTitle => 'Delete field?';
+
+  @override
+  String deleteFieldConfirm(Object label) {
+    return 'Delete \"$label\"? Existing SKUs keep their saved value, but it will no longer be shown or editable.';
+  }
+
+  @override
+  String get fieldLabel => 'Field label (e.g. Color)';
+
+  @override
+  String get fieldTypeLabel => 'Type';
+
+  @override
+  String get fieldTypeText => 'Text';
+
+  @override
+  String get fieldTypeNumber => 'Number';
+
+  @override
+  String get fieldTypeDropdown => 'Dropdown';
+
+  @override
+  String get fieldTypeDate => 'Date';
+
+  @override
+  String get fieldTypeYesNo => 'Yes / No';
+
+  @override
+  String get fieldOptionsHint => 'Options, comma separated (A,B,C)';
+
+  @override
+  String get requiredField => 'Required';
+
+  @override
+  String get scanBarcodeTooltip => 'Scan barcode';
+
+  @override
+  String get scanBarcodeTitle => 'Scan barcode';
+
+  @override
+  String get cameraUnavailable => 'Camera unavailable';
+
+  @override
+  String get noSkuFoundTitle => 'No SKU found';
+
+  @override
+  String skuNotFoundForCode(Object code) {
+    return 'No SKU found for code \"$code\"';
+  }
+
+  @override
+  String createSkuWithCodeQuestion(Object code) {
+    return 'No SKU matches code \"$code\". Create a new one with this code?';
+  }
+
+  @override
+  String get create => 'Create';
+
+  @override
+  String get editSku => 'Edit SKU';
+
+  @override
+  String get detailsSection => 'DETAILS';
 }

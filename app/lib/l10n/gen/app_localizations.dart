@@ -1519,6 +1519,156 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Generate insights'**
   String get aiGenerateInsightsAction;
+
+  /// No description provided for @customizeSkuFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize fields'**
+  String get customizeSkuFields;
+
+  /// No description provided for @customizeFieldsTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Customize SKU fields'**
+  String get customizeFieldsTooltip;
+
+  /// No description provided for @noCustomFieldsYet.
+  ///
+  /// In en, this message translates to:
+  /// **'No custom fields yet. Tap + to add one — e.g. Color, Size, Batch, Expiry.'**
+  String get noCustomFieldsYet;
+
+  /// No description provided for @addField.
+  ///
+  /// In en, this message translates to:
+  /// **'Add field'**
+  String get addField;
+
+  /// No description provided for @editField.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit field'**
+  String get editField;
+
+  /// No description provided for @deleteFieldTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete field?'**
+  String get deleteFieldTitle;
+
+  /// No description provided for @deleteFieldConfirm.
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{label}\"? Existing SKUs keep their saved value, but it will no longer be shown or editable.'**
+  String deleteFieldConfirm(Object label);
+
+  /// No description provided for @fieldLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Field label (e.g. Color)'**
+  String get fieldLabel;
+
+  /// No description provided for @fieldTypeLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Type'**
+  String get fieldTypeLabel;
+
+  /// No description provided for @fieldTypeText.
+  ///
+  /// In en, this message translates to:
+  /// **'Text'**
+  String get fieldTypeText;
+
+  /// No description provided for @fieldTypeNumber.
+  ///
+  /// In en, this message translates to:
+  /// **'Number'**
+  String get fieldTypeNumber;
+
+  /// No description provided for @fieldTypeDropdown.
+  ///
+  /// In en, this message translates to:
+  /// **'Dropdown'**
+  String get fieldTypeDropdown;
+
+  /// No description provided for @fieldTypeDate.
+  ///
+  /// In en, this message translates to:
+  /// **'Date'**
+  String get fieldTypeDate;
+
+  /// No description provided for @fieldTypeYesNo.
+  ///
+  /// In en, this message translates to:
+  /// **'Yes / No'**
+  String get fieldTypeYesNo;
+
+  /// No description provided for @fieldOptionsHint.
+  ///
+  /// In en, this message translates to:
+  /// **'Options, comma separated (A,B,C)'**
+  String get fieldOptionsHint;
+
+  /// No description provided for @requiredField.
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get requiredField;
+
+  /// No description provided for @scanBarcodeTooltip.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get scanBarcodeTooltip;
+
+  /// No description provided for @scanBarcodeTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Scan barcode'**
+  String get scanBarcodeTitle;
+
+  /// No description provided for @cameraUnavailable.
+  ///
+  /// In en, this message translates to:
+  /// **'Camera unavailable'**
+  String get cameraUnavailable;
+
+  /// No description provided for @noSkuFoundTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'No SKU found'**
+  String get noSkuFoundTitle;
+
+  /// No description provided for @skuNotFoundForCode.
+  ///
+  /// In en, this message translates to:
+  /// **'No SKU found for code \"{code}\"'**
+  String skuNotFoundForCode(Object code);
+
+  /// No description provided for @createSkuWithCodeQuestion.
+  ///
+  /// In en, this message translates to:
+  /// **'No SKU matches code \"{code}\". Create a new one with this code?'**
+  String createSkuWithCodeQuestion(Object code);
+
+  /// No description provided for @create.
+  ///
+  /// In en, this message translates to:
+  /// **'Create'**
+  String get create;
+
+  /// No description provided for @editSku.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit SKU'**
+  String get editSku;
+
+  /// No description provided for @detailsSection.
+  ///
+  /// In en, this message translates to:
+  /// **'DETAILS'**
+  String get detailsSection;
 }
 
 class _AppLocalizationsDelegate

@@ -1,8 +1,37 @@
-import { Sku, MovementType } from '@prisma/client';
+import { Sku, MovementType, SkuFieldDef } from '@prisma/client';
 import { prisma } from '../../lib/prisma';
 import { computeFirstAction, notify } from '../engine/engine.service';
 
 export type LiquidClass = 'LIQUID' | 'SLOW' | 'DEAD';
+
+// Same spirit as the required-field check in fms.routes.ts's stage-complete
+// handler — checked against the org's own SkuFieldDef rows, not a fixed
+// schema, since every org defines a different set. Values are keyed by
+// label (matches OrderStage.data's convention), not field id.
+export function validateSkuCustomData(
+  defs: Pick<SkuFieldDef, 'label' | 'type' | 'required' | 'options'>[],
+  data: Record<string, unknown>,
+): string | null {
+  for (const f of defs) {
+    const v = data[f.label];
+    const missing = v === undefined || v === null || v === '';
+    if (f.required && missing) return `Field required: ${f.label}`;
+    if (missing) continue;
+
+    if (f.type === 'NUMBER' && typeof v !== 'number') {
+      return `Field must be a number: ${f.label}`;
+    }
+    if (f.type === 'YESNO' && typeof v !== 'boolean') {
+      return `Field must be yes/no: ${f.label}`;
+    }
+    if (f.type === 'DROPDOWN' && f.options) {
+      const opts = f.options.split(',').map(s => s.trim()).filter(Boolean);
+      if (!opts.includes(String(v))) return `Invalid value for ${f.label}`;
+    }
+    // TEXT/DATE/PHOTO: stored as-is, no further shape check for a v1.
+  }
+  return null;
+}
 
 // OWNER/MANAGER can always move stock. An EMPLOYEE needs the matching flag —
 // ADJUST is treated as an inbound-style reconciliation action (setting the

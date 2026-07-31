@@ -675,6 +675,7 @@ class Api {
     double? minStock,
     double? maxStock,
     double? unitCost,
+    Map<String, dynamic>? customData,
   }) async {
     final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/inventory/skus'),
@@ -688,6 +689,7 @@ class Api {
         if (minStock != null) 'minStock': minStock,
         if (maxStock != null) 'maxStock': maxStock,
         if (unitCost != null) 'unitCost': unitCost,
+        if (customData != null) 'customData': customData,
       }),
     );
     if (res.statusCode != 201) {
@@ -704,6 +706,84 @@ class Api {
     if (res.statusCode != 200) {
       throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update SKU');
     }
+  }
+
+  // ---------------- SKU custom field defs (each org decides its own SKU shape) ----------------
+
+  static Future<List<dynamic>> skuFields() async {
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/inventory/sku-fields'), headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to load SKU fields');
+    return jsonDecode(res.body) as List<dynamic>;
+  }
+
+  static Future<void> createSkuField({
+    required String label,
+    required String type,
+    bool required = false,
+    String? options,
+  }) async {
+    final res = await _client.post(
+      Uri.parse('${Config.apiBase}/api/inventory/sku-fields'),
+      headers: _headers,
+      body: jsonEncode({
+        'label': label,
+        'type': type,
+        'required': required,
+        if (options != null && options.isNotEmpty) 'options': options,
+      }),
+    );
+    if (res.statusCode != 201) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to add field');
+    }
+  }
+
+  static Future<void> updateSkuField(
+    String id, {
+    String? label,
+    String? type,
+    bool? required,
+    String? options,
+  }) async {
+    final res = await _client.patch(
+      Uri.parse('${Config.apiBase}/api/inventory/sku-fields/$id'),
+      headers: _headers,
+      body: jsonEncode({
+        if (label != null) 'label': label,
+        if (type != null) 'type': type,
+        if (required != null) 'required': required,
+        if (options != null) 'options': options,
+      }),
+    );
+    if (res.statusCode != 200) {
+      throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to update field');
+    }
+  }
+
+  static Future<void> deleteSkuField(String id) async {
+    final res = await _client.delete(Uri.parse('${Config.apiBase}/api/inventory/sku-fields/$id'), headers: _headers);
+    if (res.statusCode != 200) throw Exception('Failed to delete field');
+  }
+
+  static Future<void> reorderSkuFields(List<String> ids) async {
+    final res = await _client.put(
+      Uri.parse('${Config.apiBase}/api/inventory/sku-fields/reorder'),
+      headers: _headers,
+      body: jsonEncode({'ids': ids}),
+    );
+    if (res.statusCode != 200) throw Exception('Failed to reorder fields');
+  }
+
+  // Exact-code barcode-scan lookup — null (not an exception) on a clean
+  // "no SKU with this code" 404, so the caller can offer "create new" instead
+  // of showing an error toast for what's actually an expected outcome.
+  static Future<Map<String, dynamic>?> skuByCode(String code) async {
+    final res = await _client.get(
+      Uri.parse('${Config.apiBase}/api/inventory/skus/by-code/${Uri.encodeComponent(code)}'),
+      headers: _headers,
+    );
+    if (res.statusCode == 404) return null;
+    if (res.statusCode != 200) throw Exception('Failed to look up SKU');
+    return jsonDecode(res.body) as Map<String, dynamic>;
   }
 
   static Future<void> _rawRecordMovement({

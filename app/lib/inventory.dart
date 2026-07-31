@@ -8,6 +8,9 @@ import 'responsive.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
 import 'offline/write_queue.dart';
+import 'sku_fields.dart';
+import 'barcode_scanner.dart';
+import 'l10n/gen/app_localizations.dart';
 
 class InventoryScreen extends StatefulWidget {
   final String? role;
@@ -109,6 +112,11 @@ class _InventoryScreenState extends State<InventoryScreen> {
               child: Text('INVENTORY SUMMARY', style: AppTheme.eyebrow(context)),
             ),
             IconButton(
+              icon: const Icon(Icons.tune, size: 20),
+              tooltip: AppLocalizations.of(context).customizeFieldsTooltip,
+              onPressed: _openSkuFields,
+            ),
+            IconButton(
               icon: const Icon(Icons.ios_share, size: 20),
               tooltip: 'Export movements',
               onPressed: _exportMovements,
@@ -176,14 +184,68 @@ class _InventoryScreenState extends State<InventoryScreen> {
   Widget _searchBar() {
     return TextField(
       controller: _search,
-      decoration: const InputDecoration(
+      decoration: InputDecoration(
         hintText: 'Search by name or code',
-        prefixIcon: Icon(Icons.search),
-        border: OutlineInputBorder(),
+        prefixIcon: const Icon(Icons.search),
+        suffixIcon: IconButton(
+          icon: const Icon(Icons.qr_code_scanner),
+          tooltip: AppLocalizations.of(context).scanBarcodeTooltip,
+          onPressed: _scanBarcode,
+        ),
+        border: const OutlineInputBorder(),
         isDense: true,
       ),
       onSubmitted: (_) => _load(),
     );
+  }
+
+  Future<void> _openSkuFields() async {
+    await Navigator.push(context, MaterialPageRoute(builder: (_) => const SkuFieldsScreen()));
+    _load(); // field defs may have changed what the Add/Edit form and detail view show
+  }
+
+  // Reusable by both the list and (via _SkuDetailSheet) the movement flow —
+  // exact-code lookup, open the matching SKU's detail, or offer to create a
+  // new one with this code (owner/manager only, since creating a SKU is).
+  Future<void> _scanBarcode() async {
+    final code = await Navigator.push<String>(
+      context, MaterialPageRoute(builder: (_) => const BarcodeScannerScreen()));
+    if (code == null || code.isEmpty || !mounted) return;
+
+    final l10n = AppLocalizations.of(context);
+    try {
+      final match = await Api.skuByCode(code);
+      if (!mounted) return;
+      if (match != null) {
+        await _openSkuDetail(match);
+        return;
+      }
+      if (!_canManage) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.skuNotFoundForCode(code))));
+        return;
+      }
+      final create = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          title: Text(l10n.noSkuFoundTitle),
+          content: Text(l10n.createSkuWithCodeQuestion(code)),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context, false), child: Text(l10n.cancel)),
+            FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(l10n.create)),
+          ],
+        ),
+      );
+      if (create == true && mounted) {
+        final ok = await showAdaptiveSheet<bool>(
+          context: context,
+          isScrollControlled: true,
+          builder: (_) => _AddSkuSheet(initialCode: code),
+        );
+        if (ok == true) _load();
+      }
+    } catch (e) {
+      if (mounted) showApiError(context, e);
+    }
   }
 
   Widget _filterChips() {
@@ -274,15 +336,21 @@ class _InventoryScreenState extends State<InventoryScreen> {
         sku: sku,
         allowIn: _canManage || widget.canStockIn,
         allowOut: _canManage || widget.canStockOut,
+        canManage: _canManage,
       ),
     );
     if (changed == true) _load();
   }
 }
 
-// ---------------- ADD SKU ----------------
+// ---------------- ADD/EDIT SKU ----------------
+// One form for both: existingSku non-null means edit. Renders the org's
+// custom SKU fields (see sku_fields.dart) after the core fields — defaults
+// (no custom fields defined) just show nothing extra.
 class _AddSkuSheet extends StatefulWidget {
-  const _AddSkuSheet();
+  final Map<String, dynamic>? existingSku;
+  final String? initialCode; // prefill for the scan-to-create flow
+  const _AddSkuSheet({this.existingSku, this.initialCode});
   @override
   State<_AddSkuSheet> createState() => _AddSkuSheetState();
 }
@@ -296,7 +364,44 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
   final _minStock = TextEditingController();
   final _maxStock = TextEditingController();
   final _unitCost = TextEditingController();
+  List<dynamic> _fieldDefs = [];
+  final Map<String, dynamic> _customValues = {};
+  bool _loadingFields = true;
   bool _saving = false;
+
+  bool get _isEdit => widget.existingSku != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final sku = widget.existingSku;
+    if (sku != null) {
+      _name.text = sku['name'] as String? ?? '';
+      _code.text = sku['code'] as String? ?? '';
+      _category.text = sku['category'] as String? ?? '';
+      _unit.text = sku['unit'] as String? ?? 'pcs';
+      _minStock.text = sku['minStock'] != null ? '${sku['minStock']}' : '';
+      _maxStock.text = sku['maxStock'] != null ? '${sku['maxStock']}' : '';
+      _unitCost.text = sku['unitCost'] != null ? '${sku['unitCost']}' : '';
+      final existingCustom = sku['customData'];
+      if (existingCustom is Map) _customValues.addAll(Map<String, dynamic>.from(existingCustom));
+    } else if (widget.initialCode != null) {
+      _code.text = widget.initialCode!;
+    }
+    _loadFields();
+  }
+
+  Future<void> _loadFields() async {
+    try {
+      final fields = await Api.skuFields();
+      if (mounted) setState(() { _fieldDefs = fields; _loadingFields = false; });
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+        setState(() => _loadingFields = false);
+      }
+    }
+  }
 
   @override
   void dispose() {
@@ -312,24 +417,51 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
   }
 
   Future<void> _save() async {
+    final l10n = AppLocalizations.of(context);
     if (_name.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Name is required')),
       );
       return;
     }
+    for (final f in _fieldDefs) {
+      final label = f['label'] as String;
+      if (f['required'] != true) continue;
+      final v = _customValues[label];
+      if (v == null || (v is String && v.trim().isEmpty)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${l10n.requiredField}: $label')),
+        );
+        return;
+      }
+    }
+
     setState(() => _saving = true);
     try {
-      await Api.createSku(
-        name: _name.text.trim(),
-        code: _code.text.trim().isEmpty ? null : _code.text.trim(),
-        category: _category.text.trim().isEmpty ? null : _category.text.trim(),
-        unit: _unit.text.trim().isEmpty ? 'pcs' : _unit.text.trim(),
-        currentStock: double.tryParse(_openingStock.text.trim()),
-        minStock: double.tryParse(_minStock.text.trim()),
-        maxStock: double.tryParse(_maxStock.text.trim()),
-        unitCost: double.tryParse(_unitCost.text.trim()),
-      );
+      if (_isEdit) {
+        await Api.updateSku(widget.existingSku!['id'] as String, {
+          'name': _name.text.trim(),
+          'code': _code.text.trim(),
+          'category': _category.text.trim().isEmpty ? null : _category.text.trim(),
+          'unit': _unit.text.trim().isEmpty ? 'pcs' : _unit.text.trim(),
+          'minStock': double.tryParse(_minStock.text.trim()),
+          'maxStock': double.tryParse(_maxStock.text.trim()),
+          'unitCost': double.tryParse(_unitCost.text.trim()),
+          'customData': _customValues,
+        });
+      } else {
+        await Api.createSku(
+          name: _name.text.trim(),
+          code: _code.text.trim().isEmpty ? null : _code.text.trim(),
+          category: _category.text.trim().isEmpty ? null : _category.text.trim(),
+          unit: _unit.text.trim().isEmpty ? 'pcs' : _unit.text.trim(),
+          currentStock: double.tryParse(_openingStock.text.trim()),
+          minStock: double.tryParse(_minStock.text.trim()),
+          maxStock: double.tryParse(_maxStock.text.trim()),
+          unitCost: double.tryParse(_unitCost.text.trim()),
+          customData: _customValues,
+        );
+      }
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
@@ -339,8 +471,75 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
     }
   }
 
+  Widget _customFieldInput(Map<String, dynamic> f) {
+    final label = f['label'] as String;
+    final type = f['type'] as String;
+    final required = f['required'] == true;
+    final displayLabel = required ? '$label *' : label;
+
+    switch (type) {
+      case 'YESNO':
+        return SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: Text(displayLabel),
+          value: _customValues[label] == true,
+          onChanged: (v) => setState(() => _customValues[label] = v),
+        );
+      case 'DATE':
+        final current = _customValues[label] as String?;
+        return ListTile(
+          contentPadding: EdgeInsets.zero,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(4),
+            side: BorderSide(color: Theme.of(context).colorScheme.outline),
+          ),
+          title: Text(displayLabel),
+          subtitle: Text(current ?? '—'),
+          trailing: const Icon(Icons.calendar_today, size: 18),
+          onTap: () async {
+            final picked = await showDatePicker(
+              context: context,
+              initialDate: current != null ? (DateTime.tryParse(current) ?? DateTime.now()) : DateTime.now(),
+              firstDate: DateTime(2000),
+              lastDate: DateTime(2100),
+            );
+            if (picked != null) {
+              setState(() => _customValues[label] = picked.toIso8601String().split('T').first);
+            }
+          },
+        );
+      case 'DROPDOWN':
+        final opts = ((f['options'] as String?) ?? '')
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+        final current = _customValues[label] as String?;
+        return DropdownButtonFormField<String>(
+          initialValue: opts.contains(current) ? current : null,
+          decoration: InputDecoration(labelText: displayLabel, border: const OutlineInputBorder()),
+          items: opts.map((o) => DropdownMenuItem(value: o, child: Text(o))).toList(),
+          onChanged: (v) => setState(() => _customValues[label] = v),
+        );
+      case 'NUMBER':
+        return TextFormField(
+          initialValue: _customValues[label]?.toString() ?? '',
+          keyboardType: TextInputType.number,
+          decoration: InputDecoration(labelText: displayLabel, border: const OutlineInputBorder()),
+          onChanged: (v) => _customValues[label] = num.tryParse(v),
+        );
+      default: // TEXT (PHOTO isn't offered as a custom-field type — falls back to text)
+        return TextFormField(
+          initialValue: _customValues[label]?.toString() ?? '',
+          decoration: InputDecoration(labelText: displayLabel, border: const OutlineInputBorder()),
+          onChanged: (v) => _customValues[label] = v,
+        );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
     return Padding(
       padding: EdgeInsets.only(
         left: 20, right: 20, top: 20,
@@ -351,7 +550,7 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Add SKU', style: Theme.of(context).textTheme.headlineSmall),
+            Text(_isEdit ? l10n.editSku : 'Add SKU', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
             TextField(
               controller: _name,
@@ -376,13 +575,15 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
               decoration: const InputDecoration(
                   labelText: 'Unit (e.g. pcs, kg, box, litre)', border: OutlineInputBorder()),
             ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _openingStock,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                  labelText: 'Opening stock (optional, default 0)', border: OutlineInputBorder()),
-            ),
+            if (!_isEdit) ...[
+              const SizedBox(height: 12),
+              TextField(
+                controller: _openingStock,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(
+                    labelText: 'Opening stock (optional, default 0)', border: OutlineInputBorder()),
+              ),
+            ],
             const SizedBox(height: 12),
             Row(
               children: [
@@ -415,11 +616,23 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
               decoration: const InputDecoration(
                   labelText: 'Unit cost ₹ (optional)', border: OutlineInputBorder()),
             ),
-            const SizedBox(height: 16),
+            if (_fieldDefs.isNotEmpty) ...[
+              const SizedBox(height: 20),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(l10n.detailsSection, style: AppTheme.eyebrow(context)),
+              ),
+              const SizedBox(height: 8),
+              for (final f in _fieldDefs) ...[
+                _customFieldInput(f as Map<String, dynamic>),
+                const SizedBox(height: 12),
+              ],
+            ],
+            const SizedBox(height: 4),
             FilledButton(
-              onPressed: _saving ? null : _save,
+              onPressed: (_saving || _loadingFields) ? null : _save,
               style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
-              child: Text(_saving ? 'Saving...' : 'Add SKU'),
+              child: Text(_saving ? 'Saving...' : (_isEdit ? l10n.save : 'Add SKU')),
             ),
           ],
         ),
@@ -433,13 +646,15 @@ class _SkuDetailSheet extends StatefulWidget {
   final dynamic sku;
   final bool allowIn;
   final bool allowOut;
-  const _SkuDetailSheet({required this.sku, required this.allowIn, required this.allowOut});
+  final bool canManage;
+  const _SkuDetailSheet({required this.sku, required this.allowIn, required this.allowOut, required this.canManage});
   @override
   State<_SkuDetailSheet> createState() => _SkuDetailSheetState();
 }
 
 class _SkuDetailSheetState extends State<_SkuDetailSheet> {
   Map<String, dynamic>? _history;
+  List<dynamic> _fieldDefs = [];
   bool _loading = true;
   bool _changed = false;
   bool _showQr = false;
@@ -449,6 +664,65 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
   void initState() {
     super.initState();
     _loadHistory();
+    // Best-effort — if this fails the detail view just shows no custom
+    // fields section, no need to block or error-toast over it.
+    Api.skuFields().then((f) {
+      if (mounted) setState(() => _fieldDefs = f);
+    }).catchError((_) {});
+  }
+
+  Future<void> _edit() async {
+    final ok = await showAdaptiveSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      builder: (_) => _AddSkuSheet(existingSku: widget.sku as Map<String, dynamic>),
+    );
+    // The edit form doesn't return the updated SKU, so rather than showing
+    // stale data in this still-open sheet, close it — the list reload the
+    // caller already does on a truthy pop picks up the fresh values.
+    if (ok == true && mounted) Navigator.pop(context, true);
+  }
+
+  String _formatCustomValue(Map<String, dynamic> f, dynamic v) {
+    if (f['type'] == 'YESNO') return v == true ? 'Yes' : 'No';
+    return '$v';
+  }
+
+  Widget _customValuesSection() {
+    final l10n = AppLocalizations.of(context);
+    final customData = widget.sku['customData'];
+    final values = customData is Map ? Map<String, dynamic>.from(customData) : <String, dynamic>{};
+    final withValues = _fieldDefs.cast<Map<String, dynamic>>().where((f) {
+      final v = values[f['label']];
+      return v != null && v != '';
+    }).toList();
+    if (withValues.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Text(l10n.detailsSection, style: AppTheme.eyebrow(context)),
+        ),
+        const SizedBox(height: 6),
+        for (final f in withValues)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(f['label'] as String,
+                      style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                ),
+                Text(_formatCustomValue(f, values[f['label']]),
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+              ],
+            ),
+          ),
+        const SizedBox(height: 12),
+      ],
+    );
   }
 
   Future<void> _loadHistory() async {
@@ -592,6 +866,11 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
                   Expanded(
                     child: Text(widget.sku['name'], style: Theme.of(context).textTheme.headlineSmall),
                   ),
+                  if (widget.canManage)
+                    IconButton(
+                      icon: const Icon(Icons.edit_outlined),
+                      onPressed: _edit,
+                    ),
                   IconButton(
                     icon: const Icon(Icons.close),
                     onPressed: () => Navigator.pop(context, _changed),
@@ -601,6 +880,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
               Text('${widget.sku['code']} · $currentStock ${widget.sku['unit']}',
                   style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
               const SizedBox(height: 16),
+              _customValuesSection(),
               if (widget.allowIn || widget.allowOut)
                 Row(
                   children: [

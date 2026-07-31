@@ -63,6 +63,7 @@ model Organization {
   checklistRules    ChecklistRule[]
   flows             Flow[]
   skus              Sku[]
+  skuFieldDefs      SkuFieldDef[]
   healthSnapshots   HealthSnapshot[]
 
   @@map("organizations")
@@ -483,12 +484,38 @@ model Sku {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  // Org-defined custom SKU attributes (see SkuFieldDef) — {label: value},
+  // same "keyed by label, not field id" convention as OrderStage.data.
+  // Absent/empty for orgs that haven't defined any fields — defaults just work.
+  customData Json?
+
   organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
   movements StockMovement[]
 
   @@unique([orgId, code])
   @@index([orgId, active])
   @@map("skus")
+}
+
+// Lets each org decide what extra attributes its SKUs track (color, size,
+// batch, expiry, ...) beyond the fixed core fields — mirrors FieldDef/FMS
+// exactly (same FieldType enum, same "options" CSV-for-DROPDOWN convention),
+// just org-scoped instead of stage-scoped since SKUs aren't part of a flow.
+// PHOTO is a valid FieldType here too (schema-wise) but the field-type
+// picker UI doesn't offer it — a SKU already has its own imageUrl.
+model SkuFieldDef {
+  id       String    @id @default(uuid())
+  orgId    String
+  label    String
+  type     FieldType @default(TEXT)
+  required Boolean   @default(false)
+  options  String?                     // DROPDOWN ke liye: "A,B,C"
+  sequence Int       @default(0)
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+
+  @@index([orgId, sequence])
+  @@map("sku_field_defs")
 }
 
 enum MovementType {
