@@ -853,4 +853,47 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get detailsSection => 'विवरण';
+
+  @override
+  String get aiSetupOption => 'AI सेटअप';
+
+  @override
+  String get aiDescribeBusinessTitle => 'अपने बिज़नेस के बारे में बताएं';
+
+  @override
+  String get aiDescribeBusinessHelp =>
+      'थोड़े शब्दों में बताएं कि आप क्या बेचते या रखते हैं। AI SKU फ़ील्ड सुझाएगा — बनाने से पहले आप किसी को भी संपादित या हटा सकते हैं।';
+
+  @override
+  String get aiDescribeBusinessHint =>
+      'जैसे रेडीमेड कपड़ों की दुकान / मेडिकल स्टोर, दवाइयां';
+
+  @override
+  String get aiDescribeBusinessEmpty => 'पहले अपने बिज़नेस के बारे में बताएं';
+
+  @override
+  String get suggestFieldsAction => 'फ़ील्ड सुझाएं';
+
+  @override
+  String get suggestingFields => 'सोच रहे हैं...';
+
+  @override
+  String get aiPreviewTitle => 'सुझाई गई फ़ील्ड';
+
+  @override
+  String get aiPreviewHelp =>
+      'बनाने से पहले जांचें, संपादित करें, या हटाएं। अभी तक कुछ भी सेव नहीं हुआ है।';
+
+  @override
+  String get aiPreviewEmpty => 'कोई फ़ील्ड नहीं बची — एक जोड़ें या वापस जाएं।';
+
+  @override
+  String createNFields(Object count) {
+    return '$count फ़ील्ड बनाएं';
+  }
+
+  @override
+  String fieldsCreatedMessage(Object count) {
+    return '$count फ़ील्ड बनाई गईं';
+  }
 }

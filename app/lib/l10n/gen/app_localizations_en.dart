@@ -853,4 +853,47 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get detailsSection => 'DETAILS';
+
+  @override
+  String get aiSetupOption => 'AI setup';
+
+  @override
+  String get aiDescribeBusinessTitle => 'Describe your business';
+
+  @override
+  String get aiDescribeBusinessHelp =>
+      'In a few words, what do you sell or stock? The AI will suggest SKU fields to track — you can edit or remove any of them before creating.';
+
+  @override
+  String get aiDescribeBusinessHint =>
+      'e.g. readymade clothes shop / medical store, दवाइयां';
+
+  @override
+  String get aiDescribeBusinessEmpty => 'Describe your business first';
+
+  @override
+  String get suggestFieldsAction => 'Suggest fields';
+
+  @override
+  String get suggestingFields => 'Thinking...';
+
+  @override
+  String get aiPreviewTitle => 'Suggested fields';
+
+  @override
+  String get aiPreviewHelp =>
+      'Review, edit, or remove before creating. Nothing is saved yet.';
+
+  @override
+  String get aiPreviewEmpty => 'No fields left — add one or go back.';
+
+  @override
+  String createNFields(Object count) {
+    return 'Create $count field(s)';
+  }
+
+  @override
+  String fieldsCreatedMessage(Object count) {
+    return '$count field(s) created';
+  }
 }

@@ -773,6 +773,19 @@ class Api {
     if (res.statusCode != 200) throw Exception('Failed to reorder fields');
   }
 
+  // AI-assisted field setup — describe the business, get back suggestions
+  // in the same shape createSkuField expects. Never applies anything itself.
+  static Future<List<dynamic>> suggestSkuFields(String description) async {
+    final res = await _client.post(
+      Uri.parse('${Config.apiBase}/api/inventory/sku-fields/suggest'),
+      headers: _headers,
+      body: jsonEncode({'description': description}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to get AI suggestions');
+    return data['fields'] as List<dynamic>;
+  }
+
   // Exact-code barcode-scan lookup — null (not an exception) on a clean
   // "no SKU with this code" 404, so the caller can offer "create new" instead
   // of showing an error toast for what's actually an expected outcome.

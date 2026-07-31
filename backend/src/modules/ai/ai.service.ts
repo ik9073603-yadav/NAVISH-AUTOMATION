@@ -189,6 +189,121 @@ export async function runInsights(
   return { ...result, provider: config.provider, model: config.model };
 }
 
+// ─────────────────────────── SKU custom-field suggestions ───────────────────────────
+// AI-assisted setup for a company that doesn't know what SKU fields to
+// define (see inventory's SkuFieldDef) — describe the business in plain
+// language, get back suggestions in the exact shape the field-def CRUD
+// already accepts. Never applied automatically; the caller always shows
+// these as an editable preview first.
+
+const SKU_FIELD_TYPES = ['TEXT', 'NUMBER', 'DATE', 'DROPDOWN', 'YESNO'] as const;
+type SkuFieldTypeSuggestion = typeof SKU_FIELD_TYPES[number];
+
+export interface SuggestedSkuField {
+  label: string;
+  type: SkuFieldTypeSuggestion;
+  options?: string;
+  required: boolean;
+}
+
+function buildSkuFieldsSystemPrompt(): string {
+  return [
+    'You set up custom inventory (SKU) fields for a small-business operations app.',
+    'Given a short description of the business, suggest the SKU attributes it should track beyond the fixed core fields (name, code, quantity, min/max stock).',
+    'Reply with ONLY a JSON array — no prose, no markdown code fences — of 3 to 7 items, each shaped exactly as:',
+    '{"label": string, "type": "TEXT" | "NUMBER" | "DATE" | "DROPDOWN" | "YESNO", "options": string, "required": boolean}',
+    '"options" is a comma-separated list of choices and must be present ONLY when type is "DROPDOWN"; omit it otherwise.',
+    'Use only those five exact type values — nothing else. Keep labels short and practical (e.g. "Color", "Size", "Expiry Date", "Batch No").',
+    'Labels may be in the same language as the business description (English or Hindi), but the JSON keys and type values must stay exactly as specified above.',
+  ].join('\n');
+}
+
+// LLMs occasionally wrap JSON in prose or code fences despite instructions —
+// pull out the first [...] block rather than trusting the whole reply to be
+// bare JSON.
+function extractJsonArray(text: string): unknown[] {
+  const start = text.indexOf('[');
+  const end = text.lastIndexOf(']');
+  if (start === -1 || end === -1 || end < start) {
+    throw Object.assign(new Error('AI response was not in the expected format — try rephrasing your description'), { status: 502 });
+  }
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text.slice(start, end + 1));
+  } catch {
+    throw Object.assign(new Error('AI response was not valid JSON — try rephrasing your description'), { status: 502 });
+  }
+  if (!Array.isArray(parsed)) {
+    throw Object.assign(new Error('AI response was not in the expected format — try rephrasing your description'), { status: 502 });
+  }
+  return parsed;
+}
+
+const TYPE_ALIASES: Record<string, SkuFieldTypeSuggestion> = {
+  TEXT: 'TEXT', STRING: 'TEXT',
+  NUMBER: 'NUMBER', NUMERIC: 'NUMBER', INT: 'NUMBER', INTEGER: 'NUMBER', FLOAT: 'NUMBER', DECIMAL: 'NUMBER',
+  DATE: 'DATE',
+  DROPDOWN: 'DROPDOWN', SELECT: 'DROPDOWN', ENUM: 'DROPDOWN', CHOICE: 'DROPDOWN',
+  YESNO: 'YESNO', YES_NO: 'YESNO', BOOLEAN: 'YESNO', BOOL: 'YESNO',
+};
+
+// Lenient by design — an LLM's minor deviations (a wrong key name, an
+// unrecognized type) should drop that one suggestion, not fail the whole
+// batch. The caller only errors out if nothing usable survives.
+function normalizeSuggestions(raw: unknown[]): SuggestedSkuField[] {
+  const out: SuggestedSkuField[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as Record<string, unknown>;
+
+    const label = typeof obj.label === 'string' ? obj.label.trim() : '';
+    if (!label) continue;
+
+    const typeKey = typeof obj.type === 'string' ? obj.type.trim().toUpperCase().replace(/[\s-]+/g, '_') : '';
+    const type = TYPE_ALIASES[typeKey];
+    if (!type) continue;
+
+    let options: string | undefined;
+    if (type === 'DROPDOWN') {
+      if (Array.isArray(obj.options)) options = obj.options.map(String).join(',');
+      else if (typeof obj.options === 'string') options = obj.options;
+    }
+
+    out.push({
+      label: label.slice(0, 60),
+      type,
+      options: options?.slice(0, 300),
+      required: obj.required === true,
+    });
+  }
+  return out.slice(0, 10); // asked the model for 3-7; hard cap regardless of what comes back
+}
+
+export async function suggestSkuFields(
+  userId: string, description: string,
+): Promise<AiCallOutcome & { fields: SuggestedSkuField[] }> {
+  const config = await getDecryptedConfig(userId);
+  if (!config) throw Object.assign(new Error('Connect an AI provider in your profile first'), { status: 400 });
+
+  // Token-bounded on purpose — only the description goes out, never any real
+  // inventory/business data.
+  const trimmedDescription = description.trim().slice(0, 500);
+  const result = await callAI({
+    provider: config.provider, apiKey: config.apiKey, model: config.model,
+    systemPrompt: buildSkuFieldsSystemPrompt(), userPrompt: trimmedDescription,
+  });
+
+  const fields = normalizeSuggestions(extractJsonArray(result.text));
+  if (fields.length === 0) {
+    throw Object.assign(
+      new Error('AI could not suggest fields for that description — try rephrasing, or add fields manually'),
+      { status: 502 },
+    );
+  }
+
+  return { ...result, provider: config.provider, model: config.model, fields };
+}
+
 export async function testConnection(provider: AiProviderName, apiKey: string, model: string): Promise<void> {
   await callAI({
     provider, apiKey, model: model || DEFAULT_MODEL[provider],

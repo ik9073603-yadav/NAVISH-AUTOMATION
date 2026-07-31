@@ -281,5 +281,18 @@
   "createSkuWithCodeQuestion": "कोड \"{code}\" से कोई SKU मेल नहीं खाता। इस कोड के साथ नया बनाएं?",
   "create": "बनाएं",
   "editSku": "SKU संपादित करें",
-  "detailsSection": "विवरण"
+  "detailsSection": "विवरण",
+
+  "aiSetupOption": "AI सेटअप",
+  "aiDescribeBusinessTitle": "अपने बिज़नेस के बारे में बताएं",
+  "aiDescribeBusinessHelp": "थोड़े शब्दों में बताएं कि आप क्या बेचते या रखते हैं। AI SKU फ़ील्ड सुझाएगा — बनाने से पहले आप किसी को भी संपादित या हटा सकते हैं।",
+  "aiDescribeBusinessHint": "जैसे रेडीमेड कपड़ों की दुकान / मेडिकल स्टोर, दवाइयां",
+  "aiDescribeBusinessEmpty": "पहले अपने बिज़नेस के बारे में बताएं",
+  "suggestFieldsAction": "फ़ील्ड सुझाएं",
+  "suggestingFields": "सोच रहे हैं...",
+  "aiPreviewTitle": "सुझाई गई फ़ील्ड",
+  "aiPreviewHelp": "बनाने से पहले जांचें, संपादित करें, या हटाएं। अभी तक कुछ भी सेव नहीं हुआ है।",
+  "aiPreviewEmpty": "कोई फ़ील्ड नहीं बची — एक जोड़ें या वापस जाएं।",
+  "createNFields": "{count} फ़ील्ड बनाएं",
+  "fieldsCreatedMessage": "{count} फ़ील्ड बनाई गईं"
 }

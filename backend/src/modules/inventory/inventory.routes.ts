@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { recordMovement, checkStockAlertForSku, classifyLiquidVsDead, generateUniqueSkuCode, canRecordMovement, validateSkuCustomData } from './inventory.service';
+import { suggestSkuFields, logUsage } from '../ai/ai.service';
 
 export const inventoryRouter = Router();
 inventoryRouter.use(requireAuth);
@@ -120,6 +121,25 @@ inventoryRouter.put('/sku-fields/reorder', requireRole('OWNER', 'MANAGER'), asyn
     );
 
     res.json({ reordered: true });
+  } catch (err) { next(err); }
+});
+
+// AI-assisted field setup — describe the business in plain language, get
+// back suggestions in the exact shape POST /sku-fields already accepts.
+// Reuses the caller's own configured AI key (ai.service.ts); never applies
+// anything itself, just returns suggestions for the client to preview.
+const suggestFieldsSchema = z.object({ description: z.string().min(2).max(500) });
+
+inventoryRouter.post('/sku-fields/suggest', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = suggestFieldsSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId, userId } = req.user!;
+    const outcome = await suggestSkuFields(userId, parsed.data.description);
+    await logUsage(userId, orgId, outcome.provider, outcome.model, 'ASSIST', outcome.usage);
+
+    res.json({ fields: outcome.fields });
   } catch (err) { next(err); }
 });
 

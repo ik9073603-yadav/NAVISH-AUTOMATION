@@ -304,5 +304,20 @@
   "@createSkuWithCodeQuestion": { "placeholders": { "code": {} } },
   "create": "Create",
   "editSku": "Edit SKU",
-  "detailsSection": "DETAILS"
+  "detailsSection": "DETAILS",
+
+  "aiSetupOption": "AI setup",
+  "aiDescribeBusinessTitle": "Describe your business",
+  "aiDescribeBusinessHelp": "In a few words, what do you sell or stock? The AI will suggest SKU fields to track — you can edit or remove any of them before creating.",
+  "aiDescribeBusinessHint": "e.g. readymade clothes shop / medical store, दवाइयां",
+  "aiDescribeBusinessEmpty": "Describe your business first",
+  "suggestFieldsAction": "Suggest fields",
+  "suggestingFields": "Thinking...",
+  "aiPreviewTitle": "Suggested fields",
+  "aiPreviewHelp": "Review, edit, or remove before creating. Nothing is saved yet.",
+  "aiPreviewEmpty": "No fields left — add one or go back.",
+  "createNFields": "Create {count} field(s)",
+  "@createNFields": { "placeholders": { "count": {} } },
+  "fieldsCreatedMessage": "{count} field(s) created",
+  "@fieldsCreatedMessage": { "placeholders": { "count": {} } }
 }

@@ -1669,6 +1669,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'DETAILS'**
   String get detailsSection;
+
+  /// No description provided for @aiSetupOption.
+  ///
+  /// In en, this message translates to:
+  /// **'AI setup'**
+  String get aiSetupOption;
+
+  /// No description provided for @aiDescribeBusinessTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your business'**
+  String get aiDescribeBusinessTitle;
+
+  /// No description provided for @aiDescribeBusinessHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'In a few words, what do you sell or stock? The AI will suggest SKU fields to track — you can edit or remove any of them before creating.'**
+  String get aiDescribeBusinessHelp;
+
+  /// No description provided for @aiDescribeBusinessHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. readymade clothes shop / medical store, दवाइयां'**
+  String get aiDescribeBusinessHint;
+
+  /// No description provided for @aiDescribeBusinessEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your business first'**
+  String get aiDescribeBusinessEmpty;
+
+  /// No description provided for @suggestFieldsAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest fields'**
+  String get suggestFieldsAction;
+
+  /// No description provided for @suggestingFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Thinking...'**
+  String get suggestingFields;
+
+  /// No description provided for @aiPreviewTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested fields'**
+  String get aiPreviewTitle;
+
+  /// No description provided for @aiPreviewHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'Review, edit, or remove before creating. Nothing is saved yet.'**
+  String get aiPreviewHelp;
+
+  /// No description provided for @aiPreviewEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No fields left — add one or go back.'**
+  String get aiPreviewEmpty;
+
+  /// No description provided for @createNFields.
+  ///
+  /// In en, this message translates to:
+  /// **'Create {count} field(s)'**
+  String createNFields(Object count);
+
+  /// No description provided for @fieldsCreatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} field(s) created'**
+  String fieldsCreatedMessage(Object count);
 }
 
 class _AppLocalizationsDelegate
