@@ -75,6 +75,16 @@ class _SessionAwareClient extends http.BaseClient {
   }
 }
 
+// Every screen's `_load()` catch block routes through this instead of
+// calling ScaffoldMessenger directly — a screen whose own API call failed
+// ONLY because the session already ended has nothing useful to add on top
+// of the forced-logout redirect (see Api._handleSessionEnded) that's
+// already taking the user to LoginScreen with its own message.
+void showApiError(BuildContext context, Object error) {
+  if (Api.sessionEnded.value) return;
+  ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$error')));
+}
+
 class Api {
   static final http.Client _client = _SessionAwareClient();
 

@@ -64,7 +64,7 @@ class _StuckScreenState extends State<StuckScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _loading = false);

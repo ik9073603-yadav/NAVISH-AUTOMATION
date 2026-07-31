@@ -506,7 +506,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         const SnackBar(content: Text('Saved offline — will sync when back online')),
       );
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 

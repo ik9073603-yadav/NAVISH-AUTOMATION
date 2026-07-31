@@ -72,7 +72,7 @@ class _AdminScreenState extends State<AdminScreen> {
       await Api.adminToggleOrg(org['id'] as String);
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 

@@ -39,7 +39,7 @@ class _ChecklistScreenState extends State<ChecklistScreen> {
       setState(() { _rules = results[0]; _users = results[1]; });
     } catch (e) {
       if (mounted && requestId == _loadRequestId) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
@@ -214,6 +214,8 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
         _users = u;
         if (u.isNotEmpty) _assignee = u.first['id'];
       });
+    }).catchError((e) {
+      if (mounted) showApiError(context, e);
     });
   }
 
@@ -252,7 +254,7 @@ class _NewChecklistSheetState extends State<_NewChecklistSheet> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }

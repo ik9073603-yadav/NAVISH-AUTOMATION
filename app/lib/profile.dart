@@ -65,7 +65,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         _dirty = false;
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -85,7 +85,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       final updated = await Api.updateMe(photoUrl: url);
       if (mounted) setState(() => _user = {..._user!, ...updated});
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _uploadingPhoto = false);
     }
@@ -109,7 +109,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             SnackBar(content: Text(AppLocalizations.of(context).profileUpdated)));
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -128,7 +128,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() => _user = {..._user!, 'language': previous});
         await LocaleController.set(previous);
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     }
   }

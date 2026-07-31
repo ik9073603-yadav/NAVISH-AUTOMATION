@@ -27,7 +27,7 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
       final requests = await Api.deletionRequests();
       if (mounted) setState(() => _requests = requests);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -59,7 +59,7 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
       await Api.completeDeletionRequest(req['id'] as String);
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 
@@ -68,7 +68,7 @@ class _DeletionRequestsScreenState extends State<DeletionRequestsScreen> {
       await Api.denyDeletionRequest(req['id'] as String);
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 

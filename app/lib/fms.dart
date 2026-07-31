@@ -69,7 +69,7 @@ class _FmsScreenState extends State<FmsScreen> {
       });
     } catch (e) {
       if (mounted && requestId == _loadRequestId) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
@@ -387,7 +387,7 @@ class _FmsScreenState extends State<FmsScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+          showApiError(context, e);
         }
       }
     }
@@ -431,7 +431,7 @@ class _FmsScreenState extends State<FmsScreen> {
       await shareExportedFile(bytes, filename);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     }
   }
@@ -601,7 +601,7 @@ class _StageFormSheetState extends State<_StageFormSheet> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _uploadingField = null);
@@ -793,6 +793,8 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
     super.initState();
     Api.users().then((u) {
       if (mounted) setState(() => _users = u);
+    }).catchError((e) {
+      if (mounted) showApiError(context, e);
     });
   }
 
@@ -829,7 +831,7 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }

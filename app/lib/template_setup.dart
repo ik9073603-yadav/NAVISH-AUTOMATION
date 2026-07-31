@@ -10,7 +10,7 @@ Future<Map<String, dynamic>?> pickAndApplyTemplate(BuildContext context, String 
   try {
     all = await Api.templates();
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    if (context.mounted) showApiError(context, e);
     return null;
   }
   final templates = all.where((t) => t['type'] == type).toList();
@@ -27,7 +27,7 @@ Future<Map<String, dynamic>?> pickAndApplyTemplate(BuildContext context, String 
   try {
     return await Api.applyTemplate(chosen['id'] as String);
   } catch (e) {
-    if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+    if (context.mounted) showApiError(context, e);
     return null;
   }
 }
@@ -106,7 +106,7 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
         }
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -121,7 +121,7 @@ class _TemplateAssignStagesScreenState extends State<TemplateAssignStagesScreen>
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }
@@ -229,7 +229,7 @@ class _TemplateAssignChecklistScreenState extends State<TemplateAssignChecklistS
         _assigneeId = _rule!['assigneeId'] as String?;
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -242,7 +242,7 @@ class _TemplateAssignChecklistScreenState extends State<TemplateAssignChecklistS
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }

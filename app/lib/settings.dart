@@ -105,7 +105,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -142,7 +142,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await Api.updateSettings(logoUrl: url);
       if (mounted) setState(() => _logoUrl = url);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _uploadingLogo = false);
     }
@@ -170,7 +170,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _saving = false);
@@ -184,7 +184,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await shareExportedFile(bytes, filename);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _backingUp = false);

@@ -28,7 +28,7 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
       if (mounted) setState(() => _requests = requests);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -74,7 +74,7 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     }
   }
@@ -85,7 +85,7 @@ class _ResetRequestsScreenState extends State<ResetRequestsScreen> {
       _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     }
   }

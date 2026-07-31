@@ -49,7 +49,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       setState(() { _skus = results[0] as List<dynamic>; _summary = results[1] as Map<String, dynamic>?; });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -252,7 +252,7 @@ class _InventoryScreenState extends State<InventoryScreen> {
       await shareExportedFile(bytes, filename);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     }
   }
@@ -333,7 +333,7 @@ class _AddSkuSheetState extends State<_AddSkuSheet> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }
@@ -457,7 +457,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
       final h = await Api.skuHistory(widget.sku['id'] as String);
       if (mounted) setState(() => _history = h);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -494,7 +494,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
         );
       }
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 
@@ -509,7 +509,7 @@ class _SkuDetailSheetState extends State<_SkuDetailSheet> {
       final code = widget.sku['code'] as String;
       await shareExportedFile(bytes, '$code.png');
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 

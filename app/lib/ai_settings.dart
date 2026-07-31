@@ -65,7 +65,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
         if (_savedProvider != null) _provider = _savedProvider!;
       });
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -93,7 +93,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved')));
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -109,7 +109,7 @@ class _AiSettingsScreenState extends State<AiSettingsScreen> {
       }
       await _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 

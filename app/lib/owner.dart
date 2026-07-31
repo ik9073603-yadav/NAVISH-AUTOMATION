@@ -44,7 +44,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
       setState(() { _tasks = results[0]; _stats = results[1]; _users = results[2]; });
     } catch (e) {
       if (mounted && requestId == _loadRequestId) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
       }
     } finally {
       if (mounted && requestId == _loadRequestId) setState(() => _loading = false);
@@ -299,7 +299,7 @@ class _OwnerScreenState extends State<OwnerScreen> {
       }
       _load();
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 
@@ -349,6 +349,8 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
       final users = results[0] as List<dynamic>;
       final selfId = (results[1] as Map<String, dynamic>)['id'];
       if (mounted) setState(() => _users = users.where((u) => u['id'] != selfId).toList());
+    }).catchError((e) {
+      if (mounted) showApiError(context, e);
     });
   }
 
@@ -384,7 +386,7 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }
@@ -516,7 +518,7 @@ class _AddUserSheetState extends State<_AddUserSheet> {
       if (mounted) Navigator.pop(context, true);
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+        showApiError(context, e);
         setState(() => _saving = false);
       }
     }

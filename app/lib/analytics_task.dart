@@ -85,7 +85,7 @@ class _TaskAnalysisScreenState extends State<TaskAnalysisScreen> {
       final (bytes, filename) = await Api.exportTasks(format, from: from, to: to);
       await shareExportedFile(bytes, filename);
     } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('$e')));
+      if (mounted) showApiError(context, e);
     }
   }
 
