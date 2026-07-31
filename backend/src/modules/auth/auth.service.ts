@@ -31,6 +31,24 @@ async function sendOtpEmail(email: string, code: string, purpose: OtpPurpose, na
   await sendMail(email, subject, html);
 }
 
+// Bumps tokenVersion and signs a JWT carrying the new value — the one place
+// a session actually gets issued, so rotation and signing can never drift
+// apart. See requireAuth (single-active-session check) and login() below.
+async function issueSessionToken(user: { id: string; orgId: string; role: 'OWNER' | 'MANAGER' | 'EMPLOYEE'; isSuperAdmin: boolean }) {
+  const updated = await prisma.user.update({
+    where: { id: user.id },
+    data: { tokenVersion: { increment: 1 } },
+    select: { tokenVersion: true },
+  });
+  return signToken({
+    userId: user.id,
+    orgId: user.orgId,
+    role: user.role,
+    isSuperAdmin: user.isSuperAdmin,
+    tokenVersion: updated.tokenVersion,
+  });
+}
+
 export async function signup(input: {
   companyName: string;
   ownerName: string;
@@ -110,8 +128,8 @@ export async function verifyOtpAndLogin(email: string, code: string) {
     throw Object.assign(new Error('This company account has been suspended'), { status: 403 });
   }
 
-  const token = signToken({
-    userId: user.id,
+  const token = await issueSessionToken({
+    id: user.id,
     orgId: user.orgId,
     role: user.role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
     isSuperAdmin: user.isSuperAdmin,
@@ -175,7 +193,7 @@ export async function resetPassword(email: string, code: string, newPassword: st
   });
 }
 
-export async function login(input: { email: string; password: string }) {
+export async function login(input: { email: string; password: string; confirm?: boolean }) {
   const email = input.email.toLowerCase().trim();
 
   const user = await prisma.user.findFirst({
@@ -218,8 +236,18 @@ export async function login(input: { email: string; password: string }) {
     throw Object.assign(new Error('This company account has been suspended'), { status: 403 });
   }
 
-  const token = signToken({
-    userId: user.id,
+  // tokenVersion > 0 means a previous login already issued a session that
+  // nothing has since superseded — warn before silently kicking it out.
+  // The client re-calls with confirm:true to proceed anyway.
+  if (user.tokenVersion > 0 && !input.confirm) {
+    throw Object.assign(
+      new Error('Already active on another device. Log in here and sign out there?'),
+      { status: 409, sessionActive: true },
+    );
+  }
+
+  const token = await issueSessionToken({
+    id: user.id,
     orgId: user.orgId,
     role: user.role as 'OWNER' | 'MANAGER' | 'EMPLOYEE',
     isSuperAdmin: user.isSuperAdmin,

@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:http_parser/http_parser.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -36,7 +37,68 @@ class EmailNotVerifiedException implements Exception {
   String toString() => message;
 }
 
+// Thrown by Api.login when the account already has an active session
+// elsewhere. The caller should confirm with the user, then retry the same
+// login with confirm:true to proceed (this rotates the session and signs
+// the other device out).
+class SessionActiveException implements Exception {
+  final String message;
+  SessionActiveException(this.message);
+  @override
+  String toString() => message;
+}
+
+// Every request routes through this client so a "session ended" 401 (another
+// device logged in and rotated this account's session) can be caught in ONE
+// place instead of every individual call site — see requireAuth on the
+// backend for where this response comes from.
+class _SessionAwareClient extends http.BaseClient {
+  final http.Client _inner = http.Client();
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    final res = await _inner.send(request);
+    if (res.statusCode == 401) {
+      final bytes = await res.stream.toBytes();
+      if (utf8.decode(bytes).contains('session ended')) {
+        Api._handleSessionEnded();
+      }
+      return http.StreamedResponse(
+        Stream.value(bytes),
+        res.statusCode,
+        contentLength: bytes.length,
+        request: res.request,
+        headers: res.headers,
+      );
+    }
+    return res;
+  }
+}
+
 class Api {
+  static final http.Client _client = _SessionAwareClient();
+
+  // Set once at app startup (main.dart) so Api can force navigation back to
+  // the login screen without importing it (main.dart imports api.dart).
+  static final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+  static Widget Function(String message) loginScreenBuilder =
+      (_) => throw StateError('Api.loginScreenBuilder not set');
+  static bool _handlingSessionEnd = false;
+
+  static void _handleSessionEnded() {
+    if (_handlingSessionEnd) return;
+    _handlingSessionEnd = true;
+    logout();
+    navigatorKey.currentState?.pushAndRemoveUntil(
+      MaterialPageRoute(
+        builder: (_) => loginScreenBuilder(
+          'Logged out: this account signed in on another device',
+        ),
+      ),
+      (route) => false,
+    );
+  }
+
   static String? _token;
 
   static Future<void> loadToken() async {
@@ -46,6 +108,7 @@ class Api {
 
   static Future<void> _saveToken(String token) async {
     _token = token;
+    _handlingSessionEnd = false;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('token', token);
   }
@@ -114,17 +177,23 @@ class Api {
     }
   }
 
-  static Future<Map<String, dynamic>> login(String email, String password) async {
-    final res = await http.post(
+  static Future<Map<String, dynamic>> login(String email, String password, {bool confirm = false}) async {
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/login'),
       headers: {'Content-Type': 'application/json'},
-      body: jsonEncode({'email': email, 'password': password}),
+      body: jsonEncode({'email': email, 'password': password, if (confirm) 'confirm': true}),
     );
     final data = jsonDecode(res.body);
     if (res.statusCode == 403 && data['error'] == 'EMAIL_NOT_VERIFIED') {
       throw EmailNotVerifiedException(
         (data['email'] as String?) ?? email,
         (data['message'] as String?) ?? 'Verify your email to continue',
+      );
+    }
+    if (res.statusCode == 409 && data['error'] == 'SESSION_ACTIVE') {
+      throw SessionActiveException(
+        (data['message'] as String?) ??
+            'Already active on another device. Log in here and sign out there?',
       );
     }
     if (res.statusCode != 200) throw Exception(data['error'] ?? 'Login failed');
@@ -135,7 +204,7 @@ class Api {
   // ---------------- Email OTP verification (signup + first-login) ----------------
 
   static Future<Map<String, dynamic>> verifyOtp(String email, String code) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/verify-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'code': code}),
@@ -147,7 +216,7 @@ class Api {
   }
 
   static Future<String> resendOtp(String email) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/resend-otp'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
@@ -160,7 +229,7 @@ class Api {
   // ---------------- Self-service forgot/reset password (email OTP) ----------------
 
   static Future<String> forgotPasswordOtp(String email) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/forgot-password'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
@@ -171,7 +240,7 @@ class Api {
   }
 
   static Future<void> resetPasswordOtp(String email, String code, String newPassword) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/reset-password'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email, 'code': code, 'newPassword': newPassword}),
@@ -181,7 +250,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> me() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/auth/me'),
       headers: _headers,
     );
@@ -195,7 +264,7 @@ class Api {
     DateTime? to,
   }) async {
     return _cachedGet('myTasks:$status', () async {
-      final res = await http.get(
+      final res = await _client.get(
         _listUri('/api/tasks/my', status: status, from: from, to: to),
         headers: _headers,
       );
@@ -205,7 +274,7 @@ class Api {
   }
 
   static Future<void> _rawMarkDone(String taskId) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/tasks/$taskId/done'),
       headers: _headers,
     );
@@ -217,7 +286,7 @@ class Api {
   }
 
   static Future<void> markStuck(String taskId, String reason) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/tasks/$taskId/stuck'),
       headers: _headers,
       body: jsonEncode({'reason': reason}),
@@ -226,15 +295,23 @@ class Api {
   }
 
   static Future<List<dynamic>> notifications() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/tasks/notifications'),
       headers: _headers,
     );
     if (res.statusCode != 200) throw Exception('Failed to load notifications');
     return jsonDecode(res.body);
   }
+
+  static Future<void> markNotificationsRead() async {
+    final res = await _client.post(
+      Uri.parse('${Config.apiBase}/api/tasks/notifications/read'),
+      headers: _headers,
+    );
+    if (res.statusCode != 200) throw Exception('Failed to mark notifications read');
+  }
   static Future<List<dynamic>> users() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/users'),
       headers: _headers,
     );
@@ -249,7 +326,7 @@ class Api {
     required String role,
     String? phone,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/users'),
       headers: _headers,
       body: jsonEncode({
@@ -270,7 +347,7 @@ class Api {
     required bool canStockIn,
     required bool canStockOut,
   }) async {
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/users/$userId/inventory-permissions'),
       headers: _headers,
       body: jsonEncode({'canStockIn': canStockIn, 'canStockOut': canStockOut}),
@@ -287,7 +364,7 @@ class Api {
     required DateTime dueAt,
     required String priority,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/tasks/bulk'),
       headers: _headers,
       body: jsonEncode({
@@ -309,7 +386,7 @@ class Api {
     DateTime? to,
     String? assigneeId,
   }) async {
-    final res = await http.get(
+    final res = await _client.get(
       _listUri('/api/tasks/all', status: status, from: from, to: to, assigneeId: assigneeId),
       headers: _headers,
     );
@@ -318,7 +395,7 @@ class Api {
   }
 
   static Future<List<dynamic>> stats() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/tasks/stats'),
       headers: _headers,
     );
@@ -333,7 +410,7 @@ class Api {
     String? assigneeId,
   }) async {
     return _cachedGet('checklists:$status', () async {
-      final res = await http.get(
+      final res = await _client.get(
         _listUri('/api/checklists', status: status, from: from, to: to, assigneeId: assigneeId),
         headers: _headers,
       );
@@ -351,7 +428,7 @@ class Api {
     int? dayOfMonth,
     String priority = 'NORMAL',
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/checklists'),
       headers: _headers,
       body: jsonEncode({
@@ -370,7 +447,7 @@ class Api {
   }
 
   static Future<void> toggleChecklist(String id) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/checklists/$id/toggle'),
       headers: _headers,
     );
@@ -378,7 +455,7 @@ class Api {
   }
 
   static Future<List<dynamic>> flows() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/fms/flows'),
       headers: _headers,
     );
@@ -392,7 +469,7 @@ class Api {
     required String itemLabel,
     required List<Map<String, dynamic>> stages,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/fms/flows'),
       headers: _headers,
       body: jsonEncode({
@@ -408,7 +485,7 @@ class Api {
   }
 
   static Future<void> createOrder(String flowId, {double? orderValue}) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/fms/flows/$flowId/orders'),
       headers: _headers,
       body: jsonEncode({if (orderValue != null) 'orderValue': orderValue}),
@@ -423,7 +500,7 @@ class Api {
     String? assigneeId,
   }) async {
     return _cachedGet('orders:$status', () async {
-      final res = await http.get(
+      final res = await _client.get(
         _listUri('/api/fms/orders', status: status, from: from, to: to, assigneeId: assigneeId),
         headers: _headers,
       );
@@ -437,7 +514,7 @@ class Api {
     Map<String, dynamic> data, {
     String? remarks,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/fms/orderstages/$orderStageId/complete'),
       headers: _headers,
       body: jsonEncode({
@@ -475,7 +552,7 @@ class Api {
       contentType: MediaType.parse(mimeType ?? _guessImageMimeType(filename)),
     ));
 
-    final streamed = await req.send();
+    final streamed = await _client.send(req);
     final res = await http.Response.fromStream(streamed);
     final decoded = jsonDecode(res.body);
     if (res.statusCode != 201) {
@@ -485,7 +562,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> orderHistory(String orderId) async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/fms/orders/$orderId/history'),
       headers: _headers,
     );
@@ -494,7 +571,7 @@ class Api {
   }
 
   static Future<List<dynamic>> bottlenecks() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/fms/bottlenecks'),
       headers: _headers,
     );
@@ -505,7 +582,7 @@ class Api {
   // Flow analytics: KPI counts + drill-down lists (see fms.dart's Analytics segment).
   static Future<Map<String, dynamic>> fmsAnalyticsSummary() async {
     return _cachedGet('fmsAnalyticsSummary', () async {
-      final res = await http.get(
+      final res = await _client.get(
         Uri.parse('${Config.apiBase}/api/fms/analytics/summary'),
         headers: _headers,
       );
@@ -527,7 +604,7 @@ class Api {
       if (from != null) 'from': from.toUtc().toIso8601String(),
       if (to != null) 'to': to.toUtc().toIso8601String(),
     });
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load orders');
     return jsonDecode(res.body) as List<dynamic>;
   }
@@ -539,7 +616,7 @@ class Api {
       if (from != null) 'from': from.toUtc().toIso8601String(),
       if (to != null) 'to': to.toUtc().toIso8601String(),
     });
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load cost of delay');
     return jsonDecode(res.body) as Map<String, dynamic>;
   }
@@ -551,7 +628,7 @@ class Api {
         if (search != null && search.isNotEmpty) 'search': search,
         if (category != null && category.isNotEmpty) 'category': category,
       });
-      final res = await http.get(uri, headers: _headers);
+      final res = await _client.get(uri, headers: _headers);
       if (res.statusCode != 200) throw Exception('Failed to load inventory');
       return jsonDecode(res.body) as List<dynamic>;
     });
@@ -567,7 +644,7 @@ class Api {
     double? maxStock,
     double? unitCost,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/inventory/skus'),
       headers: _headers,
       body: jsonEncode({
@@ -587,7 +664,7 @@ class Api {
   }
 
   static Future<void> updateSku(String id, Map<String, dynamic> changes) async {
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/inventory/skus/$id'),
       headers: _headers,
       body: jsonEncode(changes),
@@ -603,7 +680,7 @@ class Api {
     required double quantity,
     String? reason,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/inventory/skus/$skuId/movement'),
       headers: _headers,
       body: jsonEncode({
@@ -631,7 +708,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> skuHistory(String skuId) async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/inventory/skus/$skuId/history'),
       headers: _headers,
     );
@@ -640,7 +717,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> inventorySummary() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/inventory/summary'),
       headers: _headers,
     );
@@ -649,7 +726,7 @@ class Api {
   }
 
   static Future<void> registerDevice(String token, {required String platform}) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/devices'),
       headers: _headers,
       body: jsonEncode({'token': token, 'platform': platform}),
@@ -658,7 +735,7 @@ class Api {
   }
 
   static Future<void> unregisterDevice(String token) async {
-    final res = await http.delete(
+    final res = await _client.delete(
       Uri.parse('${Config.apiBase}/api/devices'),
       headers: _headers,
       body: jsonEncode({'token': token}),
@@ -688,7 +765,7 @@ class Api {
     if (language != null) body['language'] = language;
     if (photoUrl != null) body['photoUrl'] = photoUrl.isEmpty ? null : photoUrl;
 
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/auth/me'),
       headers: _headers,
       body: jsonEncode(body),
@@ -701,7 +778,7 @@ class Api {
 
   static Future<List<dynamic>> stuckList() async {
     return _cachedGet('stuckList', () async {
-      final res = await http.get(
+      final res = await _client.get(
         Uri.parse('${Config.apiBase}/api/stuck'),
         headers: _headers,
       );
@@ -714,7 +791,7 @@ class Api {
   // breakdown (see health-score.service.ts on the backend for the formula).
   static Future<Map<String, dynamic>> healthScore({int days = 7}) async {
     return _cachedGet('healthScore:$days', () async {
-      final res = await http.get(
+      final res = await _client.get(
         Uri.parse('${Config.apiBase}/api/health-score').replace(queryParameters: {'days': '$days'}),
         headers: _headers,
       );
@@ -724,7 +801,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> getSettings() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/settings'),
       headers: _headers,
     );
@@ -746,7 +823,7 @@ class Api {
     double? delayCostPerHour,
     bool clearDelayCostPerHour = false,
   }) async {
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/settings'),
       headers: _headers,
       body: jsonEncode({
@@ -769,7 +846,7 @@ class Api {
   }
 
   static Future<void> changePassword(String currentPassword, String newPassword) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/change-password'),
       headers: _headers,
       body: jsonEncode({'currentPassword': currentPassword, 'newPassword': newPassword}),
@@ -781,7 +858,7 @@ class Api {
 
   // Public — no auth token needed, called from the login screen.
   static Future<String> requestPasswordReset(String email) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/request-reset'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({'email': email}),
@@ -792,7 +869,7 @@ class Api {
   }
 
   static Future<List<dynamic>> resetRequests() async {
-    final res = await http.get(
+    final res = await _client.get(
       Uri.parse('${Config.apiBase}/api/auth/reset-requests'),
       headers: _headers,
     );
@@ -801,7 +878,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> approveReset(String requestId) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/reset-requests/$requestId/approve'),
       headers: _headers,
     );
@@ -812,7 +889,7 @@ class Api {
   }
 
   static Future<void> denyReset(String requestId) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/reset-requests/$requestId/deny'),
       headers: _headers,
     );
@@ -829,37 +906,37 @@ class Api {
   }
 
   static Future<List<dynamic>> analyticsEmployees(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/employees', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/employees', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load employee analytics');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> analyticsDelegation(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/delegation', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/delegation', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load delegation analytics');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> analyticsChecklists(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/checklists', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/checklists', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load checklist analytics');
     return jsonDecode(res.body);
   }
 
   static Future<List<dynamic>> analyticsDepartments(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/departments', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/departments', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load department analytics');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> analyticsFms(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/fms', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/fms', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load flow analytics');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> analyticsInventory(DateTime from, DateTime to) async {
-    final res = await http.get(_rangeUri('/api/analytics/inventory', from, to), headers: _headers);
+    final res = await _client.get(_rangeUri('/api/analytics/inventory', from, to), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load inventory analytics');
     return jsonDecode(res.body);
   }
@@ -870,7 +947,7 @@ class Api {
   // stored key server-side.
 
   static Future<Map<String, dynamic>> aiConfigStatus() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
     final data = jsonDecode(res.body);
     if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to load AI settings');
     return data;
@@ -881,7 +958,7 @@ class Api {
     required String apiKey,
     String? model,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/ai/config'),
       headers: _headers,
       body: jsonEncode({'provider': provider, 'apiKey': apiKey, if (model != null && model.isNotEmpty) 'model': model}),
@@ -892,7 +969,7 @@ class Api {
   }
 
   static Future<void> aiDeleteConfig() async {
-    final res = await http.delete(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
+    final res = await _client.delete(Uri.parse('${Config.apiBase}/api/ai/config'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to remove AI settings');
   }
 
@@ -901,7 +978,7 @@ class Api {
     required String apiKey,
     String? model,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/ai/config/test'),
       headers: _headers,
       body: jsonEncode({'provider': provider, 'apiKey': apiKey, if (model != null && model.isNotEmpty) 'model': model}),
@@ -915,7 +992,7 @@ class Api {
     List<Map<String, String>> history = const [],
     String feature = 'ASSIST',
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/ai/chat'),
       headers: _headers,
       body: jsonEncode({'message': message, 'history': history, 'feature': feature}),
@@ -926,7 +1003,7 @@ class Api {
   }
 
   static Future<String> aiInsights({required String screen, required Map<String, dynamic> data}) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/ai/insights'),
       headers: _headers,
       body: jsonEncode({'screen': screen, 'data': data}),
@@ -937,7 +1014,7 @@ class Api {
   }
 
   static Future<Map<String, dynamic>> aiUsage() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/ai/usage'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/ai/usage'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load AI usage');
     return jsonDecode(res.body);
   }
@@ -945,25 +1022,25 @@ class Api {
   // ---------------- Superadmin ----------------
 
   static Future<Map<String, dynamic>> adminOverview() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/admin/overview'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/admin/overview'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load admin overview');
     return jsonDecode(res.body);
   }
 
   static Future<List<dynamic>> adminOrgs() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/admin/orgs'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/admin/orgs'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load orgs');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> adminOrgDetail(String orgId) async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/admin/orgs/$orgId'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/admin/orgs/$orgId'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load org detail');
     return jsonDecode(res.body);
   }
 
   static Future<bool> adminToggleOrg(String orgId) async {
-    final res = await http.post(Uri.parse('${Config.apiBase}/api/admin/orgs/$orgId/toggle'), headers: _headers);
+    final res = await _client.post(Uri.parse('${Config.apiBase}/api/admin/orgs/$orgId/toggle'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to toggle org');
     return jsonDecode(res.body)['enabled'] as bool;
   }
@@ -977,7 +1054,7 @@ class Api {
       if (from != null) 'from': from.toUtc().toIso8601String(),
       if (to != null) 'to': to.toUtc().toIso8601String(),
     });
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to export flow report');
     return (res.bodyBytes, 'flow-report.$format');
   }
@@ -988,7 +1065,7 @@ class Api {
       if (from != null) 'from': from.toUtc().toIso8601String(),
       if (to != null) 'to': to.toUtc().toIso8601String(),
     });
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to export inventory movements');
     return (res.bodyBytes, 'inventory-movements.$format');
   }
@@ -999,13 +1076,13 @@ class Api {
       if (from != null) 'from': from.toUtc().toIso8601String(),
       if (to != null) 'to': to.toUtc().toIso8601String(),
     });
-    final res = await http.get(uri, headers: _headers);
+    final res = await _client.get(uri, headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to export tasks report');
     return (res.bodyBytes, 'tasks-report.$format');
   }
 
   static Future<(Uint8List, String)> exportBackup() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/export/backup'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/export/backup'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to export backup');
     return (res.bodyBytes, 'navish-backup.zip');
   }
@@ -1020,7 +1097,7 @@ class Api {
     String? phone,
     required bool acceptedTerms,
   }) async {
-    final res = await http.post(
+    final res = await _client.post(
       Uri.parse('${Config.apiBase}/api/auth/signup'),
       headers: {'Content-Type': 'application/json'},
       body: jsonEncode({
@@ -1041,20 +1118,20 @@ class Api {
   // ---------------- Templates ----------------
 
   static Future<List<dynamic>> templates() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/templates'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/templates'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load templates');
     return jsonDecode(res.body);
   }
 
   static Future<Map<String, dynamic>> applyTemplate(String id) async {
-    final res = await http.post(Uri.parse('${Config.apiBase}/api/templates/$id/apply'), headers: _headers);
+    final res = await _client.post(Uri.parse('${Config.apiBase}/api/templates/$id/apply'), headers: _headers);
     final data = jsonDecode(res.body);
     if (res.statusCode != 201) throw Exception(data['error'] ?? 'Failed to apply template');
     return data;
   }
 
   static Future<void> assignStage(String stageId, {String? responsibleId}) async {
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/fms/stages/$stageId'),
       headers: _headers,
       body: jsonEncode({'responsibleId': responsibleId}),
@@ -1065,7 +1142,7 @@ class Api {
   }
 
   static Future<void> updateChecklistRule(String ruleId, {String? assigneeId, bool? active}) async {
-    final res = await http.patch(
+    final res = await _client.patch(
       Uri.parse('${Config.apiBase}/api/checklists/$ruleId'),
       headers: _headers,
       body: jsonEncode({
@@ -1081,25 +1158,25 @@ class Api {
   // ---------------- Account deletion (Feature 176) ----------------
 
   static Future<void> requestAccountDeletion() async {
-    final res = await http.post(Uri.parse('${Config.apiBase}/api/auth/request-deletion'), headers: _headers);
+    final res = await _client.post(Uri.parse('${Config.apiBase}/api/auth/request-deletion'), headers: _headers);
     if (res.statusCode != 200 && res.statusCode != 201) {
       throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to request deletion');
     }
   }
 
   static Future<List<dynamic>> deletionRequests() async {
-    final res = await http.get(Uri.parse('${Config.apiBase}/api/auth/deletion-requests'), headers: _headers);
+    final res = await _client.get(Uri.parse('${Config.apiBase}/api/auth/deletion-requests'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to load deletion requests');
     return jsonDecode(res.body);
   }
 
   static Future<void> completeDeletionRequest(String id) async {
-    final res = await http.post(Uri.parse('${Config.apiBase}/api/auth/deletion-requests/$id/complete'), headers: _headers);
+    final res = await _client.post(Uri.parse('${Config.apiBase}/api/auth/deletion-requests/$id/complete'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to complete deletion request');
   }
 
   static Future<void> denyDeletionRequest(String id) async {
-    final res = await http.post(Uri.parse('${Config.apiBase}/api/auth/deletion-requests/$id/deny'), headers: _headers);
+    final res = await _client.post(Uri.parse('${Config.apiBase}/api/auth/deletion-requests/$id/deny'), headers: _headers);
     if (res.statusCode != 200) throw Exception('Failed to deny deletion request');
   }
 

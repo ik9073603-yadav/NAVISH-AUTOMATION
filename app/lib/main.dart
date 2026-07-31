@@ -6,6 +6,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'api.dart';
 import 'theme/app_theme.dart';
 import 'widgets/motion.dart';
+import 'widgets/draggable_fab.dart';
 import 'owner.dart';
 import 'checklist.dart';
 import 'fms.dart';
@@ -33,6 +34,9 @@ import 'offline/connectivity_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Lets Api force navigation back to the login screen (e.g. on a
+  // session-ended 401) without importing this file — see api.dart.
+  Api.loginScreenBuilder = (message) => LoginScreen(forcedMessage: message);
   await Api.loadToken();
   await ThemeController.load();
   await LocaleController.load();
@@ -62,6 +66,7 @@ class NavishApp extends StatelessWidget {
         builder: (_, locale, __) => MaterialApp(
           title: 'Navish',
           debugShowCheckedModeBanner: false,
+          navigatorKey: Api.navigatorKey,
           scaffoldMessengerKey: PushService.scaffoldMessengerKey,
           themeMode: mode,
           theme: AppTheme.light(),
@@ -83,7 +88,11 @@ class NavishApp extends StatelessWidget {
 
 // ---------------- LOGIN ----------------
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  // Set when Api forces a return to this screen after a "session ended" 401
+  // (another device logged in) — shown once, in the same red banner normal
+  // login errors use.
+  final String? forcedMessage;
+  const LoginScreen({super.key, this.forcedMessage});
   @override
   State<LoginScreen> createState() => _LoginScreenState();
 }
@@ -95,10 +104,33 @@ class _LoginScreenState extends State<LoginScreen> {
   String? _error;
 
   @override
+  void initState() {
+    super.initState();
+    _error = widget.forcedMessage;
+  }
+
+  @override
   void dispose() {
     _email.dispose();
     _password.dispose();
     super.dispose();
+  }
+
+  // Already logged in elsewhere — ask before rotating the session and
+  // signing that other device out.
+  Future<bool> _confirmSessionTakeover(String message) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Already signed in elsewhere'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Log in here')),
+        ],
+      ),
+    );
+    return result ?? false;
   }
 
   Future<void> _login() async {
@@ -110,7 +142,17 @@ class _LoginScreenState extends State<LoginScreen> {
     }
     setState(() { _loading = true; _error = null; });
     try {
-      await Api.login(email, _password.text);
+      try {
+        await Api.login(email, _password.text);
+      } on SessionActiveException catch (e) {
+        if (!mounted) return;
+        final confirmed = await _confirmSessionTakeover(e.message);
+        if (!confirmed) {
+          setState(() => _loading = false);
+          return;
+        }
+        await Api.login(email, _password.text, confirm: true);
+      }
       await PushService.registerToken();
       if (!mounted) return;
       Navigator.pushReplacement(context, sharedAxisRoute(const HomeScreen()));
@@ -487,11 +529,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     Navigator.push(context, sharedAxisRoute(const ResetRequestsScreen()));
   }
 
-  void _openNotifications() {
-    Navigator.push(
+  // Marks everything read BEFORE showing the list, so the badge clears the
+  // moment the view opens (server-persisted — stays cleared across
+  // refresh/relaunch, not just a local flag).
+  Future<void> _openNotifications() async {
+    try {
+      await Api.markNotificationsRead();
+      if (mounted) {
+        setState(() {
+          for (final n in _notifs) {
+            (n as Map<String, dynamic>)['readAt'] ??= DateTime.now().toIso8601String();
+          }
+        });
+      }
+    } catch (_) {
+      // Best-effort — worst case the badge stays until the next successful load.
+    }
+    if (!mounted) return;
+    await Navigator.push(
       context,
       sharedAxisRoute(_NotificationsScreen(notifs: _notifs)),
-    ).then((_) => _load());
+    );
+    if (mounted) _load();
   }
 
   IconData _moduleIcon(String label) {
@@ -603,26 +662,30 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
     return _withBackHandling(Scaffold(
       appBar: appBar,
-      body: Column(
-        children: [
-          _offlineBanner(),
-          Expanded(
-            child: MaxWidthCenter(
-              child: FadeThroughSwitcher(tabKey: _tab, child: _bodyForTab(labels)),
-            ),
-          ),
-        ],
-      ),
       // OwnerScreen (the Tasks module, for owner/manager) already carries its
       // own "Assign task" FAB — this one only covers Home, the one place
-      // that didn't have a quick-assign entry point at all.
-      floatingActionButton: (onHome && _isOwner)
-          ? FloatingActionButton.extended(
+      // that didn't have a quick-assign entry point at all. It's a draggable
+      // overlay (not Scaffold.floatingActionButton) so it can be moved
+      // anywhere within the body, not just a fixed corner.
+      body: Stack(
+        children: [
+          Column(
+            children: [
+              _offlineBanner(),
+              Expanded(
+                child: MaxWidthCenter(
+                  child: FadeThroughSwitcher(tabKey: _tab, child: _bodyForTab(labels)),
+                ),
+              ),
+            ],
+          ),
+          if (onHome && _isOwner)
+            DraggableFab(
               onPressed: _openAssignFromHome,
-              icon: const Icon(Icons.add),
               label: Text(l10n.assignTaskAction),
-            )
-          : null,
+            ),
+        ],
+      ),
     ));
   }
 
@@ -636,7 +699,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   }
 
   Widget _notificationBell(AppLocalizations l10n) {
-    final unread = _notifs.length;
+    final unread = _notifs.where((n) => n['readAt'] == null).length;
     return IconButton(
       tooltip: l10n.alerts,
       onPressed: _openNotifications,

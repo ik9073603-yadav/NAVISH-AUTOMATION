@@ -343,8 +343,12 @@ class _AssignTaskSheetState extends State<AssignTaskSheet> {
   @override
   void initState() {
     super.initState();
-    Api.users().then((u) {
-      if (mounted) setState(() => _users = u);
+    // Never offer the logged-in user their own name — the backend rejects
+    // self-assign too, this just keeps it off the list to begin with.
+    Future.wait([Api.users(), Api.me()]).then((results) {
+      final users = results[0] as List<dynamic>;
+      final selfId = (results[1] as Map<String, dynamic>)['id'];
+      if (mounted) setState(() => _users = users.where((u) => u['id'] != selfId).toList());
     });
   }
 

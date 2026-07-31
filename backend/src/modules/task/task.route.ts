@@ -24,6 +24,10 @@ taskRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req: Request, res: 
 
     const { orgId, userId } = req.user!;
 
+    if (parsed.data.assigneeId === userId) {
+      return res.status(400).json({ error: 'You cannot assign a task to yourself' });
+    }
+
     // Assignee usi company ka hona chahiye
     const assignee = await prisma.user.findFirst({ where: { id: parsed.data.assigneeId, orgId } });
     if (!assignee) return res.status(404).json({ error: 'Assignee not found in your company' });
@@ -131,6 +135,17 @@ taskRouter.get('/notifications', async (req: Request, res: Response, next: NextF
   } catch (err) { next(err); }
 });
 
+// Called when the notifications screen is opened — clears the unread badge.
+taskRouter.post('/notifications/read', async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    await prisma.notification.updateMany({
+      where: { orgId: req.user!.orgId, userId: req.user!.userId, readAt: null },
+      data: { readAt: new Date() },
+    });
+    res.json({ read: true });
+  } catch (err) { next(err); }
+});
+
 // Owner/Manager: company ke saare tasks
 taskRouter.get('/all', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
   try {
@@ -173,6 +188,11 @@ taskRouter.post('/bulk', requireRole('OWNER', 'MANAGER'), async (req: Request, r
     if (!parsed.success) return res.status(400).json({ error: 'Validation failed' });
 
     const { orgId, userId } = req.user!;
+
+    if (parsed.data.assigneeIds.includes(userId)) {
+      return res.status(400).json({ error: 'You cannot assign a task to yourself' });
+    }
+
     const dueAt = parsed.data.dueAt ? new Date(parsed.data.dueAt) : null;
 
     const valid = await prisma.user.findMany({

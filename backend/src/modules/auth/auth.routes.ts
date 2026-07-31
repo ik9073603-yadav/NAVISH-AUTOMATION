@@ -32,6 +32,7 @@ const signupSchema = z.object({
 const loginSchema = z.object({
   email: emailSchema,
   password: z.string().min(1),
+  confirm: z.boolean().optional(),
 });
 
 authRouter.post('/signup', async (req: Request, res: Response, next: NextFunction) => {
@@ -59,6 +60,12 @@ authRouter.post('/login', async (req: Request, res: Response, next: NextFunction
     // which only echoes `code` outside production).
     if (err?.emailNotVerified) {
       return res.status(403).json({ error: 'EMAIL_NOT_VERIFIED', message: err.message, email: err.email });
+    }
+    // Same idea for the single-device-login warning: the client shows a
+    // confirm dialog, then retries with confirm:true to actually rotate
+    // the session and sign the other device out.
+    if (err?.sessionActive) {
+      return res.status(409).json({ error: 'SESSION_ACTIVE', message: err.message });
     }
     next(err);
   }

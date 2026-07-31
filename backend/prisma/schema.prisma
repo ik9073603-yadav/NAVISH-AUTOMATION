@@ -101,6 +101,13 @@ model User {
   // any API — only ever flipped by a direct DB script. See scripts/set-superadmin.mjs.
   isSuperAdmin Boolean       @default(false)
 
+  // Single-active-session enforcement. Embedded in every issued JWT; bumped
+  // on each login. requireAuth 401s ("session ended") any token whose
+  // embedded version no longer matches this — i.e. a newer login elsewhere
+  // silently kicks out every older session. 0 = never logged in yet, so the
+  // very first login never shows the "already active" warning.
+  tokenVersion Int           @default(0)
+
   // Gates login until the signup/add-person OTP is confirmed (see OtpCode
   // below). Existing pre-verification accounts are backfilled to true by
   // the migration that introduced this column.
