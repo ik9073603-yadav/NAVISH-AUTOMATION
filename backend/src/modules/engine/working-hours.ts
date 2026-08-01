@@ -8,7 +8,7 @@ export interface OrgHours {
   holidays: string[];    // "YYYY-MM-DD", org-local calendar date
 }
 
-interface LocalParts {
+export interface LocalParts {
   year: number;
   month: number; // 1-12
   day: number;
@@ -24,7 +24,10 @@ const WEEKDAY_TO_ISO: Record<string, number> = {
 
 // Reads the wall-clock date/time an instant corresponds to in a given IANA
 // timezone — dependency-free (Intl handles DST/offset rules correctly).
-function getLocalParts(instant: Date, timezone: string): LocalParts {
+// Exported so callers that need to build a candidate instant from org-local
+// calendar fields (see checklist.service.ts) don't duplicate this Intl
+// double-conversion logic.
+export function getLocalParts(instant: Date, timezone: string): LocalParts {
   const fmt = new Intl.DateTimeFormat('en-US', {
     timeZone: timezone,
     year: 'numeric', month: '2-digit', day: '2-digit',
@@ -48,8 +51,9 @@ function getLocalParts(instant: Date, timezone: string): LocalParts {
 
 // Inverse of getLocalParts: what UTC instant corresponds to this wall-clock
 // time in the given timezone. Standard "double conversion" trick so DST
-// offsets resolve correctly without a date library.
-function zonedTimeToUtc(year: number, month: number, day: number, hour: number, minute: number, timezone: string): Date {
+// offsets resolve correctly without a date library. Exported for the same
+// reason as getLocalParts (see above).
+export function zonedTimeToUtc(year: number, month: number, day: number, hour: number, minute: number, timezone: string): Date {
   const guess = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
   const local = getLocalParts(guess, timezone);
   const localAsUtc = Date.UTC(local.year, local.month - 1, local.day, local.hour, local.minute, 0);
@@ -154,7 +158,7 @@ export function workingMinutesBetween(start: Date, end: Date, org: OrgHours): nu
   return totalMinutes;
 }
 
-async function loadOrgHours(orgId: string): Promise<OrgHours | null> {
+export async function loadOrgHours(orgId: string): Promise<OrgHours | null> {
   return prisma.organization.findUnique({
     where: { id: orgId },
     select: { timezone: true, workingDays: true, shiftStart: true, shiftEnd: true, holidays: true },

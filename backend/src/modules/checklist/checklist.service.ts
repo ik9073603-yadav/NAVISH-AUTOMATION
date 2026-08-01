@@ -1,23 +1,32 @@
 import { prisma } from '../../lib/prisma';
 import { computeFirstAction, notify } from '../engine/engine.service';
-import { applyWorkingHours } from '../engine/working-hours';
+import { nextWorkingMoment, loadOrgHours, getLocalParts, zonedTimeToUtc, type LocalParts } from '../engine/working-hours';
 
-// Candidate WEEKLY fire date for one target weekday, from a fresh copy of
-// `base` (so trying multiple targets never mutates a shared Date).
-export function candidateForWeekday(base: Date, target: number, from: Date): Date {
-  const candidate = new Date(base);
-  const current = base.getDay() === 0 ? 7 : base.getDay();
-  let diff = target - current;
-  if (diff < 0 || (diff === 0 && candidate <= from)) diff += 7;
-  candidate.setDate(candidate.getDate() + diff);
+// Candidate WEEKLY fire date for one target weekday, built from the org-local
+// calendar date of `from` (not the server's local date) — `timeOfDay` is an
+// org-local wall-clock time, so "today" and "already passed" must be judged
+// in the org's timezone, not the server's.
+export function candidateForWeekday(
+  fromLocal: LocalParts, target: number, from: Date, h: number, m: number, timezone: string,
+): Date {
+  let diff = target - fromLocal.isoWeekday; // 1=Mon ... 7=Sun
+  if (diff < 0) diff += 7;
+  let candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month, fromLocal.day + diff, h, m, timezone);
+  if (diff === 0 && candidate <= from) {
+    candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month, fromLocal.day + diff + 7, h, m, timezone);
+  }
   return candidate;
 }
 
 // Agla occurrence kab? (sirf agla — infinite rows nahi banate)
-// Lands on the naive next occurrence, then pushes off holidays/non-working
-// days via the same working-hours gate the rest of the engine uses (see
-// engine/working-hours.ts) — a checklist due on a holiday skips forward to
-// the next working day's shift start instead of firing off-hours.
+// timeOfDay is an org-local wall-clock time ("09:00" means 9am in the org's
+// own timezone, not the server's) — every candidate is built via
+// zonedTimeToUtc/getLocalParts (see engine/working-hours.ts) so this is
+// correct regardless of what timezone the server itself runs in. The naive
+// next occurrence is then pushed off holidays/non-working days via the same
+// working-hours gate the rest of the engine uses — a checklist due on a
+// holiday skips forward to the next working day's shift start instead of
+// firing off-hours.
 export async function computeNextFire(rule: {
   orgId: string;
   recurrence: string;
@@ -25,29 +34,29 @@ export async function computeNextFire(rule: {
   weekdays: number[];
   dayOfMonth?: number | null;
 }, from: Date = new Date()): Promise<Date> {
+  const org = await loadOrgHours(rule.orgId);
+  const timezone = org?.timezone ?? 'UTC'; // fail-open, same spirit as applyWorkingHours
   const [h, m] = rule.timeOfDay.split(':').map(Number);
-  const next = new Date(from);
-  next.setSeconds(0, 0);
-  next.setHours(h, m);
+  const fromLocal = getLocalParts(from, timezone);
 
   let candidate: Date;
 
   if (rule.recurrence === 'DAILY') {
-    candidate = new Date(next);
-    if (candidate <= from) candidate.setDate(candidate.getDate() + 1);
+    candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month, fromLocal.day, h, m, timezone);
+    if (candidate <= from) candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month, fromLocal.day + 1, h, m, timezone);
   } else if (rule.recurrence === 'WEEKLY') {
     const targets = rule.weekdays.length ? rule.weekdays : [1]; // 1=Mon ... 7=Sun
     candidate = targets
-      .map(target => candidateForWeekday(next, target, from))
+      .map(target => candidateForWeekday(fromLocal, target, from, h, m, timezone))
       .sort((a, b) => a.getTime() - b.getTime())[0]!;
   } else {
     // MONTHLY
-    candidate = new Date(next);
-    candidate.setDate(rule.dayOfMonth ?? 1);
-    if (candidate <= from) candidate.setMonth(candidate.getMonth() + 1);
+    const dom = rule.dayOfMonth ?? 1;
+    candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month, dom, h, m, timezone);
+    if (candidate <= from) candidate = zonedTimeToUtc(fromLocal.year, fromLocal.month + 1, dom, h, m, timezone);
   }
 
-  return applyWorkingHours(rule.orgId, candidate);
+  return org ? nextWorkingMoment(candidate, org) : candidate;
 }
 
 // Scheduler yeh har minute chalayega
