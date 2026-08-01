@@ -319,5 +319,20 @@
   "createNFields": "Create {count} field(s)",
   "@createNFields": { "placeholders": { "count": {} } },
   "fieldsCreatedMessage": "{count} field(s) created",
-  "@fieldsCreatedMessage": { "placeholders": { "count": {} } }
+  "@fieldsCreatedMessage": { "placeholders": { "count": {} } },
+
+  "checklistWeekdaysLabel": "Which days?",
+  "aiDescribeRoutineTitle": "Describe your business/routine",
+  "aiDescribeRoutineHelp": "In a few words, what does your team do daily? The AI will suggest recurring checklist items — you can edit or remove any of them before creating.",
+  "aiDescribeRoutineHint": "e.g. restaurant, daily opening and closing tasks",
+  "aiDescribeRoutineEmpty": "Describe your business or routine first",
+  "suggestChecklistAction": "Suggest checklist items",
+  "aiPreviewChecklistTitle": "Suggested checklist items",
+  "aiPreviewChecklistEmpty": "No items left — add one or go back.",
+  "createNChecklistItems": "Create {count} item(s)",
+  "@createNChecklistItems": { "placeholders": { "count": {} } },
+  "checklistItemsCreatedMessage": "{count} item(s) created",
+  "@checklistItemsCreatedMessage": { "placeholders": { "count": {} } },
+  "editChecklistItem": "Edit item",
+  "addChecklistItem": "Add item"
 }

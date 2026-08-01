@@ -4,9 +4,28 @@ import { prisma } from '../../lib/prisma';
 import { requireAuth, requireRole } from '../../middleware/auth';
 import { computeNextFire } from './checklist.service';
 import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
+import { suggestChecklistItems, logUsage } from '../ai/ai.service';
 
 export const checklistRouter = Router();
 checklistRouter.use(requireAuth);
+
+// AI-assisted setup — describe the business/routine in plain language, get
+// back suggestions in the same shape POST / already accepts. Never applies
+// anything itself, just returns suggestions for the client to preview.
+const suggestItemsSchema = z.object({ description: z.string().min(2).max(500) });
+
+checklistRouter.post('/suggest', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = suggestItemsSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId, userId } = req.user!;
+    const outcome = await suggestChecklistItems(userId, parsed.data.description);
+    await logUsage(userId, orgId, outcome.provider, outcome.model, 'ASSIST', outcome.usage);
+
+    res.json({ items: outcome.items });
+  } catch (err) { next(err); }
+});
 
 const schema = z.object({
   title: z.string().min(2),
@@ -14,7 +33,7 @@ const schema = z.object({
   assigneeId: z.string().uuid(),
   recurrence: z.enum(['DAILY', 'WEEKLY', 'MONTHLY']),
   timeOfDay: z.string().regex(/^\d{2}:\d{2}$/),
-  weekday: z.number().min(1).max(7).optional(),
+  weekdays: z.array(z.number().min(1).max(7)).max(7).optional(),
   dayOfMonth: z.number().min(1).max(28).optional(),
   priority: z.enum(['HIGH', 'NORMAL', 'LOW']).optional(),
 });
@@ -38,10 +57,10 @@ checklistRouter.post('/', requireRole('OWNER', 'MANAGER'), async (req: Request, 
         createdById: userId,
         recurrence: parsed.data.recurrence,
         timeOfDay: parsed.data.timeOfDay,
-        weekday: parsed.data.weekday,
+        weekdays: parsed.data.weekdays ?? [],
         dayOfMonth: parsed.data.dayOfMonth,
         priority: parsed.data.priority ?? 'NORMAL',
-        nextFireAt: computeNextFire(parsed.data as any),
+        nextFireAt: await computeNextFire({ ...parsed.data, orgId, weekdays: parsed.data.weekdays ?? [] }),
       },
     });
 
@@ -89,7 +108,7 @@ checklistRouter.get('/:id/compliance', requireRole('OWNER', 'MANAGER'), async (r
 const updateSchema = z.object({
   assigneeId: z.string().uuid().optional(),
   timeOfDay: z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  weekday: z.number().min(1).max(7).optional(),
+  weekdays: z.array(z.number().min(1).max(7)).max(7).optional(),
   dayOfMonth: z.number().min(1).max(28).optional(),
   priority: z.enum(['HIGH', 'NORMAL', 'LOW']).optional(),
   active: z.boolean().optional(),
@@ -118,7 +137,7 @@ checklistRouter.patch('/:id', requireRole('OWNER', 'MANAGER'), async (req: Reque
       where: { id: rule.id },
       data: {
         ...parsed.data,
-        nextFireAt: willBeActive ? computeNextFire(merged as any) : null,
+        nextFireAt: willBeActive ? await computeNextFire(merged) : null,
       },
     });
 
@@ -137,7 +156,7 @@ checklistRouter.post('/:id/toggle', requireRole('OWNER', 'MANAGER'), async (req:
       where: { id: rule.id },
       data: {
         active: !rule.active,
-        nextFireAt: !rule.active ? computeNextFire(rule as any) : null,
+        nextFireAt: !rule.active ? await computeNextFire(rule) : null,
       },
     });
     res.json(updated);

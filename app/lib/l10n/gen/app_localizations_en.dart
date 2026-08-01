@@ -896,4 +896,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String fieldsCreatedMessage(Object count) {
     return '$count field(s) created';
   }
+
+  @override
+  String get checklistWeekdaysLabel => 'Which days?';
+
+  @override
+  String get aiDescribeRoutineTitle => 'Describe your business/routine';
+
+  @override
+  String get aiDescribeRoutineHelp =>
+      'In a few words, what does your team do daily? The AI will suggest recurring checklist items — you can edit or remove any of them before creating.';
+
+  @override
+  String get aiDescribeRoutineHint =>
+      'e.g. restaurant, daily opening and closing tasks';
+
+  @override
+  String get aiDescribeRoutineEmpty =>
+      'Describe your business or routine first';
+
+  @override
+  String get suggestChecklistAction => 'Suggest checklist items';
+
+  @override
+  String get aiPreviewChecklistTitle => 'Suggested checklist items';
+
+  @override
+  String get aiPreviewChecklistEmpty => 'No items left — add one or go back.';
+
+  @override
+  String createNChecklistItems(Object count) {
+    return 'Create $count item(s)';
+  }
+
+  @override
+  String checklistItemsCreatedMessage(Object count) {
+    return '$count item(s) created';
+  }
+
+  @override
+  String get editChecklistItem => 'Edit item';
+
+  @override
+  String get addChecklistItem => 'Add item';
 }

@@ -456,7 +456,7 @@ class Api {
     required String assigneeId,
     required String recurrence,
     required String timeOfDay,
-    int? weekday,
+    List<int>? weekdays,
     int? dayOfMonth,
     String priority = 'NORMAL',
   }) async {
@@ -468,7 +468,7 @@ class Api {
         'assigneeId': assigneeId,
         'recurrence': recurrence,
         'timeOfDay': timeOfDay,
-        if (weekday != null) 'weekday': weekday,
+        if (weekdays != null && weekdays.isNotEmpty) 'weekdays': weekdays,
         if (dayOfMonth != null) 'dayOfMonth': dayOfMonth,
         'priority': priority,
       }),
@@ -476,6 +476,20 @@ class Api {
     if (res.statusCode != 201) {
       throw Exception(jsonDecode(res.body)['error'] ?? 'Failed to create checklist');
     }
+  }
+
+  // AI-assisted checklist setup — describe the business/routine, get back
+  // suggestions in the same shape createChecklist expects. Never applies
+  // anything itself.
+  static Future<List<dynamic>> suggestChecklistItems(String description) async {
+    final res = await _client.post(
+      Uri.parse('${Config.apiBase}/api/checklists/suggest'),
+      headers: _headers,
+      body: jsonEncode({'description': description}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to get AI suggestions');
+    return data['items'] as List<dynamic>;
   }
 
   static Future<void> toggleChecklist(String id) async {

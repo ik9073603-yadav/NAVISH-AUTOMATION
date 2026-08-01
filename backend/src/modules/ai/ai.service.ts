@@ -304,6 +304,101 @@ export async function suggestSkuFields(
   return { ...result, provider: config.provider, model: config.model, fields };
 }
 
+// ─────────────────────────── Checklist recurrence suggestions ───────────────────────────
+// AI-assisted setup for a company that doesn't know what recurring routines
+// to set up (see checklist.routes.ts POST /) — describe the business in
+// plain language, get back suggestions in the exact shape checklist create
+// already accepts. Never applied automatically; the caller always shows
+// these as an editable preview first.
+
+const CHECKLIST_RECURRENCES = ['DAILY', 'WEEKLY', 'MONTHLY'] as const;
+type ChecklistRecurrenceSuggestion = typeof CHECKLIST_RECURRENCES[number];
+
+export interface SuggestedChecklistItem {
+  title: string;
+  recurrence: ChecklistRecurrenceSuggestion;
+  weekdays?: number[];
+  dayOfMonth?: number;
+  timeOfDay: string;
+}
+
+function buildChecklistItemsSystemPrompt(): string {
+  return [
+    'You set up recurring checklist routines for a small-business operations app.',
+    'Given a short description of the business/routine, suggest 3 to 8 recurring checklist items it should track.',
+    'Reply with ONLY a JSON array — no prose, no markdown code fences — each item shaped exactly as:',
+    '{"title": string, "recurrence": "DAILY" | "WEEKLY" | "MONTHLY", "weekdays": number[], "dayOfMonth": number, "timeOfDay": "HH:mm"}',
+    '"weekdays" is a list of ISO weekdays (1=Monday ... 7=Sunday) and must be present ONLY when recurrence is "WEEKLY" (may hold several days, e.g. every weekday = [1,2,3,4,5]); omit it otherwise.',
+    '"dayOfMonth" is 1-28 and must be present ONLY when recurrence is "MONTHLY"; omit it otherwise.',
+    '"timeOfDay" is a 24-hour "HH:mm" local time picked sensibly for that task (e.g. an opening checklist early, a closing checklist late).',
+    'Use only those exact recurrence values — nothing else.',
+    'Titles may be in the same language as the description (English or Hindi), but the JSON keys and recurrence values must stay exactly as specified above.',
+  ].join('\n');
+}
+
+const TIME_OF_DAY_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+// Lenient by design, same spirit as normalizeSuggestions for SKU fields — an
+// LLM's minor deviations should drop that one suggestion, not fail the batch.
+function normalizeChecklistSuggestions(raw: unknown[]): SuggestedChecklistItem[] {
+  const out: SuggestedChecklistItem[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as Record<string, unknown>;
+
+    const title = typeof obj.title === 'string' ? obj.title.trim() : '';
+    if (!title) continue;
+
+    const recurrenceKey = typeof obj.recurrence === 'string' ? obj.recurrence.trim().toUpperCase() : '';
+    if (!CHECKLIST_RECURRENCES.includes(recurrenceKey as ChecklistRecurrenceSuggestion)) continue;
+    const recurrence = recurrenceKey as ChecklistRecurrenceSuggestion;
+
+    const timeOfDay = typeof obj.timeOfDay === 'string' && TIME_OF_DAY_RE.test(obj.timeOfDay) ? obj.timeOfDay : '09:00';
+
+    let weekdays: number[] | undefined;
+    if (recurrence === 'WEEKLY' && Array.isArray(obj.weekdays)) {
+      weekdays = obj.weekdays
+        .map(Number)
+        .filter(d => Number.isInteger(d) && d >= 1 && d <= 7);
+      if (weekdays.length === 0) weekdays = [1];
+    }
+
+    let dayOfMonth: number | undefined;
+    if (recurrence === 'MONTHLY') {
+      const d = Number(obj.dayOfMonth);
+      dayOfMonth = Number.isInteger(d) && d >= 1 && d <= 28 ? d : 1;
+    }
+
+    out.push({ title: title.slice(0, 100), recurrence, weekdays, dayOfMonth, timeOfDay });
+  }
+  return out.slice(0, 10); // asked the model for 3-8; hard cap regardless of what comes back
+}
+
+export async function suggestChecklistItems(
+  userId: string, description: string,
+): Promise<AiCallOutcome & { items: SuggestedChecklistItem[] }> {
+  const config = await getDecryptedConfig(userId);
+  if (!config) throw Object.assign(new Error('Connect an AI provider in your profile first'), { status: 400 });
+
+  // Token-bounded on purpose — only the description goes out, never any real
+  // company data.
+  const trimmedDescription = description.trim().slice(0, 500);
+  const result = await callAI({
+    provider: config.provider, apiKey: config.apiKey, model: config.model,
+    systemPrompt: buildChecklistItemsSystemPrompt(), userPrompt: trimmedDescription,
+  });
+
+  const items = normalizeChecklistSuggestions(extractJsonArray(result.text));
+  if (items.length === 0) {
+    throw Object.assign(
+      new Error('AI could not suggest checklist items for that description — try rephrasing, or add them manually'),
+      { status: 502 },
+    );
+  }
+
+  return { ...result, provider: config.provider, model: config.model, items };
+}
+
 export async function testConnection(provider: AiProviderName, apiKey: string, model: string): Promise<void> {
   await callAI({
     provider, apiKey, model: model || DEFAULT_MODEL[provider],

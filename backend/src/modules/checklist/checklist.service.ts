@@ -1,37 +1,53 @@
 import { prisma } from '../../lib/prisma';
 import { computeFirstAction, notify } from '../engine/engine.service';
+import { applyWorkingHours } from '../engine/working-hours';
+
+// Candidate WEEKLY fire date for one target weekday, from a fresh copy of
+// `base` (so trying multiple targets never mutates a shared Date).
+export function candidateForWeekday(base: Date, target: number, from: Date): Date {
+  const candidate = new Date(base);
+  const current = base.getDay() === 0 ? 7 : base.getDay();
+  let diff = target - current;
+  if (diff < 0 || (diff === 0 && candidate <= from)) diff += 7;
+  candidate.setDate(candidate.getDate() + diff);
+  return candidate;
+}
 
 // Agla occurrence kab? (sirf agla — infinite rows nahi banate)
-export function computeNextFire(rule: {
+// Lands on the naive next occurrence, then pushes off holidays/non-working
+// days via the same working-hours gate the rest of the engine uses (see
+// engine/working-hours.ts) — a checklist due on a holiday skips forward to
+// the next working day's shift start instead of firing off-hours.
+export async function computeNextFire(rule: {
+  orgId: string;
   recurrence: string;
   timeOfDay: string;
-  weekday: number | null;
-  dayOfMonth: number | null;
-}, from: Date = new Date()): Date {
+  weekdays: number[];
+  dayOfMonth?: number | null;
+}, from: Date = new Date()): Promise<Date> {
   const [h, m] = rule.timeOfDay.split(':').map(Number);
   const next = new Date(from);
   next.setSeconds(0, 0);
   next.setHours(h, m);
 
+  let candidate: Date;
+
   if (rule.recurrence === 'DAILY') {
-    if (next <= from) next.setDate(next.getDate() + 1);
-    return next;
+    candidate = new Date(next);
+    if (candidate <= from) candidate.setDate(candidate.getDate() + 1);
+  } else if (rule.recurrence === 'WEEKLY') {
+    const targets = rule.weekdays.length ? rule.weekdays : [1]; // 1=Mon ... 7=Sun
+    candidate = targets
+      .map(target => candidateForWeekday(next, target, from))
+      .sort((a, b) => a.getTime() - b.getTime())[0]!;
+  } else {
+    // MONTHLY
+    candidate = new Date(next);
+    candidate.setDate(rule.dayOfMonth ?? 1);
+    if (candidate <= from) candidate.setMonth(candidate.getMonth() + 1);
   }
 
-  if (rule.recurrence === 'WEEKLY') {
-    const target = rule.weekday ?? 1;            // 1=Mon ... 7=Sun
-    const current = next.getDay() === 0 ? 7 : next.getDay();
-    let diff = target - current;
-    if (diff < 0 || (diff === 0 && next <= from)) diff += 7;
-    next.setDate(next.getDate() + diff);
-    return next;
-  }
-
-  // MONTHLY
-  const dom = rule.dayOfMonth ?? 1;
-  next.setDate(dom);
-  if (next <= from) next.setMonth(next.getMonth() + 1);
-  return next;
+  return applyWorkingHours(rule.orgId, candidate);
 }
 
 // Scheduler yeh har minute chalayega
@@ -66,7 +82,7 @@ export async function fireDueChecklists() {
       where: { id: rule.id },
       data: {
         lastFiredAt: new Date(),
-        nextFireAt: computeNextFire(rule, new Date(dueAt.getTime() + 60_000)),
+        nextFireAt: await computeNextFire(rule, new Date(dueAt.getTime() + 60_000)),
       },
     });
 

@@ -294,5 +294,18 @@
   "aiPreviewHelp": "बनाने से पहले जांचें, संपादित करें, या हटाएं। अभी तक कुछ भी सेव नहीं हुआ है।",
   "aiPreviewEmpty": "कोई फ़ील्ड नहीं बची — एक जोड़ें या वापस जाएं।",
   "createNFields": "{count} फ़ील्ड बनाएं",
-  "fieldsCreatedMessage": "{count} फ़ील्ड बनाई गईं"
+  "fieldsCreatedMessage": "{count} फ़ील्ड बनाई गईं",
+
+  "checklistWeekdaysLabel": "कौन से दिन?",
+  "aiDescribeRoutineTitle": "अपने बिज़नेस/रूटीन के बारे में बताएं",
+  "aiDescribeRoutineHelp": "थोड़े शब्दों में बताएं कि आपकी टीम रोज़ क्या करती है। AI दोहराए जाने वाले चेकलिस्ट आइटम सुझाएगा — बनाने से पहले आप किसी को भी संपादित या हटा सकते हैं।",
+  "aiDescribeRoutineHint": "जैसे रेस्टोरेंट, रोज़ खोलने और बंद करने के काम",
+  "aiDescribeRoutineEmpty": "पहले अपने बिज़नेस या रूटीन के बारे में बताएं",
+  "suggestChecklistAction": "चेकलिस्ट आइटम सुझाएं",
+  "aiPreviewChecklistTitle": "सुझाए गए चेकलिस्ट आइटम",
+  "aiPreviewChecklistEmpty": "कोई आइटम नहीं बचा — एक जोड़ें या वापस जाएं।",
+  "createNChecklistItems": "{count} आइटम बनाएं",
+  "checklistItemsCreatedMessage": "{count} आइटम बनाए गए",
+  "editChecklistItem": "आइटम संपादित करें",
+  "addChecklistItem": "आइटम जोड़ें"
 }

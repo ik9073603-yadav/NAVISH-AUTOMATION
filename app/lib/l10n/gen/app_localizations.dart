@@ -1741,6 +1741,78 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'{count} field(s) created'**
   String fieldsCreatedMessage(Object count);
+
+  /// No description provided for @checklistWeekdaysLabel.
+  ///
+  /// In en, this message translates to:
+  /// **'Which days?'**
+  String get checklistWeekdaysLabel;
+
+  /// No description provided for @aiDescribeRoutineTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your business/routine'**
+  String get aiDescribeRoutineTitle;
+
+  /// No description provided for @aiDescribeRoutineHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'In a few words, what does your team do daily? The AI will suggest recurring checklist items — you can edit or remove any of them before creating.'**
+  String get aiDescribeRoutineHelp;
+
+  /// No description provided for @aiDescribeRoutineHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. restaurant, daily opening and closing tasks'**
+  String get aiDescribeRoutineHint;
+
+  /// No description provided for @aiDescribeRoutineEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your business or routine first'**
+  String get aiDescribeRoutineEmpty;
+
+  /// No description provided for @suggestChecklistAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest checklist items'**
+  String get suggestChecklistAction;
+
+  /// No description provided for @aiPreviewChecklistTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested checklist items'**
+  String get aiPreviewChecklistTitle;
+
+  /// No description provided for @aiPreviewChecklistEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No items left — add one or go back.'**
+  String get aiPreviewChecklistEmpty;
+
+  /// No description provided for @createNChecklistItems.
+  ///
+  /// In en, this message translates to:
+  /// **'Create {count} item(s)'**
+  String createNChecklistItems(Object count);
+
+  /// No description provided for @checklistItemsCreatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'{count} item(s) created'**
+  String checklistItemsCreatedMessage(Object count);
+
+  /// No description provided for @editChecklistItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Edit item'**
+  String get editChecklistItem;
+
+  /// No description provided for @addChecklistItem.
+  ///
+  /// In en, this message translates to:
+  /// **'Add item'**
+  String get addChecklistItem;
 }
 
 class _AppLocalizationsDelegate

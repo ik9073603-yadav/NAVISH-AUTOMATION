@@ -81,7 +81,7 @@ templatesRouter.post('/:id/apply', requireRole('OWNER', 'MANAGER'), async (req: 
         createdById: userId,
         recurrence: template.recurrence,
         timeOfDay: template.timeOfDay,
-        weekday: template.weekday,
+        weekdays: template.weekdays ?? [],
         dayOfMonth: template.dayOfMonth,
         priority: template.priority,
         active: false,

@@ -33,7 +33,7 @@ export type ChecklistTemplate = {
   title: string;
   recurrence: 'DAILY' | 'WEEKLY' | 'MONTHLY';
   timeOfDay: string;
-  weekday?: number;
+  weekdays?: number[];
   dayOfMonth?: number;
   priority: 'HIGH' | 'NORMAL' | 'LOW';
 };
@@ -122,7 +122,7 @@ export const TEMPLATES: Template[] = [
     title: 'Weekly safety check',
     recurrence: 'WEEKLY',
     timeOfDay: '09:30',
-    weekday: 1,
+    weekdays: [1],
     priority: 'HIGH',
   },
 ];

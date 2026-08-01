@@ -333,7 +333,7 @@ model ChecklistRule {
 
   recurrence  Recurrence
   timeOfDay   String     // "09:00" — us din kis waqt due hoga
-  weekday     Int?       // WEEKLY ke liye: 1=Mon ... 7=Sun
+  weekdays    Int[]      @default([]) // WEEKLY ke liye: set of 1=Mon ... 7=Sun (multi-select)
   dayOfMonth  Int?       // MONTHLY ke liye: 1-28
 
   priority    String     @default("NORMAL")
