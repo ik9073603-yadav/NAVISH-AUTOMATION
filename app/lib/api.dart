@@ -509,6 +509,20 @@ class Api {
     return jsonDecode(res.body);
   }
 
+  // AI-assisted flow setup — describe the process, get back stage
+  // suggestions in the same shape createFlow expects. Never applies
+  // anything itself.
+  static Future<List<dynamic>> suggestFlowStages(String description) async {
+    final res = await _client.post(
+      Uri.parse('${Config.apiBase}/api/fms/flows/suggest'),
+      headers: _headers,
+      body: jsonEncode({'description': description}),
+    );
+    final data = jsonDecode(res.body);
+    if (res.statusCode != 200) throw Exception(data['error'] ?? 'Failed to get AI suggestions');
+    return data['stages'] as List<dynamic>;
+  }
+
   static Future<void> createFlow({
     required String name,
     required String prefix,

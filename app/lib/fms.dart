@@ -14,6 +14,7 @@ import 'time_format.dart';
 import 'widgets/motion.dart';
 import 'widgets/cost_of_delay_info.dart';
 import 'offline/write_queue.dart';
+import 'l10n/gen/app_localizations.dart';
 
 class FmsScreen extends StatefulWidget {
   final String? currentUserId;
@@ -35,6 +36,7 @@ class _FmsScreenState extends State<FmsScreen> {
   DateRangePreset _datePreset = DateRangePreset.all;
   String? _assigneeId;
   int _loadRequestId = 0;
+  bool _aiConfigured = false;
 
   // Owner never executes; only the stage's responsible person (or anyone,
   // if the stage has no assigned responsible) may complete it.
@@ -48,6 +50,11 @@ class _FmsScreenState extends State<FmsScreen> {
   void initState() {
     super.initState();
     _load();
+    // Best-effort — if this fails, the AI setup option just doesn't show;
+    // no need to block the screen or error-toast over it.
+    Api.aiConfigStatus().then((s) {
+      if (mounted) setState(() => _aiConfigured = s['configured'] == true);
+    }).catchError((_) {});
   }
 
   Future<void> _load() async {
@@ -437,11 +444,21 @@ class _FmsScreenState extends State<FmsScreen> {
   }
 
   Future<void> _newFlow() async {
+    final l10n = AppLocalizations.of(context);
     final choice = await showDialog<String>(
       context: context,
       builder: (_) => SimpleDialog(
         title: const Text('New flow'),
         children: [
+          if (_aiConfigured)
+            SimpleDialogOption(
+              onPressed: () => Navigator.pop(context, 'ai'),
+              child: Row(children: [
+                const Icon(Icons.auto_awesome, size: 18),
+                const SizedBox(width: 8),
+                Text(l10n.aiSetupOption),
+              ]),
+            ),
           SimpleDialogOption(
             onPressed: () => Navigator.pop(context, 'template'),
             child: const Text('Start from template'),
@@ -462,6 +479,13 @@ class _FmsScreenState extends State<FmsScreen> {
         builder: (_) => const _FlowBuilderSheet(),
       );
       if (ok == true) _load();
+      return;
+    }
+
+    if (choice == 'ai') {
+      final created = await Navigator.push<bool>(
+        context, MaterialPageRoute(builder: (_) => const _AiDescribeFlowScreen()));
+      if (created == true) _load();
       return;
     }
 
@@ -915,12 +939,32 @@ class _FlowBuilderSheetState extends State<_FlowBuilderSheet> {
 
 // Stage ka draft — plannedMins null = unplanned
 class _StageDraft {
+  // Stable identity across reorders (list index isn't stable when dragged).
+  final Key uiKey = UniqueKey();
   String name = '';
   String? responsibleId;
   bool hasPlannedTime = false;
   int? planValue;
   String planUnit = 'minutes';
   List<Map<String, dynamic>> fields = [];
+
+  _StageDraft();
+
+  // Built from an AI-suggested stage ({name, plannedMins, fields}) — plannedMins
+  // is already in minutes and already follows the FMS rule (null for the
+  // first stage, a number for every stage after it; see suggestFlowStages
+  // in ai.service.ts), so it's used as-is.
+  _StageDraft.fromSuggestion(Map<String, dynamic> s) {
+    name = (s['name'] as String?) ?? '';
+    final mins = s['plannedMins'];
+    if (mins is num) {
+      hasPlannedTime = true;
+      planValue = mins.toInt();
+    }
+    fields = ((s['fields'] as List?) ?? [])
+        .map((f) => Map<String, dynamic>.from(f as Map))
+        .toList();
+  }
 
   int? get plannedMins {
     if (!hasPlannedTime || planValue == null) return null;
@@ -950,6 +994,7 @@ class _StageCard extends StatelessWidget {
   final VoidCallback onChanged;
 
   const _StageCard({
+    super.key,
     required this.index,
     required this.draft,
     required this.users,
@@ -1165,6 +1210,289 @@ class _FieldDialogState extends State<_FieldDialog> {
           child: const Text('Add'),
         ),
       ],
+    );
+  }
+}
+
+// ---------------- AI SETUP: DESCRIBE PROCESS ----------------
+// Step 1 of 2. Only reachable when the user already has an AI key configured
+// (see _FmsScreenState). Uses THEIR key server-side — see suggestFlowStages()
+// in ai.service.ts; nothing here ever sees the key.
+class _AiDescribeFlowScreen extends StatefulWidget {
+  const _AiDescribeFlowScreen();
+  @override
+  State<_AiDescribeFlowScreen> createState() => _AiDescribeFlowScreenState();
+}
+
+class _AiDescribeFlowScreenState extends State<_AiDescribeFlowScreen> {
+  final _description = TextEditingController();
+  bool _loading = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    _description.dispose();
+    super.dispose();
+  }
+
+  Future<void> _suggest() async {
+    final l10n = AppLocalizations.of(context);
+    final text = _description.text.trim();
+    if (text.isEmpty) {
+      setState(() => _error = l10n.aiDescribeFlowEmpty);
+      return;
+    }
+    setState(() { _loading = true; _error = null; });
+    try {
+      final stages = await Api.suggestFlowStages(text);
+      if (!mounted) return;
+      final created = await Navigator.push<bool>(
+        context,
+        MaterialPageRoute(builder: (_) => _AiPreviewFlowScreen(suggested: stages)),
+      );
+      if (!mounted) return;
+      if (created == true) {
+        Navigator.pop(context, true);
+        return;
+      }
+      setState(() => _loading = false);
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = e.toString().replaceAll('Exception: ', '');
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.aiDescribeFlowTitle)),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              l10n.aiDescribeFlowHelp,
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _description,
+              maxLines: 3,
+              autofocus: true,
+              decoration: InputDecoration(
+                hintText: l10n.aiDescribeFlowHint,
+                border: const OutlineInputBorder(),
+              ),
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(_error!, style: TextStyle(color: AppColors.of(context).danger)),
+            ],
+            const SizedBox(height: 16),
+            FilledButton.icon(
+              onPressed: _loading ? null : _suggest,
+              icon: _loading
+                  ? const SizedBox(
+                      width: 16, height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_awesome),
+              label: Text(_loading ? l10n.suggestingFields : l10n.suggestFlowStagesAction),
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------- AI SETUP: EDITABLE PREVIEW ----------------
+// Step 2 of 2. Nothing is created until "Create flow" is pressed — every
+// edit/reorder/remove here only touches this screen's local list. The AI
+// only suggests stages, so name/prefix/itemLabel are collected here too,
+// then the whole flow is created with one Api.createFlow call (unlike the
+// SKU-field/checklist AI setup, which creates items one at a time — FMS
+// already accepts the full stage list in a single request).
+class _AiPreviewFlowScreen extends StatefulWidget {
+  final List<dynamic> suggested;
+  const _AiPreviewFlowScreen({required this.suggested});
+  @override
+  State<_AiPreviewFlowScreen> createState() => _AiPreviewFlowScreenState();
+}
+
+class _AiPreviewFlowScreenState extends State<_AiPreviewFlowScreen> {
+  final _name = TextEditingController();
+  final _prefix = TextEditingController(text: 'ORD');
+  final _itemLabel = TextEditingController(text: 'Order');
+  late List<_StageDraft> _stages;
+  List<dynamic> _users = [];
+  bool _saving = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _stages = widget.suggested
+        .map((s) => _StageDraft.fromSuggestion(Map<String, dynamic>.from(s as Map)))
+        .toList();
+    Api.users().then((u) {
+      if (mounted) setState(() => _users = u);
+    }).catchError((e) {
+      if (mounted) showApiError(context, e);
+    });
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _prefix.dispose();
+    _itemLabel.dispose();
+    super.dispose();
+  }
+
+  // onReorderItem (unlike the deprecated onReorder) already adjusts newIndex
+  // for the removed item at oldIndex — no manual -1 needed here.
+  void _reorder(int oldIndex, int newIndex) {
+    setState(() {
+      final draft = _stages.removeAt(oldIndex);
+      _stages.insert(newIndex, draft);
+    });
+  }
+
+  Future<void> _confirm() async {
+    final l10n = AppLocalizations.of(context);
+    if (_name.text.trim().length < 2 || _stages.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Flow needs a name and at least one stage')),
+      );
+      return;
+    }
+    if (_stages.any((s) => s.name.trim().isEmpty)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Every stage needs a name')),
+      );
+      return;
+    }
+
+    setState(() => _saving = true);
+    try {
+      await Api.createFlow(
+        name: _name.text.trim(),
+        prefix: _prefix.text.trim().toUpperCase(),
+        itemLabel: _itemLabel.text.trim(),
+        stages: _stages.map((s) => s.toJson()).toList(),
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(l10n.flowCreatedMessage)));
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (mounted) {
+        showApiError(context, e);
+        setState(() => _saving = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context);
+    return Scaffold(
+      appBar: AppBar(title: Text(l10n.aiPreviewFlowTitle)),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                l10n.aiPreviewHelp,
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ),
+            ),
+          ),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  TextField(
+                    controller: _name,
+                    decoration: const InputDecoration(
+                      labelText: 'Flow name (e.g. Order to Delivery)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _itemLabel,
+                    decoration: const InputDecoration(
+                      labelText: 'What do you call each one?',
+                      hintText: 'Order / Batch / Job / Ticket / Lot',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _prefix,
+                    decoration: const InputDecoration(
+                      labelText: 'Order prefix (e.g. ORD)',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('STAGES', style: AppTheme.eyebrow(context)),
+                  ),
+                  const SizedBox(height: 8),
+                  if (_stages.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 24),
+                      child: Center(child: Text(l10n.aiPreviewFlowEmpty)),
+                    )
+                  else
+                    ReorderableListView(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      onReorderItem: _reorder,
+                      children: [
+                        for (final entry in _stages.asMap().entries)
+                          _StageCard(
+                            key: entry.value.uiKey,
+                            index: entry.key,
+                            draft: entry.value,
+                            users: _users,
+                            onRemove: () => setState(() => _stages.removeAt(entry.key)),
+                            onChanged: () => setState(() {}),
+                          ),
+                      ],
+                    ),
+                  OutlinedButton.icon(
+                    onPressed: () => setState(() => _stages.add(_StageDraft())),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Add stage'),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: FilledButton(
+              onPressed: (_saving || _stages.isEmpty) ? null : _confirm,
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(vertical: 16)),
+              child: Text(_saving ? 'Creating...' : l10n.createNStages(_stages.length)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

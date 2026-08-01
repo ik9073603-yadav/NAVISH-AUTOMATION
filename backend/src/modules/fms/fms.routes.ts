@@ -7,11 +7,31 @@ import { parseListQuery, dateRangeFilter } from '../../lib/listFilters';
 import { cached } from '../../lib/cache';
 import { classifyOrdersSla, deriveOrderDetailLabel } from './fms-analytics.service';
 import { loadOrgForCost, stageDelayHours, stageDelayCost, totalPlannedHoursForStages, round2 } from './delay-cost.service';
+import { suggestFlowStages, logUsage } from '../ai/ai.service';
 
 export const fmsRouter = Router();
 fmsRouter.use(requireAuth);
 
 // ---------- FLOW BUILDER ----------
+
+// AI-assisted setup — describe the process in plain language, get back
+// suggestions in the same shape POST /flows already accepts. Never applies
+// anything itself, just returns suggestions for the client to preview.
+const suggestStagesSchema = z.object({ description: z.string().min(2).max(500) });
+
+fmsRouter.post('/flows/suggest', requireRole('OWNER', 'MANAGER'), async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const parsed = suggestStagesSchema.safeParse(req.body);
+    if (!parsed.success) return res.status(400).json({ error: 'Validation failed', details: parsed.error.issues });
+
+    const { orgId, userId } = req.user!;
+    const outcome = await suggestFlowStages(userId, parsed.data.description);
+    await logUsage(userId, orgId, outcome.provider, outcome.model, 'ASSIST', outcome.usage);
+
+    res.json({ stages: outcome.stages });
+  } catch (err) { next(err); }
+});
+
 const flowSchema = z.object({
   name: z.string().min(2),
   prefix: z.string().min(1).max(6),

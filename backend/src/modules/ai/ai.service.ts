@@ -399,6 +399,137 @@ export async function suggestChecklistItems(
   return { ...result, provider: config.provider, model: config.model, items };
 }
 
+// ─────────────────────────── FMS flow-stage suggestions ───────────────────────────
+// AI-assisted setup for a company that doesn't know how to break its process
+// into stages (see fms.routes.ts POST /flows) — describe the process in
+// plain language, get back suggestions in the exact shape flow create already
+// accepts. Never applied automatically; the caller always shows these as an
+// editable preview first.
+
+const FLOW_FIELD_TYPES = ['TEXT', 'NUMBER', 'DROPDOWN', 'DATE', 'PHOTO', 'YESNO'] as const;
+type FlowFieldTypeSuggestion = typeof FLOW_FIELD_TYPES[number];
+
+export interface SuggestedFlowField {
+  label: string;
+  type: FlowFieldTypeSuggestion;
+  options?: string;
+  required: boolean;
+}
+
+export interface SuggestedFlowStage {
+  name: string;
+  plannedMins: number | null;
+  fields: SuggestedFlowField[];
+}
+
+function buildFlowStagesSystemPrompt(): string {
+  return [
+    'You set up a multi-stage process flow (FMS) for a small-business operations app.',
+    'Given a short description of a business process, suggest 2 to 8 stages it goes through, in order from start to finish.',
+    'Reply with ONLY a JSON array — no prose, no markdown code fences — in stage order, each item shaped exactly as:',
+    '{"name": string, "plannedMins": number | null, "fields": [{"label": string, "type": "TEXT" | "NUMBER" | "DROPDOWN" | "DATE" | "PHOTO" | "YESNO", "options": string, "required": boolean}]}',
+    'CRITICAL RULE for "plannedMins": the FIRST stage in the array is the entry point — an item can enter it at any time, so it has no deadline and must be plannedMins: null. EVERY stage AFTER the first has its deadline computed from the previous stage\'s completion time, so it MUST have plannedMins set to a realistic positive integer number of minutes for that step.',
+    '"fields" is optional per stage — 0 to 4 fields, only for data genuinely worth recording at that stage; omit it or use an empty array if none.',
+    '"options" is a comma-separated list of choices and must be present ONLY when a field\'s type is "DROPDOWN"; omit it otherwise.',
+    'Use only those exact type values. Stage/field names may be in the same language as the description (English or Hindi), but the JSON keys and type values must stay exactly as specified above.',
+  ].join('\n');
+}
+
+const FLOW_FIELD_TYPE_ALIASES: Record<string, FlowFieldTypeSuggestion> = {
+  TEXT: 'TEXT', STRING: 'TEXT',
+  NUMBER: 'NUMBER', NUMERIC: 'NUMBER', INT: 'NUMBER', INTEGER: 'NUMBER', FLOAT: 'NUMBER', DECIMAL: 'NUMBER',
+  DATE: 'DATE',
+  DROPDOWN: 'DROPDOWN', SELECT: 'DROPDOWN', ENUM: 'DROPDOWN', CHOICE: 'DROPDOWN',
+  YESNO: 'YESNO', YES_NO: 'YESNO', BOOLEAN: 'YESNO', BOOL: 'YESNO',
+  PHOTO: 'PHOTO', IMAGE: 'PHOTO', PICTURE: 'PHOTO',
+};
+
+function normalizeFlowFields(raw: unknown): SuggestedFlowField[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SuggestedFlowField[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as Record<string, unknown>;
+
+    const label = typeof obj.label === 'string' ? obj.label.trim() : '';
+    if (!label) continue;
+
+    const typeKey = typeof obj.type === 'string' ? obj.type.trim().toUpperCase().replace(/[\s-]+/g, '_') : '';
+    const type = FLOW_FIELD_TYPE_ALIASES[typeKey];
+    if (!type) continue;
+
+    let options: string | undefined;
+    if (type === 'DROPDOWN') {
+      if (Array.isArray(obj.options)) options = obj.options.map(String).join(',');
+      else if (typeof obj.options === 'string') options = obj.options;
+    }
+
+    out.push({
+      label: label.slice(0, 60),
+      type,
+      options: options?.slice(0, 300),
+      required: obj.required === true,
+    });
+  }
+  return out.slice(0, 4); // asked the model for 0-4 per stage; hard cap regardless
+}
+
+// Lenient by design, same spirit as normalizeSuggestions for SKU fields — an
+// LLM's minor deviations should drop that one suggestion, not fail the batch.
+// The plannedMins rule, however, is enforced regardless of what the model
+// returned (see comment at the bottom): the FMS deadline cascade depends on
+// exactly this nullability shape.
+export function normalizeFlowStageSuggestions(raw: unknown[]): SuggestedFlowStage[] {
+  const out: SuggestedFlowStage[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const obj = item as Record<string, unknown>;
+
+    const name = typeof obj.name === 'string' ? obj.name.trim() : '';
+    if (!name) continue;
+
+    const plannedMinsRaw = Number(obj.plannedMins);
+    const plannedMins = Number.isFinite(plannedMinsRaw) && plannedMinsRaw > 0 ? Math.round(plannedMinsRaw) : null;
+
+    out.push({ name: name.slice(0, 60), plannedMins, fields: normalizeFlowFields(obj.fields) });
+  }
+  const capped = out.slice(0, 10); // asked the model for 2-8; hard cap regardless of what comes back
+
+  // The FMS rule (see StageDef.plannedMins / advanceOrder's working-time
+  // cascade): the first stage is the unplanned entry point — no deadline, no
+  // chasing, never stuck. Every later stage's deadline is computed from the
+  // previous stage's actual completion time, so it needs a real duration —
+  // a stray null there would silently disable chasing for that step.
+  return capped.map((s, i) => (
+    i === 0 ? { ...s, plannedMins: null } : { ...s, plannedMins: s.plannedMins ?? 60 }
+  ));
+}
+
+export async function suggestFlowStages(
+  userId: string, description: string,
+): Promise<AiCallOutcome & { stages: SuggestedFlowStage[] }> {
+  const config = await getDecryptedConfig(userId);
+  if (!config) throw Object.assign(new Error('Connect an AI provider in your profile first'), { status: 400 });
+
+  // Token-bounded on purpose — only the description goes out, never any real
+  // company data.
+  const trimmedDescription = description.trim().slice(0, 500);
+  const result = await callAI({
+    provider: config.provider, apiKey: config.apiKey, model: config.model,
+    systemPrompt: buildFlowStagesSystemPrompt(), userPrompt: trimmedDescription,
+  });
+
+  const stages = normalizeFlowStageSuggestions(extractJsonArray(result.text));
+  if (stages.length === 0) {
+    throw Object.assign(
+      new Error('AI could not suggest a flow for that description — try rephrasing, or build it manually'),
+      { status: 502 },
+    );
+  }
+
+  return { ...result, provider: config.provider, model: config.model, stages };
+}
+
 export async function testConnection(provider: AiProviderName, apiKey: string, model: string): Promise<void> {
   await callAI({
     provider, apiKey, model: model || DEFAULT_MODEL[provider],

@@ -307,5 +307,15 @@
   "createNChecklistItems": "{count} आइटम बनाएं",
   "checklistItemsCreatedMessage": "{count} आइटम बनाए गए",
   "editChecklistItem": "आइटम संपादित करें",
-  "addChecklistItem": "आइटम जोड़ें"
+  "addChecklistItem": "आइटम जोड़ें",
+
+  "aiDescribeFlowTitle": "अपनी प्रक्रिया के बारे में बताएं",
+  "aiDescribeFlowHelp": "थोड़े शब्दों में बताएं कि शुरू से अंत तक क्या होता है? AI क्रम में चरण सुझाएगा — बनाने से पहले आप किसी को भी संपादित, फिर से क्रमबद्ध या हटा सकते हैं।",
+  "aiDescribeFlowHint": "जैसे मैं पैकेजिंग का काम करता हूं",
+  "aiDescribeFlowEmpty": "पहले अपनी प्रक्रिया के बारे में बताएं",
+  "suggestFlowStagesAction": "फ़्लो सुझाएं",
+  "aiPreviewFlowTitle": "सुझाया गया फ़्लो",
+  "aiPreviewFlowEmpty": "कोई चरण नहीं बचा — एक जोड़ें या वापस जाएं।",
+  "createNStages": "फ़्लो बनाएं ({count} चरण)",
+  "flowCreatedMessage": "फ़्लो बन गया"
 }

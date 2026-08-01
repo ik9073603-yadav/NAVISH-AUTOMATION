@@ -334,5 +334,16 @@
   "checklistItemsCreatedMessage": "{count} item(s) created",
   "@checklistItemsCreatedMessage": { "placeholders": { "count": {} } },
   "editChecklistItem": "Edit item",
-  "addChecklistItem": "Add item"
+  "addChecklistItem": "Add item",
+
+  "aiDescribeFlowTitle": "Describe your process",
+  "aiDescribeFlowHelp": "In a few words, what happens from start to finish? The AI will suggest ordered stages — you can edit, reorder, or remove any of them before creating.",
+  "aiDescribeFlowHint": "e.g. main packaging ka kaam karta hoon",
+  "aiDescribeFlowEmpty": "Describe your process first",
+  "suggestFlowStagesAction": "Suggest flow",
+  "aiPreviewFlowTitle": "Suggested flow",
+  "aiPreviewFlowEmpty": "No stages left — add one or go back.",
+  "createNStages": "Create flow ({count} stage(s))",
+  "@createNStages": { "placeholders": { "count": {} } },
+  "flowCreatedMessage": "Flow created"
 }

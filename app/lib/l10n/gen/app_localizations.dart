@@ -1813,6 +1813,60 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Add item'**
   String get addChecklistItem;
+
+  /// No description provided for @aiDescribeFlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your process'**
+  String get aiDescribeFlowTitle;
+
+  /// No description provided for @aiDescribeFlowHelp.
+  ///
+  /// In en, this message translates to:
+  /// **'In a few words, what happens from start to finish? The AI will suggest ordered stages — you can edit, reorder, or remove any of them before creating.'**
+  String get aiDescribeFlowHelp;
+
+  /// No description provided for @aiDescribeFlowHint.
+  ///
+  /// In en, this message translates to:
+  /// **'e.g. main packaging ka kaam karta hoon'**
+  String get aiDescribeFlowHint;
+
+  /// No description provided for @aiDescribeFlowEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'Describe your process first'**
+  String get aiDescribeFlowEmpty;
+
+  /// No description provided for @suggestFlowStagesAction.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggest flow'**
+  String get suggestFlowStagesAction;
+
+  /// No description provided for @aiPreviewFlowTitle.
+  ///
+  /// In en, this message translates to:
+  /// **'Suggested flow'**
+  String get aiPreviewFlowTitle;
+
+  /// No description provided for @aiPreviewFlowEmpty.
+  ///
+  /// In en, this message translates to:
+  /// **'No stages left — add one or go back.'**
+  String get aiPreviewFlowEmpty;
+
+  /// No description provided for @createNStages.
+  ///
+  /// In en, this message translates to:
+  /// **'Create flow ({count} stage(s))'**
+  String createNStages(Object count);
+
+  /// No description provided for @flowCreatedMessage.
+  ///
+  /// In en, this message translates to:
+  /// **'Flow created'**
+  String get flowCreatedMessage;
 }
 
 class _AppLocalizationsDelegate

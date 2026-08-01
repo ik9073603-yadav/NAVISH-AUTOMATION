@@ -940,4 +940,34 @@ class AppLocalizationsHi extends AppLocalizations {
 
   @override
   String get addChecklistItem => 'आइटम जोड़ें';
+
+  @override
+  String get aiDescribeFlowTitle => 'अपनी प्रक्रिया के बारे में बताएं';
+
+  @override
+  String get aiDescribeFlowHelp =>
+      'थोड़े शब्दों में बताएं कि शुरू से अंत तक क्या होता है? AI क्रम में चरण सुझाएगा — बनाने से पहले आप किसी को भी संपादित, फिर से क्रमबद्ध या हटा सकते हैं।';
+
+  @override
+  String get aiDescribeFlowHint => 'जैसे मैं पैकेजिंग का काम करता हूं';
+
+  @override
+  String get aiDescribeFlowEmpty => 'पहले अपनी प्रक्रिया के बारे में बताएं';
+
+  @override
+  String get suggestFlowStagesAction => 'फ़्लो सुझाएं';
+
+  @override
+  String get aiPreviewFlowTitle => 'सुझाया गया फ़्लो';
+
+  @override
+  String get aiPreviewFlowEmpty => 'कोई चरण नहीं बचा — एक जोड़ें या वापस जाएं।';
+
+  @override
+  String createNStages(Object count) {
+    return 'फ़्लो बनाएं ($count चरण)';
+  }
+
+  @override
+  String get flowCreatedMessage => 'फ़्लो बन गया';
 }
